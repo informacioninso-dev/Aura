@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "set NAPI_RS_FORCE_WASI=1&& vite",
-    "build": "set NAPI_RS_FORCE_WASI=1&& vite build",
+    "dev": "vite",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
