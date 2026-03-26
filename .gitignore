@@ -1,0 +1,22 @@
+.venv/
+
+# Python
+**/__pycache__/
+*.py[cod]
+*.pyo
+
+# Local environment files
+.env
+.env.*
+
+# Backend local database/media
+back/db.sqlite3
+back/media/
+
+# Frontend artifacts (kept here as extra safety in root repo)
+front/node_modules/
+front/dist/
+
+# OS/editor
+.DS_Store
+Thumbs.db

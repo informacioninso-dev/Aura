@@ -1,0 +1,166 @@
+/* ── APP SHELL ── */
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+  background: #0F172A;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 240px;
+  height: 100vh;
+  background: #1E293B;
+  border-right: 1px solid #334155;
+  display: flex;
+  flex-direction: column;
+  z-index: 50;
+}
+
+.sidebar-logo {
+  padding: 24px 20px;
+  border-bottom: 1px solid #334155;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+.sidebar-logo-icon {
+  width: 36px;
+  height: 36px;
+  background: #10B981;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 16px;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(16,185,129,0.3);
+}
+.sidebar-logo-name {
+  font-size: 15px;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: 0.05em;
+}
+.sidebar-logo-tag {
+  font-size: 9px;
+  font-weight: 600;
+  color: #10B981;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-top: 1px;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 16px 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #94A3B8;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+  cursor: pointer;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+.nav-item:hover {
+  background: #334155;
+  color: #E2E8F0;
+}
+.nav-item.active {
+  background: rgba(16,185,129,0.15);
+  color: #10B981;
+  font-weight: 600;
+}
+.nav-item svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+}
+
+.nav-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #475569;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 16px 14px 6px;
+}
+
+.sidebar-footer {
+  padding: 12px;
+  border-top: 1px solid #334155;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-item-danger:hover {
+  background: rgba(239,68,68,0.1);
+  color: #F87171;
+}
+
+/* ── MAIN CONTENT ── */
+.app-main {
+  margin-left: 240px;
+  flex: 1;
+  min-height: 100vh;
+  padding: 36px 40px;
+  background: #0F172A;
+  color: #F8FAFC;
+}
+
+/* ── PAGE HEADER ── */
+.page-header {
+  margin-bottom: 28px;
+}
+.page-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: #fff;
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
+}
+.page-subtitle {
+  font-size: 14px;
+  color: #64748B;
+  margin: 0;
+}
+
+/* ── LOADING SPINNER ── */
+.loading-screen {
+  min-height: 100vh;
+  background: #0F172A;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #334155;
+  border-top-color: #10B981;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

@@ -1,0 +1,7 @@
+<h2>Crear cuenta financiera</h2>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Crear cuenta</button>
+</form>
+<a href="{% url 'login' %}">Ya tengo cuenta</a>
