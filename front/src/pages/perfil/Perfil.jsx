@@ -2,15 +2,16 @@ import { useState } from 'react'
 import { useAuth } from '../../context/useAuth'
 import api from '../../api/client'
 import { User, CheckCircle } from 'lucide-react'
+import '../../components/ui/app.css'
 
 const MONEDAS = ['USD', 'CLP', 'EUR', 'ARS', 'COP', 'MXN', 'PEN']
 
 export default function Perfil() {
   const { user, fetchPerfil } = useAuth()
-  const [form, setForm] = useState({ username: user?.username || '', moneda_preferida: user?.moneda_preferida || 'USD' })
+  const [form, setForm]       = useState({ username: user?.username || '', moneda_preferida: user?.moneda_preferida || 'USD' })
   const [loading, setLoading] = useState(false)
-  const [ok, setOk] = useState(false)
-  const [error, setError] = useState('')
+  const [ok, setOk]           = useState(false)
+  const [error, setError]     = useState('')
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -26,57 +27,61 @@ export default function Perfil() {
   }
 
   return (
-    <div className="max-w-lg space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Perfil</h1>
-        <p className="text-[#94A3B8] text-sm mt-1">Información de tu cuenta</p>
+    <div style={{ maxWidth: 520 }}>
+      <div className="page-header">
+        <h1 className="page-title">Tu perfil</h1>
+        <p className="page-subtitle">Personaliza tu cuenta y preferencias</p>
       </div>
 
-      <div className="bg-[#1E293B] rounded-xl border border-[#334155] p-6">
-        <div className="flex items-center gap-4 mb-6 pb-6 border-b border-[#334155]">
-          <div className="w-14 h-14 bg-[#10B981]/20 border border-[#10B981]/30 rounded-full flex items-center justify-center">
-            <User size={24} className="text-[#10B981]" />
+      <div className="card">
+        {/* Avatar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, paddingBottom: 24, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'linear-gradient(135deg, rgba(196,135,246,0.25), rgba(16,185,129,0.20))', border: '1.5px solid rgba(196,135,246,0.30)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <User size={24} style={{ color: '#C487F6' }} />
           </div>
           <div>
-            <p className="font-semibold text-white">{user?.username}</p>
-            <p className="text-sm text-[#94A3B8]">{user?.email}</p>
+            <p style={{ fontWeight: 700, color: '#fff', fontSize: 16 }}>{user?.username}</p>
+            <p style={{ color: 'rgba(255,255,255,0.40)', fontSize: 13 }}>{user?.email}</p>
           </div>
         </div>
 
         {error && (
-          <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">{error}</div>
+          <div style={{ background: 'rgba(248,113,113,0.10)', border: '1px solid rgba(248,113,113,0.25)', color: '#FCA5A5', borderRadius: 12, padding: '12px 16px', fontSize: 13, marginBottom: 20 }}>
+            {error}
+          </div>
         )}
         {ok && (
-          <div className="bg-[#10B981]/10 border border-[#10B981]/30 text-[#10B981] rounded-lg px-4 py-3 text-sm mb-4 flex items-center gap-2">
-            <CheckCircle size={16} /> Cambios guardados
+          <div style={{ background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.25)', color: '#10B981', borderRadius: 12, padding: '12px 16px', fontSize: 13, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <CheckCircle size={15} /> Cambios guardados
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-sm text-[#94A3B8] block mb-1.5">Nombre de usuario</label>
-            <input value={form.username} onChange={e => setForm({ ...form, username: e.target.value })}
-              className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-[#10B981]" />
+        <form onSubmit={handleSubmit}>
+          <div className="form-modal-group">
+            <label className="form-modal-label">Nombre de usuario</label>
+            <input className="form-modal-input" value={form.username}
+              onChange={e => setForm({ ...form, username: e.target.value })} />
           </div>
-          <div>
-            <label className="text-sm text-[#94A3B8] block mb-1.5">Correo electrónico</label>
-            <input value={user?.email} disabled
-              className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-4 py-2.5 text-[#475569] cursor-not-allowed" />
+          <div className="form-modal-group">
+            <label className="form-modal-label">Correo electrónico</label>
+            <input className="form-modal-input" value={user?.email} disabled
+              style={{ opacity: 0.4, cursor: 'not-allowed' }} />
           </div>
-          <div>
-            <label className="text-sm text-[#94A3B8] block mb-1.5">Moneda preferida</label>
-            <select value={form.moneda_preferida} onChange={e => setForm({ ...form, moneda_preferida: e.target.value })}
-              className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-[#10B981]">
+          <div className="form-modal-group">
+            <label className="form-modal-label">Moneda preferida</label>
+            <select className="form-modal-select" value={form.moneda_preferida}
+              onChange={e => setForm({ ...form, moneda_preferida: e.target.value })}>
               {MONEDAS.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
-          <div>
-            <label className="text-sm text-[#94A3B8] block mb-1.5">Miembro desde</label>
-            <input value={user?.fecha_registro ? new Date(user.fecha_registro).toLocaleDateString('es-CL') : ''} disabled
-              className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-4 py-2.5 text-[#475569] cursor-not-allowed" />
+          <div className="form-modal-group">
+            <label className="form-modal-label">Miembro desde</label>
+            <input className="form-modal-input"
+              value={user?.fecha_registro ? new Date(user.fecha_registro).toLocaleDateString('es-CL') : ''} disabled
+              style={{ opacity: 0.4, cursor: 'not-allowed' }} />
           </div>
-          <button type="submit" disabled={loading}
-            className="w-full bg-[#10B981] hover:bg-[#059669] disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg transition-colors">
+          <button type="submit" className="btn-modal-save" disabled={loading}
+            style={{ width: '100%', padding: '13px 0', marginTop: 4 }}>
             {loading ? 'Guardando...' : 'Guardar cambios'}
           </button>
         </form>

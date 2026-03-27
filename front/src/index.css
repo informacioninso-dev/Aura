@@ -1,15 +1,23 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
-@theme {
-  --color-aura-dark: #0F172A;
-  --color-aura-green: #10B981;
-  --color-aura-green-dark: #059669;
-  --color-aura-green-light: #34D399;
-  --color-aura-slate: #1E293B;
-  --color-aura-slate-light: #334155;
-  --color-aura-text: #94A3B8;
-  --color-aura-text-light: #CBD5E1;
-  --color-aura-white: #F8FAFC;
+/* ── DESIGN TOKENS ── */
+:root {
+  --dark:       #0F172A;
+  --dark-2:     #1A2540;
+  --dark-3:     #1E2D4A;
+  --green:      #10B981;
+  --green-glow: rgba(16,185,129,0.25);
+  --lila:       #C487F6;
+  --lila-glow:  rgba(196,135,246,0.25);
+  --cream:      #F7F1E1;
+  --text-muted: rgba(255,255,255,0.45);
+  --text-soft:  rgba(255,255,255,0.70);
+  --border:     rgba(255,255,255,0.08);
+  --glass-bg:   rgba(255,255,255,0.05);
+  --glass-bg-2: rgba(255,255,255,0.08);
+  --grad:       linear-gradient(135deg, #C487F6 0%, #10B981 100%);
+  --grad-r:     linear-gradient(135deg, #10B981 0%, #C487F6 100%);
 }
 
 * {
@@ -19,21 +27,19 @@
 }
 
 body {
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
+  background: #0F172A;
+  color: #fff;
 }
 
 #root {
   min-height: 100vh;
 }
 
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #1E293B;
-}
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 3px;
+  background: rgba(196,135,246,0.3);
+  border-radius: 10px;
 }

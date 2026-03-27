@@ -1,9 +1,13 @@
-/* ── APP SHELL ── */
+/* ══════════════════════════════════════════
+   LAYOUT — Sidebar + App Shell
+   Dark · Glassmorphism · Lila accent
+   ══════════════════════════════════════════ */
+
 .app-shell {
   display: flex;
   min-height: 100vh;
   background: #0F172A;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
 }
 
 /* ── SIDEBAR ── */
@@ -13,8 +17,10 @@
   left: 0;
   width: 240px;
   height: 100vh;
-  background: #1E293B;
-  border-right: 1px solid #334155;
+  background: rgba(26,37,64,0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(255,255,255,0.06);
   display: flex;
   flex-direction: column;
   z-index: 50;
@@ -22,7 +28,7 @@
 
 .sidebar-logo {
   padding: 24px 20px;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -31,7 +37,7 @@
 .sidebar-logo-icon {
   width: 36px;
   height: 36px;
-  background: #10B981;
+  background: linear-gradient(135deg, #C487F6, #10B981);
   border-radius: 10px;
   display: flex;
   align-items: center;
@@ -40,19 +46,19 @@
   font-size: 16px;
   color: #fff;
   flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(16,185,129,0.3);
+  box-shadow: 0 4px 16px rgba(196,135,246,0.40);
 }
 .sidebar-logo-name {
   font-size: 15px;
   font-weight: 900;
   color: #fff;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
 }
 .sidebar-logo-tag {
   font-size: 9px;
   font-weight: 600;
-  color: #10B981;
-  letter-spacing: 0.1em;
+  color: #C487F6;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   margin-top: 1px;
 }
@@ -71,10 +77,10 @@
   align-items: center;
   gap: 11px;
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: 12px;
   font-size: 14px;
   font-weight: 500;
-  color: #94A3B8;
+  color: rgba(255,255,255,0.45);
   text-decoration: none;
   transition: background 0.15s, color 0.15s;
   cursor: pointer;
@@ -82,15 +88,17 @@
   background: none;
   width: 100%;
   text-align: left;
+  font-family: inherit;
 }
 .nav-item:hover {
-  background: #334155;
-  color: #E2E8F0;
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.85);
 }
 .nav-item.active {
-  background: rgba(16,185,129,0.15);
-  color: #10B981;
+  background: linear-gradient(135deg, rgba(196,135,246,0.18), rgba(16,185,129,0.12));
+  color: #C487F6;
   font-weight: 600;
+  border: 1px solid rgba(196,135,246,0.18);
 }
 .nav-item svg {
   width: 17px;
@@ -101,23 +109,23 @@
 .nav-section-label {
   font-size: 10px;
   font-weight: 700;
-  color: #475569;
-  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.25);
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   padding: 16px 14px 6px;
 }
 
 .sidebar-footer {
   padding: 12px;
-  border-top: 1px solid #334155;
+  border-top: 1px solid rgba(255,255,255,0.06);
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
 .nav-item-danger:hover {
-  background: rgba(239,68,68,0.1);
-  color: #F87171;
+  background: rgba(239,68,68,0.10);
+  color: #FCA5A5;
 }
 
 /* ── MAIN CONTENT ── */
@@ -127,27 +135,27 @@
   min-height: 100vh;
   padding: 36px 40px;
   background: #0F172A;
-  color: #F8FAFC;
+  color: #fff;
 }
 
 /* ── PAGE HEADER ── */
 .page-header {
-  margin-bottom: 28px;
+  margin-bottom: 32px;
 }
 .page-title {
   font-size: 24px;
   font-weight: 800;
   color: #fff;
   margin: 0 0 4px;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.4px;
 }
 .page-subtitle {
   font-size: 14px;
-  color: #64748B;
+  color: rgba(255,255,255,0.40);
   margin: 0;
 }
 
-/* ── LOADING SPINNER ── */
+/* ── LOADING ── */
 .loading-screen {
   min-height: 100vh;
   background: #0F172A;
@@ -158,8 +166,8 @@
 .spinner {
   width: 36px;
   height: 36px;
-  border: 3px solid #334155;
-  border-top-color: #10B981;
+  border: 3px solid rgba(255,255,255,0.08);
+  border-top-color: #C487F6;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }

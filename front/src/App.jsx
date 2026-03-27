@@ -11,6 +11,9 @@ import GastosNoCorrientes from './pages/gastos/GastosNoCorrientes'
 import Diferidos from './pages/diferidos/Diferidos'
 import Simulador from './pages/simulador/Simulador'
 import Perfil from './pages/perfil/Perfil'
+import Presupuesto from './pages/presupuesto/Presupuesto'
+import Importar from './pages/importar/Importar'
+import Reporte from './pages/reporte/Reporte'
 
 export default function App() {
   return (
@@ -27,6 +30,9 @@ export default function App() {
             <Route path="/gastos-no-corrientes" element={<GastosNoCorrientes />} />
             <Route path="/diferidos" element={<Diferidos />} />
             <Route path="/simulador" element={<Simulador />} />
+            <Route path="/presupuesto" element={<Presupuesto />} />
+            <Route path="/importar" element={<Importar />} />
+            <Route path="/reporte" element={<Reporte />} />
             <Route path="/perfil" element={<Perfil />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

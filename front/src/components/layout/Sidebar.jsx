@@ -3,11 +3,11 @@ import { useAuth } from '../../context/useAuth'
 import './layout.css'
 
 const navItems = [
-  { to: '/dashboard',            icon: '◈', label: 'Dashboard' },
-  { to: '/ingresos',             icon: '↑', label: 'Ingresos' },
-  { to: '/gastos-corrientes',    icon: '↓', label: 'Gastos Corrientes' },
-  { to: '/gastos-no-corrientes', icon: '◉', label: 'Gastos No Corrientes' },
-  { to: '/diferidos',            icon: '⊞', label: 'Diferidos' },
+  { to: '/dashboard',            icon: '◈', label: 'Mi dinero' },
+  { to: '/ingresos',             icon: '↑', label: 'Lo que entra' },
+  { to: '/gastos-corrientes',    icon: '↓', label: 'Lo que sale' },
+  { to: '/gastos-no-corrientes', icon: '◉', label: 'Gastos puntuales' },
+  { to: '/diferidos',            icon: '⊞', label: 'Cuotas' },
 ]
 
 export default function Sidebar() {
@@ -44,11 +44,32 @@ export default function Sidebar() {
 
         <div className="nav-section-label" style={{ marginTop: 8 }}>Herramientas</div>
         <NavLink
+          to="/presupuesto"
+          className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+        >
+          <span style={{ fontSize: 16, lineHeight: 1 }}>◑</span>
+          Categorías
+        </NavLink>
+        <NavLink
           to="/simulador"
           className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
         >
           <span style={{ fontSize: 16, lineHeight: 1 }}>⬡</span>
           Simulador
+        </NavLink>
+        <NavLink
+          to="/importar"
+          className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+        >
+          <span style={{ fontSize: 16, lineHeight: 1 }}>⤒</span>
+          Importar historial
+        </NavLink>
+        <NavLink
+          to="/reporte"
+          className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+        >
+          <span style={{ fontSize: 16, lineHeight: 1 }}>≡</span>
+          Reportes
         </NavLink>
       </nav>
 

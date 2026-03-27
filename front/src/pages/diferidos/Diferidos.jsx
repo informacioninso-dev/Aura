@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Plus, Pencil, Trash2, CreditCard } from 'lucide-react'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 import api from '../../api/client'
 import Modal from '../../components/ui/Modal'
-
-const CATEGORIAS = ['vivienda', 'alimentacion', 'transporte', 'salud', 'educacion', 'entretenimiento', 'ropa', 'servicios', 'tecnologia', 'deudas', 'ahorro', 'otro']
+import { useCategorias } from '../../hooks/useCategorias'
+import '../../components/ui/app.css'
 const EMPTY = { descripcion: '', categoria: 'otro', monto_total: '', num_cuotas: '', cuota_mensual: '', fecha_inicio: '', fecha_fin: '', activo: true }
 
 export default function Diferidos() {
-  const [items, setItems] = useState([])
-  const [modal, setModal] = useState(false)
-  const [form, setForm] = useState(EMPTY)
-  const [editId, setEditId] = useState(null)
+  const [items, setItems]     = useState([])
+  const [modal, setModal]     = useState(false)
+  const [form, setForm]       = useState(EMPTY)
+  const [editId, setEditId]   = useState(null)
   const [loading, setLoading] = useState(false)
+  const { categorias }        = useCategorias()
 
   useEffect(() => { fetchItems() }, [])
 
@@ -21,19 +22,36 @@ export default function Diferidos() {
   }
 
   function calcularCuota(monto, cuotas) {
-    if (monto && cuotas && parseFloat(cuotas) > 0) {
+    if (monto && cuotas && parseFloat(cuotas) > 0)
       return (parseFloat(monto) / parseFloat(cuotas)).toFixed(2)
-    }
     return ''
+  }
+
+  function calcularFechaFin(fechaInicio, numCuotas) {
+    if (!fechaInicio || !numCuotas || parseInt(numCuotas) <= 0) return ''
+    const d = new Date(fechaInicio + 'T00:00:00')
+    d.setMonth(d.getMonth() + parseInt(numCuotas))
+    return d.toISOString().split('T')[0]
   }
 
   function handleMontoOrCuotas(field, value) {
     const updated = { ...form, [field]: value }
     updated.cuota_mensual = calcularCuota(
       field === 'monto_total' ? value : form.monto_total,
-      field === 'num_cuotas' ? value : form.num_cuotas
+      field === 'num_cuotas'  ? value : form.num_cuotas
     )
+    const cuotas    = field === 'num_cuotas'    ? value : form.num_cuotas
+    const fechaIni  = form.fecha_inicio
+    updated.fecha_fin = calcularFechaFin(fechaIni, cuotas)
     setForm(updated)
+  }
+
+  function handleFechaInicio(value) {
+    setForm(prev => ({
+      ...prev,
+      fecha_inicio: value,
+      fecha_fin: calcularFechaFin(value, prev.num_cuotas),
+    }))
   }
 
   function openNew() { setForm(EMPTY); setEditId(null); setModal(true) }
@@ -46,7 +64,7 @@ export default function Diferidos() {
     e.preventDefault(); setLoading(true)
     try {
       if (editId) await api.put(`/finanzas/diferidos/${editId}/`, form)
-      else await api.post('/finanzas/diferidos/', form)
+      else        await api.post('/finanzas/diferidos/', form)
       setModal(false); fetchItems()
     } finally { setLoading(false) }
   }
@@ -60,134 +78,146 @@ export default function Diferidos() {
   const totalMensual = items.filter(i => i.activo).reduce((s, i) => s + parseFloat(i.cuota_mensual), 0)
 
   function progreso(item) {
-    const ini = new Date(item.fecha_inicio)
-    const fin = new Date(item.fecha_fin)
-    const hoy = new Date()
-    const total = (fin - ini) / (1000 * 60 * 60 * 24 * 30)
+    const ini  = new Date(item.fecha_inicio)
+    const fin  = new Date(item.fecha_fin)
+    const hoy  = new Date()
+    const total  = (fin - ini) / (1000 * 60 * 60 * 24 * 30)
     const pasado = (hoy - ini) / (1000 * 60 * 60 * 24 * 30)
     return Math.min(100, Math.max(0, Math.round((pasado / total) * 100)))
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div>
+      <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h1 className="text-2xl font-bold text-white">Diferidos</h1>
-          <p className="text-[#94A3B8] text-sm mt-1">Cuota total mensual: <span className="text-purple-400 font-semibold">${totalMensual.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</span></p>
+          <h1 className="page-title">Cuotas y diferidos</h1>
+          <p className="page-subtitle">
+            Total mensual en cuotas:&nbsp;
+            <span style={{ color: '#C487F6', fontWeight: 700 }}>
+              ${totalMensual.toLocaleString('es-CL', { maximumFractionDigits: 0 })}
+            </span>
+          </p>
         </div>
-        <button onClick={openNew} className="flex items-center gap-2 bg-[#10B981] hover:bg-[#059669] text-white font-medium px-4 py-2 rounded-lg transition-colors">
-          <Plus size={16} /> Agregar
-        </button>
+        <button className="btn-add" onClick={openNew}><Plus size={16} /> Agregar</button>
       </div>
 
       {items.length === 0 ? (
-        <div className="bg-[#1E293B] rounded-xl border border-[#334155] flex flex-col items-center justify-center py-16 text-[#475569]">
-          <CreditCard size={32} className="mb-2" />
-          <p>No hay diferidos registrados</p>
+        <div className="card">
+          <div className="empty-state">
+            <div className="empty-icon">💳</div>
+            <p className="empty-text">Sin cuotas registradas</p>
+            <p className="empty-sub">Agrega compras en cuotas o deudas para verlas reflejadas en tu flujo de caja</p>
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
           {items.map(item => {
             const pct = progreso(item)
             return (
-              <div key={item.id} className="bg-[#1E293B] rounded-xl border border-[#334155] p-5">
-                <div className="flex items-start justify-between mb-3">
+              <div key={item.id} className="card" style={{ padding: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
                   <div>
-                    <p className="font-semibold text-white">{item.descripcion}</p>
-                    <p className="text-xs text-[#475569] capitalize mt-0.5">{item.categoria}</p>
+                    <p style={{ fontWeight: 700, color: '#fff', marginBottom: 2 }}>{item.descripcion}</p>
+                    <span className="badge badge-gray" style={{ textTransform: 'capitalize' }}>{item.categoria}</span>
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => openEdit(item)} className="text-[#475569] hover:text-[#10B981] transition-colors"><Pencil size={14} /></button>
-                    <button onClick={() => handleDelete(item.id)} className="text-[#475569] hover:text-red-400 transition-colors"><Trash2 size={14} /></button>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button className="btn-icon edit" onClick={() => openEdit(item)}><Pencil size={14} /></button>
+                    <button className="btn-icon danger" onClick={() => handleDelete(item.id)}><Trash2 size={14} /></button>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', marginBottom: 14 }}>
                   <div>
-                    <p className="text-[#475569] text-xs">Total</p>
-                    <p className="text-white font-medium">${parseFloat(item.monto_total).toLocaleString('es-CL')}</p>
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>Total</p>
+                    <p style={{ fontWeight: 600, color: '#fff' }}>${parseFloat(item.monto_total).toLocaleString('es-CL')}</p>
                   </div>
                   <div>
-                    <p className="text-[#475569] text-xs">Cuota mensual</p>
-                    <p className="text-purple-400 font-semibold">${parseFloat(item.cuota_mensual).toLocaleString('es-CL')}</p>
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>Cuota mensual</p>
+                    <p style={{ fontWeight: 700, color: '#C487F6' }}>${parseFloat(item.cuota_mensual).toLocaleString('es-CL')}</p>
                   </div>
                   <div>
-                    <p className="text-[#475569] text-xs">Cuotas</p>
-                    <p className="text-[#94A3B8]">{item.num_cuotas}</p>
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>Cuotas</p>
+                    <p style={{ color: 'rgba(255,255,255,0.65)' }}>{item.num_cuotas}</p>
                   </div>
                   <div>
-                    <p className="text-[#475569] text-xs">Vence</p>
-                    <p className="text-[#94A3B8]">{item.fecha_fin}</p>
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>Vence</p>
+                    <p style={{ color: 'rgba(255,255,255,0.65)' }}>{item.fecha_fin}</p>
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs text-[#475569]">
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>
                     <span>Progreso</span><span>{pct}%</span>
                   </div>
-                  <div className="w-full bg-[#334155] rounded-full h-1.5">
-                    <div className="bg-purple-500 h-1.5 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                  <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 99, height: 6 }}>
+                    <div style={{ width: `${pct}%`, height: 6, borderRadius: 99, background: 'linear-gradient(90deg, #C487F6, #10B981)', transition: 'width 0.4s' }} />
                   </div>
                 </div>
-                {!item.activo && <span className="text-xs text-[#475569] mt-2 block">Inactivo</span>}
+
+                {!item.activo && (
+                  <span className="badge badge-gray" style={{ marginTop: 10, display: 'inline-block' }}>Inactivo</span>
+                )}
               </div>
             )
           })}
         </div>
       )}
 
-      <Modal open={modal} onClose={() => setModal(false)} title={editId ? 'Editar diferido' : 'Nuevo diferido'}>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-sm text-[#94A3B8] block mb-1.5">Descripción</label>
-            <input required value={form.descripcion} onChange={e => setForm({ ...form, descripcion: e.target.value })}
-              className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-[#10B981]" placeholder="Ej: iPhone 15 Pro" />
+      <Modal open={modal} onClose={() => setModal(false)} title={editId ? 'Editar cuota' : '+ Nueva cuota o diferido'}>
+        <form onSubmit={handleSubmit}>
+          <div className="form-modal-group">
+            <label className="form-modal-label">¿Qué compraste o debes?</label>
+            <input className="form-modal-input" required placeholder="Ej: iPhone, viaje, crédito de consumo..."
+              value={form.descripcion} onChange={e => setForm({ ...form, descripcion: e.target.value })} />
           </div>
-          <div>
-            <label className="text-sm text-[#94A3B8] block mb-1.5">Categoría</label>
-            <select value={form.categoria} onChange={e => setForm({ ...form, categoria: e.target.value })}
-              className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-[#10B981] capitalize">
-              {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+          <div className="form-modal-group">
+            <label className="form-modal-label">Categoría</label>
+            <select className="form-modal-select" value={form.categoria} onChange={e => setForm({ ...form, categoria: e.target.value })}>
+              {categorias.map(c => <option key={c.nombre} value={c.nombre}>{c.icono} {c.nombre}</option>)}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm text-[#94A3B8] block mb-1.5">Monto total</label>
-              <input type="number" required min="0" step="0.01" value={form.monto_total}
-                onChange={e => handleMontoOrCuotas('monto_total', e.target.value)}
-                className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-[#10B981]" placeholder="0" />
+          <div className="form-modal-row">
+            <div className="form-modal-group">
+              <label className="form-modal-label">Monto total</label>
+              <input className="form-modal-input" type="number" required min="0" step="0.01" placeholder="0"
+                value={form.monto_total} onChange={e => handleMontoOrCuotas('monto_total', e.target.value)} />
             </div>
-            <div>
-              <label className="text-sm text-[#94A3B8] block mb-1.5">N° de cuotas</label>
-              <input type="number" required min="1" value={form.num_cuotas}
-                onChange={e => handleMontoOrCuotas('num_cuotas', e.target.value)}
-                className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-[#10B981]" placeholder="12" />
+            <div className="form-modal-group">
+              <label className="form-modal-label">N° de cuotas</label>
+              <input className="form-modal-input" type="number" required min="1" placeholder="12"
+                value={form.num_cuotas} onChange={e => handleMontoOrCuotas('num_cuotas', e.target.value)} />
             </div>
           </div>
-          <div>
-            <label className="text-sm text-[#94A3B8] block mb-1.5">Cuota mensual</label>
-            <input type="number" required min="0" step="0.01" value={form.cuota_mensual}
-              onChange={e => setForm({ ...form, cuota_mensual: e.target.value })}
-              className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-[#10B981]" placeholder="Calculada automáticamente" />
+          <div className="form-modal-group">
+            <label className="form-modal-label">Cuota mensual</label>
+            <input className="form-modal-input" type="number" required min="0" step="0.01" placeholder="Se calcula automático"
+              value={form.cuota_mensual} onChange={e => setForm({ ...form, cuota_mensual: e.target.value })} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm text-[#94A3B8] block mb-1.5">Fecha inicio</label>
-              <input type="date" required value={form.fecha_inicio} onChange={e => setForm({ ...form, fecha_inicio: e.target.value })}
-                className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-[#10B981]" />
+          <div className="form-modal-row">
+            <div className="form-modal-group">
+              <label className="form-modal-label">¿Desde cuándo?</label>
+              <div className="date-input-wrap">
+                <input className="form-modal-input" type="date" required
+                  value={form.fecha_inicio} onChange={e => handleFechaInicio(e.target.value)} />
+              </div>
             </div>
-            <div>
-              <label className="text-sm text-[#94A3B8] block mb-1.5">Fecha fin</label>
-              <input type="date" required value={form.fecha_fin} onChange={e => setForm({ ...form, fecha_fin: e.target.value })}
-                className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-[#10B981]" />
+            <div className="form-modal-group">
+              <label className="form-modal-label">¿Hasta cuándo? <span>(auto)</span></label>
+              <div className="date-input-wrap">
+                <input className="form-modal-input" type="date" required
+                  value={form.fecha_fin} onChange={e => setForm({ ...form, fecha_fin: e.target.value })}
+                  style={form.fecha_fin ? { borderColor: 'rgba(196,135,246,0.40)' } : {}} />
+              </div>
             </div>
           </div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={form.activo} onChange={e => setForm({ ...form, activo: e.target.checked })} className="accent-[#10B981] w-4 h-4" />
-            <span className="text-sm text-[#94A3B8]">Activo</span>
+          <label className="form-modal-check">
+            <input type="checkbox" checked={form.activo} onChange={e => setForm({ ...form, activo: e.target.checked })} />
+            <span>Cuota activa</span>
           </label>
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={() => setModal(false)} className="flex-1 border border-[#334155] text-[#94A3B8] hover:text-white py-2.5 rounded-lg transition-colors">Cancelar</button>
-            <button type="submit" disabled={loading} className="flex-1 bg-[#10B981] hover:bg-[#059669] disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors">
-              {loading ? 'Guardando...' : 'Guardar'}
+          <div className="form-modal-actions">
+            <button type="button" className="btn-modal-cancel" onClick={() => setModal(false)}>Cancelar</button>
+            <button type="submit" className="btn-modal-save" disabled={loading}>
+              {loading ? 'Guardando...' : editId ? 'Guardar cambios' : 'Agregar cuota'}
             </button>
           </div>
         </form>

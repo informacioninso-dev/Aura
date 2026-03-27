@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Plus, Pencil, Trash2, Wallet } from 'lucide-react'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 import api from '../../api/client'
 import Modal from '../../components/ui/Modal'
-
-const CATEGORIAS = ['vivienda', 'alimentacion', 'transporte', 'salud', 'educacion', 'entretenimiento', 'ropa', 'servicios', 'tecnologia', 'deudas', 'ahorro', 'otro']
+import { useCategorias } from '../../hooks/useCategorias'
+import '../../components/ui/app.css'
 const EMPTY = { descripcion: '', categoria: 'otro', monto: '', fecha: '', notas: '' }
 
 export default function GastosNoCorrientes() {
-  const [items, setItems] = useState([])
-  const [modal, setModal] = useState(false)
-  const [form, setForm] = useState(EMPTY)
-  const [editId, setEditId] = useState(null)
+  const [items, setItems]     = useState([])
+  const [modal, setModal]     = useState(false)
+  const [form, setForm]       = useState(EMPTY)
+  const [editId, setEditId]   = useState(null)
   const [loading, setLoading] = useState(false)
+  const { categorias }        = useCategorias()
 
   useEffect(() => { fetchItems() }, [])
 
@@ -30,7 +31,7 @@ export default function GastosNoCorrientes() {
     e.preventDefault(); setLoading(true)
     try {
       if (editId) await api.put(`/finanzas/gastos-no-corrientes/${editId}/`, form)
-      else await api.post('/finanzas/gastos-no-corrientes/', form)
+      else        await api.post('/finanzas/gastos-no-corrientes/', form)
       setModal(false); fetchItems()
     } finally { setLoading(false) }
   }
@@ -44,88 +45,92 @@ export default function GastosNoCorrientes() {
   const total = items.reduce((s, i) => s + parseFloat(i.monto), 0)
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div>
+      <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h1 className="text-2xl font-bold text-white">Gastos No Corrientes</h1>
-          <p className="text-[#94A3B8] text-sm mt-1">Total registrado: <span className="text-amber-400 font-semibold">${total.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</span></p>
+          <h1 className="page-title">Gastos puntuales</h1>
+          <p className="page-subtitle">
+            Total registrado:&nbsp;
+            <span style={{ color: '#F87171', fontWeight: 700 }}>
+              ${total.toLocaleString('es-CL', { maximumFractionDigits: 0 })}
+            </span>
+          </p>
         </div>
-        <button onClick={openNew} className="flex items-center gap-2 bg-[#10B981] hover:bg-[#059669] text-white font-medium px-4 py-2 rounded-lg transition-colors">
-          <Plus size={16} /> Agregar
-        </button>
+        <button className="btn-add" onClick={openNew}><Plus size={16} /> Agregar</button>
       </div>
 
-      <div className="bg-[#1E293B] rounded-xl border border-[#334155] overflow-hidden">
+      <div className="card" style={{ padding: 0 }}>
         {items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-[#475569]">
-            <Wallet size={32} className="mb-2" />
-            <p>No hay gastos no corrientes registrados</p>
+          <div className="empty-state">
+            <div className="empty-icon">🧾</div>
+            <p className="empty-text">Sin gastos puntuales registrados</p>
+            <p className="empty-sub">Registra compras o gastos que no se repiten para tener el historial completo</p>
           </div>
         ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-[#334155]">
-                {['Descripción', 'Categoría', 'Monto', 'Fecha', 'Notas', ''].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-medium text-[#475569] uppercase">{h}</th>
+          <div className="table-wrap" style={{ border: 'none', borderRadius: 20 }}>
+            <table className="table">
+              <thead>
+                <tr>{['Descripción', 'Categoría', 'Monto', 'Fecha', 'Notas', ''].map(h => <th key={h}>{h}</th>)}</tr>
+              </thead>
+              <tbody>
+                {items.map(item => (
+                  <tr key={item.id}>
+                    <td style={{ fontWeight: 600 }}>{item.descripcion}</td>
+                    <td><span className="badge badge-gray" style={{ textTransform: 'capitalize' }}>{item.categoria}</span></td>
+                    <td className="table-amount negative">${parseFloat(item.monto).toLocaleString('es-CL')}</td>
+                    <td>{item.fecha}</td>
+                    <td style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>{item.notas || '—'}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button className="btn-icon edit" onClick={() => openEdit(item)}><Pencil size={15} /></button>
+                        <button className="btn-icon danger" onClick={() => handleDelete(item.id)}><Trash2 size={15} /></button>
+                      </div>
+                    </td>
+                  </tr>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {items.map(item => (
-                <tr key={item.id} className="border-b border-[#334155]/50 hover:bg-[#334155]/20 transition-colors">
-                  <td className="px-4 py-3 text-white text-sm">{item.descripcion}</td>
-                  <td className="px-4 py-3 text-[#94A3B8] text-sm capitalize">{item.categoria}</td>
-                  <td className="px-4 py-3 text-amber-400 font-semibold text-sm">${parseFloat(item.monto).toLocaleString('es-CL')}</td>
-                  <td className="px-4 py-3 text-[#94A3B8] text-sm">{item.fecha}</td>
-                  <td className="px-4 py-3 text-[#475569] text-sm truncate max-w-[150px]">{item.notas || '—'}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => openEdit(item)} className="text-[#475569] hover:text-[#10B981] transition-colors"><Pencil size={15} /></button>
-                      <button onClick={() => handleDelete(item.id)} className="text-[#475569] hover:text-red-400 transition-colors"><Trash2 size={15} /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
-      <Modal open={modal} onClose={() => setModal(false)} title={editId ? 'Editar gasto' : 'Nuevo gasto no corriente'}>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-sm text-[#94A3B8] block mb-1.5">Descripción</label>
-            <input required value={form.descripcion} onChange={e => setForm({ ...form, descripcion: e.target.value })}
-              className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-[#10B981]" placeholder="Ej: Reparación auto" />
+      <Modal open={modal} onClose={() => setModal(false)} title={editId ? 'Editar gasto' : '+ Nuevo gasto puntual'}>
+        <form onSubmit={handleSubmit}>
+          <div className="form-modal-group">
+            <label className="form-modal-label">¿En qué gastaste?</label>
+            <input className="form-modal-input" required placeholder="Ej: Reparación auto, médico, ropa..."
+              value={form.descripcion} onChange={e => setForm({ ...form, descripcion: e.target.value })} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm text-[#94A3B8] block mb-1.5">Categoría</label>
-              <select value={form.categoria} onChange={e => setForm({ ...form, categoria: e.target.value })}
-                className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-[#10B981] capitalize">
-                {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+          <div className="form-modal-row">
+            <div className="form-modal-group">
+              <label className="form-modal-label">Categoría</label>
+              <select className="form-modal-select" value={form.categoria} onChange={e => setForm({ ...form, categoria: e.target.value })}>
+                {categorias.map(c => <option key={c.nombre} value={c.nombre}>{c.icono} {c.nombre}</option>)}
               </select>
             </div>
-            <div>
-              <label className="text-sm text-[#94A3B8] block mb-1.5">Monto</label>
-              <input type="number" required min="0" step="0.01" value={form.monto} onChange={e => setForm({ ...form, monto: e.target.value })}
-                className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-[#10B981]" placeholder="0" />
+            <div className="form-modal-group">
+              <label className="form-modal-label">¿Cuánto?</label>
+              <input className="form-modal-input" type="number" required min="0" step="0.01" placeholder="0"
+                value={form.monto} onChange={e => setForm({ ...form, monto: e.target.value })} />
             </div>
           </div>
-          <div>
-            <label className="text-sm text-[#94A3B8] block mb-1.5">Fecha</label>
-            <input type="date" required value={form.fecha} onChange={e => setForm({ ...form, fecha: e.target.value })}
-              className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-[#10B981]" />
+          <div className="form-modal-group">
+            <label className="form-modal-label">¿Cuándo fue?</label>
+            <div className="date-input-wrap">
+              <input className="form-modal-input" type="date" required
+                value={form.fecha} onChange={e => setForm({ ...form, fecha: e.target.value })} />
+            </div>
           </div>
-          <div>
-            <label className="text-sm text-[#94A3B8] block mb-1.5">Notas <span className="text-[#475569]">(opcional)</span></label>
-            <textarea rows={2} value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })}
-              className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-[#10B981] resize-none" placeholder="..." />
+          <div className="form-modal-group">
+            <label className="form-modal-label">Notas <span>(opcional)</span></label>
+            <textarea className="form-modal-input" rows={2} placeholder="Detalles adicionales..."
+              value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })}
+              style={{ resize: 'none', height: 'auto' }} />
           </div>
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={() => setModal(false)} className="flex-1 border border-[#334155] text-[#94A3B8] hover:text-white py-2.5 rounded-lg transition-colors">Cancelar</button>
-            <button type="submit" disabled={loading} className="flex-1 bg-[#10B981] hover:bg-[#059669] disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors">
-              {loading ? 'Guardando...' : 'Guardar'}
+          <div className="form-modal-actions">
+            <button type="button" className="btn-modal-cancel" onClick={() => setModal(false)}>Cancelar</button>
+            <button type="submit" className="btn-modal-save" disabled={loading}>
+              {loading ? 'Guardando...' : editId ? 'Guardar cambios' : 'Agregar gasto'}
             </button>
           </div>
         </form>

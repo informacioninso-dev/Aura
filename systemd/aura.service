@@ -1,0 +1,21 @@
+[Unit]
+Description=Aura — Gunicorn Django
+After=network.target postgresql.service
+
+[Service]
+User=aura
+Group=www-data
+WorkingDirectory=/var/www/aura/back
+EnvironmentFile=/var/www/aura/back/.env
+ExecStart=/var/www/aura/back/.venv/bin/gunicorn \
+    --workers 3 \
+    --bind 127.0.0.1:8000 \
+    --timeout 120 \
+    --access-logfile /var/log/aura/gunicorn-access.log \
+    --error-logfile /var/log/aura/gunicorn-error.log \
+    config.wsgi:application
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

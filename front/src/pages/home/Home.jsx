@@ -8,34 +8,32 @@ const features = [
     emoji: '📊',
     title: 'Flujo de caja real',
     desc: 'Ve tus próximos 12 meses proyectados. Sabe exactamente cuánto te queda cada mes.',
-    bg: '#F0FDF4',
-    iconBg: '#DCFCE7',
-    accent: '#10B981',
   },
   {
     emoji: '💸',
     title: 'Control total de gastos',
     desc: 'Registra ingresos, gastos fijos, variables y cuotas. Todo categorizado y con fechas.',
-    bg: '#EFF6FF',
-    iconBg: '#DBEAFE',
-    accent: '#3B82F6',
   },
   {
     emoji: '🏠',
     title: 'Simulador de préstamos',
     desc: '¿Casa, auto o celular? Simula el crédito y ve si tu flujo lo aguanta antes de firmar.',
-    bg: '#F5F3FF',
-    iconBg: '#EDE9FE',
-    accent: '#8B5CF6',
   },
 ]
 
+const kpis = [
+  { l: 'Ingresos',   v: '$3.500.000',  c: '#10B981' },
+  { l: 'Gastos',     v: '$2.100.000',  c: '#F87171' },
+  { l: 'Balance',    v: '+$1.400.000', c: '#10B981' },
+  { l: 'Cuotas',     v: '$220.000',    c: '#C487F6' },
+]
+
 const simRows = [
-  { label: '¿Qué quiero?',   value: 'Auto 2024' },
-  { label: 'Monto',          value: '$15.000.000' },
-  { label: 'Banco',          value: 'BCI · 8.5% anual' },
-  { label: 'Cuota mensual',  value: '$681.000' },
-  { label: 'Plazo',          value: '24 meses' },
+  { label: '¿Qué quiero?',  value: 'Auto 2024' },
+  { label: 'Monto',         value: '$15.000.000' },
+  { label: 'Banco',         value: 'BCI · 8.5% anual' },
+  { label: 'Cuota mensual', value: '$681.000' },
+  { label: 'Plazo',         value: '24 meses' },
 ]
 
 export default function Home() {
@@ -60,9 +58,8 @@ export default function Home() {
       </nav>
 
       {/* ── HERO ── */}
-      <section>
+      <div className="hero-wrap">
         <div className="hero">
-          {/* Left */}
           <div>
             <div className="hero-badge">
               <span className="hero-badge-dot" />
@@ -87,7 +84,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Right — Dashboard */}
+          {/* Dashboard mockup */}
           <div className="mockup">
             <div className="mockup-bar">
               <div className="dot dot-r" />
@@ -99,13 +96,8 @@ export default function Home() {
             </div>
             <div className="mockup-body">
               <div className="kpi-row">
-                {[
-                  { l: 'Ingresos',  v: '$3.500.000', c: '#10B981', bg: '#F0FDF4' },
-                  { l: 'Gastos',    v: '$2.100.000', c: '#EF4444', bg: '#FEF2F2' },
-                  { l: 'Balance',   v: '+$1.400.000', c: '#10B981', bg: '#F0FDF4' },
-                  { l: 'Cuotas',    v: '$220.000',   c: '#8B5CF6', bg: '#F5F3FF' },
-                ].map(s => (
-                  <div key={s.l} className="kpi-card" style={{ background: s.bg }}>
+                {kpis.map(s => (
+                  <div key={s.l} className="kpi-card">
                     <div className="kpi-label">{s.l}</div>
                     <div className="kpi-value" style={{ color: s.c }}>{s.v}</div>
                   </div>
@@ -117,36 +109,34 @@ export default function Home() {
                   {bars.map((h, i) => (
                     <div key={i} className="bar-col">
                       <div className="bar-inc" style={{ height: `${h}%`, background: 'linear-gradient(to top, #10B981, #34D399)' }} />
-                      <div className="bar-gas" style={{ height: `${h * 0.55}%`, background: '#FCA5A5' }} />
+                      <div className="bar-gas" style={{ height: `${h * 0.55}%`, background: 'rgba(248,113,113,0.6)' }} />
                     </div>
                   ))}
                 </div>
                 <div className="chart-legend">
                   <div className="legend-item"><div className="legend-dot" style={{ background: '#10B981' }} /><span>Ingresos</span></div>
-                  <div className="legend-item"><div className="legend-dot" style={{ background: '#FCA5A5' }} /><span>Gastos</span></div>
+                  <div className="legend-item"><div className="legend-dot" style={{ background: '#F87171' }} /><span>Gastos</span></div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </section>
+      </div>
 
       {/* ── FEATURES ── */}
-      <section style={{ background: '#FAFAFA', borderTop: '1px solid #F1F5F9', borderBottom: '1px solid #F1F5F9' }}>
+      <section>
         <div className="section">
           <div style={{ textAlign: 'center', marginBottom: 52 }}>
-            <div className="section-label" style={{ color: '#10B981' }}>Qué hace Aura</div>
+            <div className="section-label">Qué hace Aura</div>
             <h2 className="section-title">Tu plata, bajo control total.</h2>
             <p className="section-desc" style={{ margin: '0 auto', textAlign: 'center' }}>
               No es solo un registro. Aura te proyecta el futuro para que no te agarre por sorpresa.
             </p>
           </div>
           <div className="features-grid">
-            {features.map(({ emoji, title, desc, bg, iconBg }) => (
-              <div key={title} className="feature-card" style={{ background: bg }}>
-                <div className="feature-icon" style={{ background: iconBg }}>
-                  {emoji}
-                </div>
+            {features.map(({ emoji, title, desc }) => (
+              <div key={title} className="feature-card">
+                <div className="feature-icon">{emoji}</div>
                 <h3 className="feature-title">{title}</h3>
                 <p className="feature-desc">{desc}</p>
               </div>
@@ -167,7 +157,7 @@ export default function Home() {
               Ingresa el monto, elige el banco y Aura te dice al tiro si tu flujo de caja lo aguanta.
               Sin Excel. Sin suposiciones.
             </p>
-            <Link to="/registro" className="btn-indigo">
+            <Link to="/registro" className="btn-lila">
               Probarlo gratis →
             </Link>
           </div>
@@ -203,7 +193,7 @@ export default function Home() {
           </Link>
           <p className="cta-sub">
             ¿Ya tienes cuenta?{' '}
-            <Link to="/login" style={{ color: '#10B981', textDecoration: 'none', fontWeight: 600 }}>
+            <Link to="/login" style={{ color: '#C487F6', textDecoration: 'none', fontWeight: 600 }}>
               Inicia sesión aquí
             </Link>
           </p>

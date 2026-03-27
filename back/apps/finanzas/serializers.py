@@ -2,7 +2,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from rest_framework import serializers
 
-from .models import Diferido, GastoCorriente, GastoNoCorriente, Ingreso
+from .models import Categoria, Diferido, GastoCorriente, GastoNoCorriente, Ingreso, Notificacion, SaldoMes
 
 
 TWOPLACES = Decimal('0.01')
@@ -12,11 +12,47 @@ def round_money(value):
     return value.quantize(TWOPLACES, rounding=ROUND_HALF_UP)
 
 
+class NotificacionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notificacion
+        fields = '__all__'
+        read_only_fields = ('usuario', 'tipo', 'titulo', 'mensaje', 'categoria', 'anio', 'mes', 'creada_en')
+
+
+class CategoriaSerializer(serializers.ModelSerializer):
+    def validate_nombre(self, value):
+        if not value.strip():
+            raise serializers.ValidationError('El nombre no puede estar vacío.')
+        return value.strip().lower()
+
+    def validate_limite_mensual(self, value):
+        if value is not None and value <= 0:
+            raise serializers.ValidationError('El límite debe ser mayor que 0.')
+        return value
+
+    class Meta:
+        model = Categoria
+        fields = '__all__'
+        read_only_fields = ('usuario', 'creado_en')
+
+
+class SaldoMesSerializer(serializers.ModelSerializer):
+    recalculos_restantes = serializers.SerializerMethodField()
+
+    def get_recalculos_restantes(self, obj):
+        return obj.recalculos_restantes()
+
+    class Meta:
+        model = SaldoMes
+        fields = '__all__'
+        read_only_fields = ('usuario', 'creado_en', 'actualizado_en', 'ultimo_recalculo', 'recalculos_hoy')
+
+
 class IngresoSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
-        monto = attrs.get('monto', getattr(self.instance, 'monto', None))
+        monto        = attrs.get('monto',        getattr(self.instance, 'monto',        None))
         fecha_inicio = attrs.get('fecha_inicio', getattr(self.instance, 'fecha_inicio', None))
-        fecha_fin = attrs.get('fecha_fin', getattr(self.instance, 'fecha_fin', None))
+        fecha_fin    = attrs.get('fecha_fin',    getattr(self.instance, 'fecha_fin',    None))
 
         errors = {}
         if monto is not None and monto <= 0:
@@ -35,9 +71,9 @@ class IngresoSerializer(serializers.ModelSerializer):
 
 class GastoCorrienteSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
-        monto = attrs.get('monto', getattr(self.instance, 'monto', None))
+        monto        = attrs.get('monto',        getattr(self.instance, 'monto',        None))
         fecha_inicio = attrs.get('fecha_inicio', getattr(self.instance, 'fecha_inicio', None))
-        fecha_fin = attrs.get('fecha_fin', getattr(self.instance, 'fecha_fin', None))
+        fecha_fin    = attrs.get('fecha_fin',    getattr(self.instance, 'fecha_fin',    None))
 
         errors = {}
         if monto is not None and monto <= 0:
@@ -78,10 +114,10 @@ class DeferidoSerializer(serializers.ModelSerializer):
         return None
 
     def validate(self, attrs):
-        monto_total = self._get_value(attrs, 'monto_total')
-        num_cuotas = self._get_value(attrs, 'num_cuotas')
+        monto_total  = self._get_value(attrs, 'monto_total')
+        num_cuotas   = self._get_value(attrs, 'num_cuotas')
         fecha_inicio = self._get_value(attrs, 'fecha_inicio')
-        fecha_fin = self._get_value(attrs, 'fecha_fin')
+        fecha_fin    = self._get_value(attrs, 'fecha_fin')
 
         errors = {}
         if monto_total is not None and monto_total <= 0:
@@ -96,7 +132,7 @@ class DeferidoSerializer(serializers.ModelSerializer):
 
     def _set_cuota_mensual(self, validated_data):
         monto_total = self._get_value(validated_data, 'monto_total')
-        num_cuotas = self._get_value(validated_data, 'num_cuotas')
+        num_cuotas  = self._get_value(validated_data, 'num_cuotas')
         if monto_total is not None and num_cuotas:
             validated_data['cuota_mensual'] = round_money(Decimal(monto_total) / Decimal(num_cuotas))
         return validated_data
