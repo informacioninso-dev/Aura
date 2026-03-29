@@ -543,3 +543,85 @@
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
+
+/* ══════════════════════════════════════════
+   RESPONSIVE — Mobile & Tablet
+   ══════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  /* Stat cards */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .stat-card { padding: 16px 18px; }
+  .stat-value { font-size: 20px; }
+
+  /* Card */
+  .card { padding: 16px; }
+  .card-header { margin-bottom: 14px; }
+
+  /* Btn add */
+  .btn-add {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  /* Form rows → single column */
+  .form-modal-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    padding: 12px;
+    align-items: flex-end;
+  }
+  .modal-box {
+    border-radius: 24px 24px 16px 16px;
+    padding: 24px 20px;
+    max-height: 92vh;
+  }
+  .modal-title { font-size: 17px; }
+
+  /* Diferidos grid */
+  .diferidos-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  /* Tabla — make action buttons always visible on mobile */
+  .table td, .table th { padding: 10px 12px; }
+  .btn-icon { padding: 8px; }
+
+  /* Simulador */
+  .sim-form-card, .sim-result-card { padding: 20px 16px; }
+  .sim-kpi-value { font-size: 22px; }
+
+  /* Perfil */
+  .perfil-card {
+    padding: 20px 16px;
+    max-width: 100%;
+  }
+
+  /* Empty state */
+  .empty-state { padding: 36px 16px; }
+}
+
+@media (max-width: 480px) {
+  /* Stat cards — full width on very small screens */
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .stat-value { font-size: 17px; }
+  .stat-label { font-size: 10px; }
+
+  /* Actions row on card header */
+  .card-header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+}

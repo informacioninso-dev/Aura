@@ -10,7 +10,7 @@ const navItems = [
   { to: '/diferidos',            icon: '⊞', label: 'Cuotas' },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
 
@@ -19,14 +19,25 @@ export default function Sidebar() {
     navigate('/login')
   }
 
+  function handleNavClick() {
+    if (onClose) onClose()
+  }
+
   return (
-    <aside className="sidebar">
-      <NavLink to="/dashboard" className="sidebar-logo">
+    <aside className={`sidebar${isOpen ? ' sidebar-open' : ''}`}>
+      <NavLink to="/dashboard" className="sidebar-logo" onClick={handleNavClick}>
         <div className="sidebar-logo-icon">A</div>
         <div>
           <div className="sidebar-logo-name">AURA</div>
           <div className="sidebar-logo-tag">Tus finanzas</div>
         </div>
+        <button
+          className="sidebar-close-btn"
+          onClick={(e) => { e.preventDefault(); if (onClose) onClose() }}
+          aria-label="Cerrar menú"
+        >
+          ✕
+        </button>
       </NavLink>
 
       <nav className="sidebar-nav">
@@ -36,6 +47,7 @@ export default function Sidebar() {
             key={to}
             to={to}
             className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+            onClick={handleNavClick}
           >
             <span style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>
             {label}
@@ -46,6 +58,7 @@ export default function Sidebar() {
         <NavLink
           to="/presupuesto"
           className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+          onClick={handleNavClick}
         >
           <span style={{ fontSize: 16, lineHeight: 1 }}>◑</span>
           Categorías
@@ -53,6 +66,7 @@ export default function Sidebar() {
         <NavLink
           to="/simulador"
           className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+          onClick={handleNavClick}
         >
           <span style={{ fontSize: 16, lineHeight: 1 }}>⬡</span>
           Simulador
@@ -60,6 +74,7 @@ export default function Sidebar() {
         <NavLink
           to="/importar"
           className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+          onClick={handleNavClick}
         >
           <span style={{ fontSize: 16, lineHeight: 1 }}>⤒</span>
           Importar historial
@@ -67,6 +82,7 @@ export default function Sidebar() {
         <NavLink
           to="/reporte"
           className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+          onClick={handleNavClick}
         >
           <span style={{ fontSize: 16, lineHeight: 1 }}>≡</span>
           Reportes
@@ -77,6 +93,7 @@ export default function Sidebar() {
         <NavLink
           to="/perfil"
           className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+          onClick={handleNavClick}
         >
           <span style={{ fontSize: 16, lineHeight: 1 }}>◎</span>
           {user?.username || 'Mi perfil'}
