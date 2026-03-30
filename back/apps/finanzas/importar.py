@@ -180,15 +180,15 @@ def parsear_archivo(nombre: str, file_bytes: bytes, max_filas: int = MAX_FILAS) 
         else:
             tipo = 'ingreso' if monto > 0 else 'gasto'
 
-        categoria = get('categoria') or 'otro'
+        categoria = (get('categoria') or 'otro').lower().strip()[:50]
 
         filas_ok.append(
             {
                 'fecha': str(fecha),
-                'descripcion': get('descripcion') or '(sin descripcion)',
+                'descripcion': (get('descripcion') or '(sin descripcion)')[:200],
                 'monto': str(abs(monto)),
                 'tipo': tipo,
-                'categoria': categoria.lower().strip(),
+                'categoria': categoria,
             }
         )
 
@@ -225,8 +225,8 @@ def validar_filas_confirmacion(filas: list[dict], max_filas: int = MAX_FILAS) ->
         if tipo not in ('ingreso', 'gasto'):
             raise ValueError(f'Fila {idx}: tipo invalido. Usa "ingreso" o "gasto".')
 
-        descripcion = str(fila.get('descripcion', '')).strip() or '(sin descripcion)'
-        categoria = str(fila.get('categoria', 'otro')).strip().lower() or 'otro'
+        descripcion = (str(fila.get('descripcion', '')).strip() or '(sin descripcion)')[:200]
+        categoria = (str(fila.get('categoria', 'otro')).strip().lower() or 'otro')[:50]
 
         filas_ok.append(
             {

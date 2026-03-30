@@ -281,7 +281,13 @@ class ImportarView(APIView):
             except ValueError as e:
                 return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-            resultado = crear_registros(request.user, filas_ok)
+            try:
+                resultado = crear_registros(request.user, filas_ok)
+            except Exception as e:
+                return Response(
+                    {'error': f'Error al guardar los registros: {str(e)}'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
             return Response(resultado)
 
         return Response({'error': 'Accion desconocida.'}, status=status.HTTP_400_BAD_REQUEST)
