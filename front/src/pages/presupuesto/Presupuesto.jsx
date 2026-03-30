@@ -119,12 +119,12 @@ export default function Presupuesto() {
 
   return (
     <div>
-      <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
+      <div className="page-header page-header-actions">
+        <div className="page-header-main">
           <h1 className="page-title">Categorías y presupuesto</h1>
           <p className="page-subtitle">Crea tus categorías y ponles un límite mensual para no pasarte.</p>
         </div>
-        <button className="btn-add" onClick={openNew}><Plus size={16} /> Nueva categoría</button>
+        <button className="btn-add page-primary-action" onClick={openNew}><Plus size={16} /> Nueva categoría</button>
       </div>
 
       {/* ── CON PRESUPUESTO ── */}
@@ -220,12 +220,12 @@ function TarjetaCategoria({ cat, gasto, openEdit, handleDelete, deletingId, edit
   return (
     <div className="card" style={{ padding: 18 }}>
       {/* Cabecera */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div className="budget-card-head">
+        <div className="budget-card-meta">
           <span style={{ fontSize: 24 }}>{cat.icono}</span>
           <span style={{ fontWeight: 700, fontSize: 15, textTransform: 'capitalize' }}>{cat.nombre}</span>
         </div>
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div className="table-actions-row">
           <button className="btn-icon edit" onClick={() => openEdit(cat)}><Pencil size={13} /></button>
           <button className="btn-icon danger" disabled={deletingId === cat.id} onClick={() => handleDelete(cat.id)}><Trash2 size={13} /></button>
         </div>
@@ -257,7 +257,7 @@ function TarjetaCategoria({ cat, gasto, openEdit, handleDelete, deletingId, edit
 
       {/* Edición inline del presupuesto */}
       {editPresup === cat.id ? (
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4 }}>
+        <div className="budget-inline-edit">
           <input className="form-modal-input" type="number" min="0" step="0.01" placeholder="Límite mensual"
             value={valorPresup} onChange={e => setValorPresup(e.target.value)}
             style={{ flex: 1, padding: '7px 10px', fontSize: 13 }}

@@ -37,15 +37,7 @@
 .sidebar-logo-icon {
   width: 36px;
   height: 36px;
-  background: linear-gradient(135deg, #C487F6, #10B981);
   border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 900;
-  font-size: 16px;
-  color: #fff;
-  flex-shrink: 0;
   box-shadow: 0 4px 16px rgba(196,135,246,0.40);
 }
 .sidebar-logo-name {

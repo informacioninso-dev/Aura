@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { useAuth } from '../../context/useAuth'
 import { getApiErrorMessage } from '../../api/errors'
+import BrandMark from '../../components/brand/BrandMark'
 import './auth.css'
 
 export default function ResetPassword() {
@@ -67,7 +68,7 @@ export default function ResetPassword() {
     <div className="auth-page">
       <div className="auth-box">
         <div className="auth-logo">
-          <div className="auth-logo-icon">A</div>
+          <BrandMark className="auth-logo-icon" />
           <div className="auth-logo-name">AURA</div>
           <div className="auth-logo-tag">Define una nueva contraseña segura.</div>
         </div>

@@ -660,8 +660,8 @@ export default function SuperAdmin() {
 
   return (
     <div>
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <div>
+      <div className="page-header page-header-actions superadmin-header">
+        <div className="page-header-main">
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <ShieldCheck size={24} />
             Super Admin
@@ -670,10 +670,9 @@ export default function SuperAdmin() {
         </div>
         <button
           type="button"
-          className="btn-add"
+          className="btn-add page-primary-action superadmin-refresh"
           onClick={refreshAll}
           disabled={refreshingAll}
-          style={{ minWidth: 150, justifyContent: 'center' }}
         >
           <RefreshCw size={16} style={{ animation: refreshingAll ? 'spin 1s linear infinite' : 'none' }} />
           {refreshingAll ? 'Actualizando...' : 'Actualizar todo'}
@@ -698,14 +697,7 @@ export default function SuperAdmin() {
         </div>
       )}
 
-      <div
-        style={{
-          display: 'flex',
-          gap: 10,
-          flexWrap: 'wrap',
-          marginBottom: 18,
-        }}
-      >
+      <div className="superadmin-tabs">
         {SECTION_OPTIONS.map((section) => {
           const active = activeSection === section.id
           return (
@@ -713,16 +705,7 @@ export default function SuperAdmin() {
               key={section.id}
               type="button"
               onClick={() => setActiveSection(section.id)}
-              style={{
-                borderRadius: 999,
-                border: active ? '1px solid rgba(196,135,246,0.45)' : '1px solid rgba(255,255,255,0.10)',
-                background: active ? 'rgba(196,135,246,0.14)' : 'rgba(255,255,255,0.03)',
-                color: active ? '#E9D5FF' : 'rgba(255,255,255,0.70)',
-                padding: '10px 16px',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
+              className={`superadmin-tab ${active ? 'is-active' : ''}`}
             >
               {section.label}
             </button>
@@ -783,7 +766,7 @@ export default function SuperAdmin() {
         {currencyDistribution.length > 0 && (
           <div style={{ marginTop: 18 }}>
             <div className="card-title" style={{ marginBottom: 10 }}>Monedas preferidas</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div className="superadmin-badge-cluster">
               {currencyDistribution.map((item) => (
                 <span key={item.moneda_preferida || 'NA'} className="badge badge-lila">
                   {(item.moneda_preferida || 'N/A')} - {item.total}
@@ -796,7 +779,7 @@ export default function SuperAdmin() {
         {planDistribution.length > 0 && (
           <div style={{ marginTop: 18 }}>
             <div className="card-title" style={{ marginBottom: 10 }}>Distribucion por plan</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div className="superadmin-badge-cluster">
               {planDistribution.map((item) => (
                 <span key={item.slug || item.id} className="badge badge-lila">
                   {item.name} - {item.total}
@@ -815,31 +798,14 @@ export default function SuperAdmin() {
           <h2 className="card-title">Planes y funciones destacadas</h2>
         </div>
 
-        <div
-          style={{
-            marginBottom: 16,
-            padding: '12px 14px',
-            borderRadius: 14,
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            fontSize: 12,
-            color: 'rgba(255,255,255,0.55)',
-          }}
-        >
+        <div className="superadmin-note">
           Aqui configuras el plan, eliges sus capacidades y luego lo asignas manualmente a cada usuario.
           La edicion de features vive por plan para que el panel se mantenga compacto y rapido de entender.
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 340px) 1fr', gap: 16 }}>
-          <div style={{ display: 'grid', gap: 16 }}>
-            <div
-              style={{
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 16,
-                padding: 16,
-                background: 'rgba(255,255,255,0.02)',
-              }}
-            >
+        <div className="superadmin-plans-grid">
+          <div className="superadmin-column">
+            <div className="superadmin-panel">
               <div className="card-title" style={{ marginBottom: 12 }}>Nuevo plan</div>
               <div className="form-modal-group">
                 <label className="form-modal-label">Slug</label>
@@ -906,20 +872,13 @@ export default function SuperAdmin() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gap: 16 }}>
-            <div
-              style={{
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 16,
-                padding: 16,
-                background: 'rgba(255,255,255,0.02)',
-              }}
-            >
+          <div className="superadmin-column">
+            <div className="superadmin-panel">
               <div className="card-title" style={{ marginBottom: 12 }}>Catalogo de features</div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>
                 Las features se definen por codigo y aqui solo se muestran para poder incluirlas dentro de los planes.
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div className="superadmin-feature-catalog">
                 {!featuresLoading && features.length === 0 && (
                   <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
                     No hay features registradas todavia.
@@ -928,15 +887,9 @@ export default function SuperAdmin() {
                 {features.map((feature) => (
                   <div
                     key={feature.id}
-                    style={{
-                      minWidth: 220,
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: 14,
-                      padding: 12,
-                      background: 'rgba(255,255,255,0.02)',
-                    }}
+                    className="superadmin-feature-card"
                   >
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 }}>
+                    <div className="superadmin-feature-card-head">
                       <strong style={{ fontSize: 13 }}>{feature.name}</strong>
                       <span className={`badge ${feature.is_active ? 'badge-green' : 'badge-gray'}`}>
                         {feature.is_active ? 'Activa' : 'Inactiva'}
@@ -950,16 +903,9 @@ export default function SuperAdmin() {
               </div>
             </div>
 
-            <div
-              style={{
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 16,
-                padding: 16,
-                background: 'rgba(255,255,255,0.02)',
-              }}
-            >
+            <div className="superadmin-panel">
               <div className="card-title" style={{ marginBottom: 12 }}>Capacidades por plan</div>
-              <div style={{ display: 'grid', gap: 12 }}>
+              <div className="superadmin-plan-list">
                 {!plansLoading && plans.length === 0 && (
                   <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
                     No hay planes configurados todavia.
@@ -968,15 +914,10 @@ export default function SuperAdmin() {
                 {plans.map((plan) => (
                   <div
                     key={plan.id}
-                    style={{
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: 16,
-                      padding: 16,
-                      background: 'rgba(15,23,42,0.35)',
-                    }}
+                    className="superadmin-plan-card"
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: expandedPlanId === plan.id ? 12 : 0 }}>
-                      <div>
+                    <div className="superadmin-plan-head" style={{ marginBottom: expandedPlanId === plan.id ? 12 : 0 }}>
+                      <div className="superadmin-plan-summary">
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <strong style={{ fontSize: 16 }}>{plan.name}</strong>
                           <span className="badge badge-gray">{plan.slug}</span>
@@ -989,7 +930,7 @@ export default function SuperAdmin() {
                           {plan.description || 'Sin descripcion.'}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <div className="superadmin-plan-actions">
                         <button
                           type="button"
                           className="btn-modal-cancel"
@@ -1011,19 +952,11 @@ export default function SuperAdmin() {
                     </div>
 
                     {expandedPlanId === plan.id && (
-                    <div style={{ display: 'grid', gap: 10 }}>
+                    <div className="superadmin-plan-feature-list">
                       {(plan.features || []).map((feature) => (
                         <div
                           key={`${plan.id}-${feature.feature_id}`}
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'minmax(180px, 1fr) minmax(180px, 280px)',
-                            gap: 12,
-                            alignItems: 'center',
-                            border: '1px solid rgba(255,255,255,0.05)',
-                            borderRadius: 12,
-                            padding: 12,
-                          }}
+                          className="superadmin-plan-feature-row"
                         >
                           <div>
                             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1275,7 +1208,7 @@ export default function SuperAdmin() {
           <h2 className="card-title">Gestion de usuarios</h2>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+        <div className="superadmin-user-filters">
           <select
             className="form-modal-select"
             value={userActiveFilter}
@@ -1283,7 +1216,6 @@ export default function SuperAdmin() {
               setUsersPage(1)
               setUserActiveFilter(event.target.value)
             }}
-            style={{ width: 190 }}
           >
             <option value="">Estado: todos</option>
             <option value="true">Solo activos</option>
@@ -1296,7 +1228,6 @@ export default function SuperAdmin() {
               setUsersPage(1)
               setUserStaffFilter(event.target.value)
             }}
-            style={{ width: 190 }}
           >
             <option value="">Staff: todos</option>
             <option value="true">Solo staff</option>
@@ -1309,7 +1240,6 @@ export default function SuperAdmin() {
               setUsersPage(1)
               setUserSuperFilter(event.target.value)
             }}
-            style={{ width: 190 }}
           >
             <option value="">Superadmin: todos</option>
             <option value="true">Solo superadmin</option>
@@ -1366,16 +1296,15 @@ export default function SuperAdmin() {
                   <td>{item.email}</td>
                   <td>{item.username || '-'}</td>
                   <td>
-                    <div style={{ display: 'grid', gap: 8 }}>
+                    <div className="superadmin-user-plan-stack">
                       <span className={`badge ${item.plan?.slug === 'pro' ? 'badge-lila' : 'badge-gray'}`}>
                         {item.plan?.name || 'Sin plan'}
                       </span>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <div className="superadmin-user-plan-controls">
                         <select
-                          className="form-modal-select"
+                          className="form-modal-select superadmin-user-plan-select"
                           value={userPlanDrafts[item.id] || ''}
                           onChange={(event) => updateUserPlanDraft(item.id, event.target.value)}
-                          style={{ minWidth: 130, padding: '8px 10px' }}
                         >
                           <option value="">Seleccionar</option>
                           {plans.filter((plan) => plan.is_active).map((plan) => (
@@ -1384,10 +1313,9 @@ export default function SuperAdmin() {
                         </select>
                         <button
                           type="button"
-                          className="btn-modal-cancel"
+                          className="btn-modal-cancel superadmin-inline-button"
                           onClick={() => saveUserPlan(item)}
                           disabled={savingUserPlanId === item.id || !userPlanDrafts[item.id]}
-                          style={{ padding: '8px 10px' }}
                         >
                           {savingUserPlanId === item.id ? 'Guardando...' : 'Asignar'}
                         </button>
@@ -1414,14 +1342,14 @@ export default function SuperAdmin() {
                   </td>
                   <td>{formatDateTime(item.last_login)}</td>
                   <td>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      <button type="button" className="btn-modal-cancel" onClick={() => askToggleActive(item)} style={{ padding: '8px 10px' }}>
+                    <div className="superadmin-user-actions">
+                      <button type="button" className="btn-modal-cancel superadmin-inline-button" onClick={() => askToggleActive(item)}>
                         {item.is_active ? 'Desactivar' : 'Activar'}
                       </button>
-                      <button type="button" className="btn-modal-cancel" onClick={() => askToggleStaff(item)} style={{ padding: '8px 10px' }}>
+                      <button type="button" className="btn-modal-cancel superadmin-inline-button" onClick={() => askToggleStaff(item)}>
                         {item.is_staff ? 'Quitar staff' : 'Dar staff'}
                       </button>
-                      <button type="button" className="btn-modal-danger" onClick={() => askResetPassword(item)} style={{ padding: '8px 10px' }}>
+                      <button type="button" className="btn-modal-danger superadmin-inline-button" onClick={() => askResetPassword(item)}>
                         Reset clave
                       </button>
                     </div>
@@ -1440,35 +1368,32 @@ export default function SuperAdmin() {
           <h2 className="card-title">Auditoria de acciones</h2>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+        <div className="superadmin-audit-toolbar">
           <input
-            className="form-modal-input"
+            className="form-modal-input superadmin-audit-search"
             value={auditQuery}
             onChange={(event) => {
               setAuditPage(1)
               setAuditQuery(event.target.value)
             }}
             placeholder="Buscar por accion o correo..."
-            style={{ maxWidth: 290 }}
           />
           <input
-            className="form-modal-input"
+            className="form-modal-input superadmin-audit-filter"
             value={auditAction}
             onChange={(event) => {
               setAuditPage(1)
               setAuditAction(event.target.value)
             }}
             placeholder="Filtro exacto de accion"
-            style={{ maxWidth: 220 }}
           />
           <select
-            className="form-modal-select"
+            className="form-modal-select superadmin-audit-pagesize"
             value={auditPageSize}
             onChange={(event) => {
               setAuditPage(1)
               setAuditPageSize(Number(event.target.value))
             }}
-            style={{ width: 120 }}
           >
             {[10, 20, 50].map((size) => (
               <option key={size} value={size}>{size}/pag</option>
@@ -1477,7 +1402,7 @@ export default function SuperAdmin() {
           <button type="button" className="btn-modal-cancel" onClick={() => setAuditPage((page) => Math.max(1, page - 1))} disabled={auditPage <= 1}>
             Anterior
           </button>
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', alignSelf: 'center', minWidth: 66, textAlign: 'center' }}>
+          <span className="superadmin-audit-page">
             {auditPage}/{auditPageCount}
           </span>
           <button type="button" className="btn-modal-cancel" onClick={() => setAuditPage((page) => Math.min(auditPageCount, page + 1))} disabled={auditPage >= auditPageCount}>

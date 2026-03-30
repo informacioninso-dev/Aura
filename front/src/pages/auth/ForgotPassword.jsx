@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 
 import { useAuth } from '../../context/useAuth'
 import { getApiErrorMessage } from '../../api/errors'
+import BrandMark from '../../components/brand/BrandMark'
 import './auth.css'
 
 export default function ForgotPassword() {
@@ -32,7 +33,7 @@ export default function ForgotPassword() {
     <div className="auth-page">
       <div className="auth-box">
         <div className="auth-logo">
-          <div className="auth-logo-icon">A</div>
+          <BrandMark className="auth-logo-icon" />
           <div className="auth-logo-name">AURA</div>
           <div className="auth-logo-tag">Recupera el acceso de forma segura.</div>
         </div>

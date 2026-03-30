@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 
+import BrandMark from '../brand/BrandMark'
 import { useAuth } from '../../context/useAuth'
 import './layout.css'
 
@@ -58,7 +59,7 @@ export default function Sidebar({ isOpen, onClose }) {
   return (
     <aside className={`sidebar${isOpen ? ' sidebar-open' : ''}`}>
       <NavLink to="/dashboard" className="sidebar-logo" onClick={handleNavClick}>
-        <div className="sidebar-logo-icon">A</div>
+        <BrandMark className="sidebar-logo-icon" />
         <div>
           <div className="sidebar-logo-name">AURA</div>
           <div className="sidebar-logo-tag">Tus finanzas</div>

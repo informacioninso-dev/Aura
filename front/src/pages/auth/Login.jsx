@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { getApiErrorMessage } from '../../api/errors'
+import BrandMark from '../../components/brand/BrandMark'
 import { useAuth } from '../../context/useAuth'
 import './auth.css'
 
@@ -32,7 +33,7 @@ export default function Login() {
     <div className="auth-page">
       <div className="auth-box">
         <div className="auth-logo">
-          <div className="auth-logo-icon">A</div>
+          <BrandMark className="auth-logo-icon" />
           <div className="auth-logo-name">AURA</div>
           <div className="auth-logo-tag">Clara proyeccion, futuro solido.</div>
         </div>

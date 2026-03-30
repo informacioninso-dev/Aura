@@ -67,6 +67,30 @@
   margin: 0;
 }
 
+.page-header-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.page-header-main {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.page-primary-action {
+  min-height: 42px;
+}
+
+.inline-actions-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 /* ── BOTÓN AGREGAR ── */
 .btn-add {
   display: inline-flex;
@@ -95,11 +119,14 @@
   overflow-x: auto;
   border-radius: 16px;
   border: 1px solid rgba(255,255,255,0.07);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 .table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
+  min-width: 620px;
 }
 .table th {
   background: rgba(255,255,255,0.05);
@@ -121,6 +148,15 @@
 }
 .table tr:last-child td { border-bottom: none; }
 .table tr:hover td { background: rgba(255,255,255,0.03); }
+.table-actions-cell {
+  width: 1%;
+  white-space: nowrap;
+}
+.table-actions-row {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
 .table-amount {
   font-weight: 700;
   font-size: 15px;
@@ -429,7 +465,427 @@
   cursor: not-allowed;
 }
 
+.list-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 14px 20px 8px;
+}
+
+.list-controls-search {
+  width: 100%;
+  max-width: 280px;
+}
+
+.list-controls-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.list-controls-page {
+  font-size: 12px;
+  color: rgba(255,255,255,0.45);
+  min-width: 68px;
+  text-align: center;
+}
+
+.responsive-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.dashboard-onboarding-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dashboard-saldo-card {
+  margin-bottom: 20px;
+  border-radius: 16px;
+  padding: 16px 20px;
+}
+
+.dashboard-saldo-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.dashboard-saldo-top-spacer {
+  margin-left: auto;
+}
+
+.dashboard-saldo-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dashboard-saldo-value-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dashboard-saldo-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dashboard-saldo-input {
+  width: 170px;
+  max-width: 100%;
+}
+
+.dashboard-saldo-recalc {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.dashboard-hero-title {
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+
+.dashboard-chart-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.import-result-stats {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  margin: 20px 0;
+  flex-wrap: wrap;
+}
+
+.import-dropzone {
+  border-radius: 20px;
+  padding: 60px 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 24px;
+}
+
+.import-preview-toolbar {
+  padding: 14px 20px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.import-preview-pagination {
+  padding: 0 20px 14px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.perfil-summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.perfil-avatar-shell {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(196,135,246,0.25), rgba(16,185,129,0.20));
+  border: 1.5px solid rgba(196,135,246,0.30);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reporte-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+
+.reporte-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.diferidos-grid-responsive {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.diferido-card-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+  margin-bottom: 14px;
+}
+
+.budget-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.budget-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.budget-inline-edit {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.sim-result-status {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 /* ── DIFERIDOS ── */
+.superadmin-header {
+  margin-bottom: 18px;
+}
+
+.superadmin-refresh {
+  min-width: 150px;
+  justify-content: center;
+}
+
+.superadmin-tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.superadmin-tab {
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.03);
+  color: rgba(255,255,255,0.70);
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  font-family: inherit;
+}
+
+.superadmin-tab:hover {
+  border-color: rgba(196,135,246,0.26);
+  color: #fff;
+}
+
+.superadmin-tab.is-active {
+  border-color: rgba(196,135,246,0.45);
+  background: rgba(196,135,246,0.14);
+  color: #E9D5FF;
+}
+
+.superadmin-badge-cluster {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.superadmin-note {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  font-size: 12px;
+  color: rgba(255,255,255,0.55);
+}
+
+.superadmin-plans-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.superadmin-column {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.superadmin-panel {
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 16px;
+  background: rgba(255,255,255,0.02);
+}
+
+.superadmin-feature-catalog {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.superadmin-feature-card {
+  min-width: 0;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255,255,255,0.02);
+}
+
+.superadmin-feature-card-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.superadmin-plan-list {
+  display: grid;
+  gap: 12px;
+}
+
+.superadmin-plan-card {
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 16px;
+  background: rgba(15,23,42,0.35);
+}
+
+.superadmin-plan-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.superadmin-plan-summary {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.superadmin-plan-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.superadmin-plan-feature-list {
+  display: grid;
+  gap: 10px;
+}
+
+.superadmin-plan-feature-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 280px);
+  gap: 12px;
+  align-items: center;
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.superadmin-user-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.superadmin-user-plan-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.superadmin-user-plan-controls {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.superadmin-user-plan-select {
+  min-width: 130px;
+  padding: 8px 10px;
+}
+
+.superadmin-inline-button {
+  padding: 8px 10px;
+}
+
+.superadmin-user-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.superadmin-audit-toolbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.superadmin-audit-search {
+  flex: 1 1 290px;
+  min-width: 220px;
+}
+
+.superadmin-audit-filter {
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+
+.superadmin-audit-pagesize {
+  width: 120px;
+}
+
+.superadmin-audit-page {
+  font-size: 12px;
+  color: rgba(255,255,255,0.45);
+  min-width: 66px;
+  text-align: center;
+}
+
 .diferidos-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -589,6 +1045,12 @@
   /* Card */
   .card { padding: 16px; }
   .card-header { margin-bottom: 14px; }
+  .page-header-actions { align-items: stretch; }
+  .page-primary-action {
+    width: 100%;
+    justify-content: center;
+  }
+  .inline-actions-wrap { width: 100%; }
 
   /* Btn add */
   .btn-add {
@@ -622,7 +1084,181 @@
 
   /* Tabla — make action buttons always visible on mobile */
   .table td, .table th { padding: 10px 12px; }
+  .table { min-width: 560px; font-size: 13px; }
+  .table-actions-row { gap: 6px; }
   .btn-icon { padding: 8px; }
+
+  /* List controls */
+  .list-controls {
+    padding: 14px 16px 10px;
+  }
+  .list-controls-search {
+    max-width: none;
+  }
+  .list-controls-meta {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  /* Form actions */
+  .form-modal-actions {
+    flex-direction: column-reverse;
+  }
+  .btn-modal-cancel,
+  .btn-modal-save,
+  .btn-modal-danger {
+    width: 100%;
+  }
+
+  /* Shared grids */
+  .responsive-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  /* Dashboard */
+  .dashboard-onboarding-actions > * {
+    flex: 1 1 100%;
+  }
+  .dashboard-saldo-card {
+    padding: 14px 16px;
+  }
+  .dashboard-saldo-top-spacer,
+  .dashboard-saldo-recalc {
+    margin-left: 0;
+  }
+  .dashboard-saldo-recalc {
+    width: 100%;
+    align-items: stretch;
+  }
+  .dashboard-saldo-value-wrap,
+  .dashboard-saldo-edit {
+    width: 100%;
+  }
+  .dashboard-saldo-input {
+    width: 100%;
+  }
+  .dashboard-hero-title {
+    font-size: 16px;
+  }
+
+  /* Importar */
+  .import-result-stats {
+    gap: 16px;
+  }
+  .import-dropzone {
+    padding: 32px 20px;
+  }
+  .import-preview-toolbar,
+  .import-preview-pagination {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  /* Perfil */
+  .perfil-summary {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .perfil-avatar-shell {
+    width: 52px;
+    height: 52px;
+  }
+
+  /* Reporte */
+  .reporte-header {
+    margin-bottom: 22px;
+  }
+  .reporte-actions {
+    width: 100%;
+  }
+  .reporte-actions .form-modal-select,
+  .reporte-actions .btn-modal-save,
+  .reporte-actions .btn-modal-cancel {
+    width: 100% !important;
+  }
+
+  .superadmin-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .superadmin-tab {
+    width: 100%;
+    text-align: center;
+  }
+  .superadmin-plans-grid {
+    grid-template-columns: 1fr;
+  }
+  .superadmin-feature-catalog {
+    grid-template-columns: 1fr;
+  }
+  .superadmin-plan-actions {
+    width: 100%;
+  }
+  .superadmin-plan-feature-row {
+    grid-template-columns: 1fr;
+  }
+  .superadmin-user-filters {
+    grid-template-columns: 1fr;
+  }
+  .superadmin-user-plan-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .superadmin-user-plan-select,
+  .superadmin-inline-button {
+    width: 100% !important;
+    min-width: 0;
+  }
+  .superadmin-user-actions {
+    min-width: 190px;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+  .superadmin-audit-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .superadmin-audit-search,
+  .superadmin-audit-filter,
+  .superadmin-audit-pagesize,
+  .superadmin-audit-toolbar .btn-modal-cancel {
+    width: 100%;
+    min-width: 0;
+  }
+  .superadmin-audit-page {
+    width: 100%;
+    text-align: left;
+  }
+
+  /* Diferidos */
+  .diferidos-grid-responsive {
+    grid-template-columns: 1fr;
+  }
+  .diferido-card-summary {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  /* Presupuesto */
+  .budget-card-head {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .budget-inline-edit {
+    flex-wrap: wrap;
+  }
+  .budget-inline-edit .form-modal-input {
+    flex: 1 1 100%;
+  }
+
+  /* Sim result */
+  .sim-result-status {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
 
   /* Simulador */
   .sim-form-card, .sim-result-card { padding: 20px 16px; }
@@ -656,5 +1292,12 @@
   .card-header {
     flex-wrap: wrap;
     gap: 10px;
+  }
+  .table { min-width: 520px; }
+  .list-controls-meta {
+    justify-content: center;
+  }
+  .superadmin-tabs {
+    grid-template-columns: 1fr;
   }
 }

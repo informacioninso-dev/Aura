@@ -54,14 +54,7 @@
 .auth-logo-icon {
   width: 56px;
   height: 56px;
-  background: linear-gradient(135deg, #C487F6, #10B981);
   border-radius: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 900;
-  font-size: 24px;
-  color: #fff;
   margin: 0 auto 14px;
   box-shadow: 0 10px 32px rgba(196,135,246,0.40);
 }

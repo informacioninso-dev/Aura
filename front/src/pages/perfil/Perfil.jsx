@@ -81,8 +81,8 @@ export default function Perfil() {
       </div>
 
       <div className="card" style={{ marginBottom: 18 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, paddingBottom: 24, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-          <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'linear-gradient(135deg, rgba(196,135,246,0.25), rgba(16,185,129,0.20))', border: '1.5px solid rgba(196,135,246,0.30)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="perfil-summary">
+          <div className="perfil-avatar-shell">
             <User size={24} style={{ color: '#C487F6' }} />
           </div>
           <div>

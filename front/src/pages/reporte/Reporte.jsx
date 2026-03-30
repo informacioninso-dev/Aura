@@ -155,13 +155,13 @@ export default function Reporte() {
 
   return (
     <div className="page-container">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
-        <div>
+      <div className="reporte-header">
+        <div className="page-header-main">
           <h1 className="page-title">Reportes</h1>
           <p className="page-subtitle">Resumen mensual de tus finanzas</p>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="reporte-actions">
           <select
             value={mes}
             onChange={(e) => setMes(Number(e.target.value))}
@@ -281,28 +281,30 @@ export default function Reporte() {
           {data.top_gastos.length > 0 && (
             <div className="card">
               <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Top gastos puntuales</h2>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Descripcion</th>
-                    <th>Categoria</th>
-                    <th>Fecha</th>
-                    <th style={{ textAlign: 'right' }}>Monto</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.top_gastos.map((gasto, index) => (
-                    <tr key={index}>
-                      <td>{gasto.descripcion}</td>
-                      <td style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>{gasto.categoria}</td>
-                      <td style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>{gasto.fecha}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 600, color: '#F87171' }}>
-                        ${formatNumber(Number(gasto.monto))}
-                      </td>
+              <div className="table-wrap" style={{ border: 'none' }}>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Descripcion</th>
+                      <th>Categoria</th>
+                      <th>Fecha</th>
+                      <th style={{ textAlign: 'right' }}>Monto</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {data.top_gastos.map((gasto, index) => (
+                      <tr key={index}>
+                        <td>{gasto.descripcion}</td>
+                        <td style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>{gasto.categoria}</td>
+                        <td style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>{gasto.fecha}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 600, color: '#F87171' }}>
+                          ${formatNumber(Number(gasto.monto))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 

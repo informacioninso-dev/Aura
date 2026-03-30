@@ -257,7 +257,7 @@ export default function Dashboard() {
             ))}
           </div>
 
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div className="dashboard-onboarding-actions">
             <Link to="/ingresos" className="btn-modal-save" style={{ textDecoration: 'none' }}>
               Empezar con ingresos
             </Link>
@@ -270,15 +270,13 @@ export default function Dashboard() {
 
       {saldo !== null && (
         <div
+          className="dashboard-saldo-card"
           style={{
-            marginBottom: 20,
-            borderRadius: 16,
-            padding: '16px 20px',
             background: saldo.activo ? 'rgba(196,135,246,0.08)' : 'rgba(255,255,255,0.03)',
             border: `1.5px solid ${saldo.activo ? 'rgba(196,135,246,0.25)' : 'rgba(255,255,255,0.07)'}`,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+          <div className="dashboard-saldo-top">
             <span style={{ fontWeight: 700, fontSize: 14, color: saldo.activo ? '#C487F6' : 'rgba(255,255,255,0.35)' }}>
               Saldo del mes anterior
             </span>
@@ -295,7 +293,7 @@ export default function Dashboard() {
               </span>
             )}
 
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div className="dashboard-saldo-top-spacer">
               <button
                 onClick={toggleSaldo}
                 style={{
@@ -317,10 +315,11 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div className="dashboard-saldo-main">
             {editSaldo ? (
               <>
                 <input
+                  className="dashboard-saldo-input"
                   type="number"
                   step="0.01"
                   value={valorSaldo}
@@ -337,42 +336,43 @@ export default function Dashboard() {
                     color: '#FFFFFF',
                     padding: '6px 12px',
                     fontSize: 15,
-                    width: 170,
                     outline: 'none',
                   }}
                 />
-                <button
-                  onClick={guardarSaldo}
-                  disabled={savingSaldo}
-                  style={{
-                    background: 'rgba(16,185,129,0.15)',
-                    border: '1px solid rgba(16,185,129,0.30)',
-                    borderRadius: 8,
-                    padding: '6px 9px',
-                    color: '#10B981',
-                    cursor: 'pointer',
-                    display: 'flex',
-                  }}
-                >
-                  <Check size={15} />
-                </button>
-                <button
-                  onClick={() => setEditSaldo(false)}
-                  style={{
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.10)',
-                    borderRadius: 8,
-                    padding: '6px 9px',
-                    color: 'rgba(255,255,255,0.40)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                  }}
-                >
-                  <X size={15} />
-                </button>
+                <div className="dashboard-saldo-edit">
+                  <button
+                    onClick={guardarSaldo}
+                    disabled={savingSaldo}
+                    style={{
+                      background: 'rgba(16,185,129,0.15)',
+                      border: '1px solid rgba(16,185,129,0.30)',
+                      borderRadius: 8,
+                      padding: '6px 9px',
+                      color: '#10B981',
+                      cursor: 'pointer',
+                      display: 'flex',
+                    }}
+                  >
+                    <Check size={15} />
+                  </button>
+                  <button
+                    onClick={() => setEditSaldo(false)}
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.10)',
+                      borderRadius: 8,
+                      padding: '6px 9px',
+                      color: 'rgba(255,255,255,0.40)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                    }}
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
               </>
             ) : (
-              <>
+              <div className="dashboard-saldo-value-wrap">
                 <span
                   style={{
                     fontWeight: 800,
@@ -392,10 +392,10 @@ export default function Dashboard() {
                 >
                   <Pencil size={14} />
                 </button>
-              </>
+              </div>
             )}
 
-            <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+            <div className="dashboard-saldo-recalc">
               <button
                 onClick={recalcular}
                 disabled={recalculando || (saldo.recalculos_restantes === 0)}

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '../../context/useAuth'
+import BrandMark from '../brand/BrandMark'
 import Sidebar from './Sidebar'
 import NotificationBell from './NotificationBell'
 import './layout.css'
@@ -31,7 +32,7 @@ export default function AppLayout() {
           <span /><span /><span />
         </button>
         <div className="mobile-logo">
-          <div className="sidebar-logo-icon">A</div>
+          <BrandMark className="sidebar-logo-icon" />
           <span className="sidebar-logo-name">AURA</span>
         </div>
         <div style={{ width: 44 }} />

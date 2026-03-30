@@ -154,7 +154,7 @@ export default function Importar() {
           <CheckCircle size={56} style={{ color: '#10B981', marginBottom: 16 }} />
           <p style={{ fontWeight: 800, fontSize: 20, marginBottom: 8 }}>Todo importado</p>
 
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 32, margin: '20px 0' }}>
+          <div className="import-result-stats">
             <div>
               <p style={{ fontWeight: 700, fontSize: 28, color: '#10B981' }}>{resultado.ingresos_creados}</p>
               <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>ingresos historicos</p>
@@ -181,18 +181,15 @@ export default function Importar() {
   if (fase === 'preview' && preview) {
     return (
       <div>
-        <div
-          className="page-header"
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}
-        >
-          <div>
+        <div className="page-header page-header-actions">
+          <div className="page-header-main">
             <h1 className="page-title">Revisar importacion</h1>
             <p className="page-subtitle">
               {preview.total} filas detectadas, {preview.filas_ok.length} validas, {preview.filas_error.length} con error y un limite actual de {formatNumber(maxFilasDetectadas)} filas.
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div className="inline-actions-wrap">
             <button type="button" className="btn-modal-cancel" onClick={reiniciar}>
               Cancelar
             </button>
@@ -232,22 +229,14 @@ export default function Importar() {
 
         {preview.filas_ok.length > 0 && (
           <div className="card" style={{ padding: 0, marginBottom: 16 }}>
-            <div
-              style={{
-                padding: '14px 20px 10px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                flexWrap: 'wrap',
-              }}
-            >
+            <div className="import-preview-toolbar">
               <CheckCircle size={16} style={{ color: '#10B981' }} />
               <span style={{ fontWeight: 700, fontSize: 14 }}>Filas validas ({preview.filas_ok.length})</span>
               <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.40)' }}>
                 Mostrando {previewSliceStart + 1}-{Math.min(previewSliceEnd, preview.filas_ok.length)} de {preview.filas_ok.length}
               </span>
 
-              <div style={{ marginLeft: 'auto', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <div className="inline-actions-wrap" style={{ marginLeft: 'auto' }}>
                 <button
                   type="button"
                   onClick={togglePaginaActual}
@@ -265,7 +254,7 @@ export default function Importar() {
               </div>
             </div>
 
-            <div style={{ padding: '0 20px 14px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div className="import-preview-pagination">
               <button
                 type="button"
                 className="btn-modal-cancel"
@@ -384,6 +373,7 @@ export default function Importar() {
       </div>
 
       <div
+        className="import-dropzone"
         onDragOver={(event) => {
           event.preventDefault()
           setDrag(true)
@@ -393,13 +383,7 @@ export default function Importar() {
         onClick={() => inputRef.current?.click()}
         style={{
           border: `2px dashed ${drag ? '#C487F6' : 'rgba(255,255,255,0.12)'}`,
-          borderRadius: 20,
-          padding: '60px 40px',
-          textAlign: 'center',
-          cursor: 'pointer',
           background: drag ? 'rgba(196,135,246,0.06)' : 'rgba(255,255,255,0.02)',
-          transition: 'all 0.2s',
-          marginBottom: 24,
         }}
       >
         <input
@@ -443,7 +427,7 @@ export default function Importar() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div className="responsive-grid-2">
         <div className="card" style={{ padding: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
             <FileSpreadsheet size={18} style={{ color: '#C487F6' }} />

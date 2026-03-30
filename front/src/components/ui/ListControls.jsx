@@ -12,25 +12,15 @@ export default function ListControls({
   filteredItems,
 }) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 10,
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        padding: '14px 20px 8px',
-      }}
-    >
+    <div className="list-controls">
       <input
-        className="form-modal-input"
+        className="form-modal-input list-controls-search"
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
         placeholder={placeholder}
-        style={{ maxWidth: 280 }}
       />
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <div className="list-controls-meta">
         <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
           {filteredItems} de {totalItems}
         </span>
@@ -47,7 +37,7 @@ export default function ListControls({
         <button className="btn-modal-cancel" onClick={onPrevPage} disabled={page <= 1} style={{ padding: '8px 10px' }}>
           Anterior
         </button>
-        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', minWidth: 68, textAlign: 'center' }}>
+        <span className="list-controls-page">
           {page}/{pageCount}
         </span>
         <button className="btn-modal-cancel" onClick={onNextPage} disabled={page >= pageCount} style={{ padding: '8px 10px' }}>

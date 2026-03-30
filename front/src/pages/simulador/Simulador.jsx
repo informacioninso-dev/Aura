@@ -479,7 +479,7 @@ export default function Simulador() {
                       border: `1px solid ${resultado.factible ? 'rgba(16,185,129,0.25)' : 'rgba(248,113,113,0.25)'}`,
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <div className="sim-result-status">
                       {resultado.factible
                         ? <CheckCircle size={36} style={{ color: '#10B981', flexShrink: 0 }} />
                         : <XCircle size={36} style={{ color: '#F87171', flexShrink: 0 }} />}
@@ -526,6 +526,7 @@ export default function Simulador() {
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 8,
+                      width: '100%',
                       padding: '12px 0',
                       border: '1.5px solid rgba(196,135,246,0.30)',
                       color: '#C487F6',
@@ -558,7 +559,7 @@ export default function Simulador() {
                         onClick={agregarComoDiferido}
                         disabled={agregando}
                         className="btn-modal-save"
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 0' }}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '12px 0' }}
                       >
                         <CreditCard size={16} /> {agregando ? 'Agregando...' : 'Agregar como cuota a mi plan'}
                       </button>
@@ -673,7 +674,7 @@ export default function Simulador() {
                           <td>{s.plazo_meses} m</td>
                           <td>{s.colchon_minimo ? fmt(s.colchon_minimo) : '-'}</td>
                           <td className="table-amount positive">{fmt(s.cuota_mensual)}</td>
-                          <td>
+                          <td className="table-actions-cell">
                             <button
                               className="btn-icon danger"
                               disabled={deletingId === s.id}

@@ -151,8 +151,8 @@ export default function GastosCorrientes() {
 
   return (
     <div>
-      <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
+      <div className="page-header page-header-actions">
+        <div className="page-header-main">
           <h1 className="page-title">Gastos del mes</h1>
           <p className="page-subtitle">
             Total mensual:&nbsp;
@@ -161,7 +161,7 @@ export default function GastosCorrientes() {
             </span>
           </p>
         </div>
-        <button className="btn-add" onClick={openNew}><Plus size={16} /> Agregar</button>
+        <button className="btn-add page-primary-action" onClick={openNew}><Plus size={16} /> Agregar</button>
       </div>
 
       <FeedbackAlert type={feedback.type || 'error'} message={feedback.message} />
@@ -204,8 +204,8 @@ export default function GastosCorrientes() {
                       <td>{item.fecha_inicio}</td>
                       <td>{item.fecha_fin || '-'}</td>
                       <td><span className={item.activo ? 'badge badge-green' : 'badge badge-gray'}>{item.activo ? 'Activo' : 'Inactivo'}</span></td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 4 }}>
+                      <td className="table-actions-cell">
+                        <div className="table-actions-row">
                           <button className="btn-icon edit" onClick={() => openEdit(item)}><Pencil size={15} /></button>
                           <button className="btn-icon danger" disabled={deletingId === item.id} onClick={() => openDeleteConfirm(item.id)}><Trash2 size={15} /></button>
                         </div>

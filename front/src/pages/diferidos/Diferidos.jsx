@@ -116,8 +116,8 @@ export default function Diferidos() {
 
   return (
     <div>
-      <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
+      <div className="page-header page-header-actions">
+        <div className="page-header-main">
           <h1 className="page-title">Cuotas y diferidos</h1>
           <p className="page-subtitle">
             Total mensual en cuotas:&nbsp;
@@ -126,7 +126,7 @@ export default function Diferidos() {
             </span>
           </p>
         </div>
-        <button className="btn-add" onClick={openNew}><Plus size={16} /> Agregar</button>
+        <button className="btn-add page-primary-action" onClick={openNew}><Plus size={16} /> Agregar</button>
       </div>
 
       {items.length === 0 ? (
@@ -138,7 +138,7 @@ export default function Diferidos() {
           </div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+        <div className="diferidos-grid-responsive">
           {items.map(item => {
             const pct = progreso(item)
             return (
@@ -148,13 +148,13 @@ export default function Diferidos() {
                     <p style={{ fontWeight: 700, color: '#fff', marginBottom: 2 }}>{item.descripcion}</p>
                     <span className="badge badge-gray" style={{ textTransform: 'capitalize' }}>{item.categoria}</span>
                   </div>
-                  <div style={{ display: 'flex', gap: 4 }}>
+                  <div className="table-actions-row">
                     <button className="btn-icon edit" onClick={() => openEdit(item)}><Pencil size={14} /></button>
                     <button className="btn-icon danger" disabled={deletingId === item.id} onClick={() => openDeleteConfirm(item.id)}><Trash2 size={14} /></button>
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', marginBottom: 14 }}>
+                <div className="diferido-card-summary">
                   <div>
                     <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>Total</p>
                     <p style={{ fontWeight: 600, color: '#fff' }}>${formatNumber(parseFloat(item.monto_total))}</p>
