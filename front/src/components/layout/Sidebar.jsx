@@ -1,14 +1,46 @@
+import {
+  ArrowDownCircle,
+  ArrowUpCircle,
+  BarChart3,
+  Calculator,
+  CreditCard,
+  LogOut,
+  ReceiptText,
+  ShieldCheck,
+  Tags,
+  Upload,
+  UserRound,
+  Wallet,
+} from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
+
 import { useAuth } from '../../context/useAuth'
 import './layout.css'
 
-const navItems = [
-  { to: '/dashboard',            icon: '◈', label: 'Mi dinero' },
-  { to: '/ingresos',             icon: '↑', label: 'Lo que entra' },
-  { to: '/gastos-corrientes',    icon: '↓', label: 'Lo que sale' },
-  { to: '/gastos-no-corrientes', icon: '◉', label: 'Gastos puntuales' },
-  { to: '/diferidos',            icon: '⊞', label: 'Cuotas' },
+const FINANCE_NAV_ITEMS = [
+  { to: '/dashboard', icon: Wallet, label: 'Mi dinero' },
+  { to: '/ingresos', icon: ArrowDownCircle, label: 'Lo que entra' },
+  { to: '/gastos-corrientes', icon: ArrowUpCircle, label: 'Lo que sale' },
+  { to: '/gastos-no-corrientes', icon: ReceiptText, label: 'Gastos puntuales' },
+  { to: '/diferidos', icon: CreditCard, label: 'Cuotas' },
 ]
+
+function NavItem({ to, icon, label, onClick }) {
+  const IconComponent = icon
+
+  return (
+    <NavLink
+      to={to}
+      className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+      onClick={onClick}
+    >
+      <span className="nav-item-icon" aria-hidden="true">
+        <IconComponent size={17} strokeWidth={2.1} />
+      </span>
+      {label}
+    </NavLink>
+  )
+}
 
 export default function Sidebar({ isOpen, onClose }) {
   const { user, logout } = useAuth()
@@ -33,77 +65,46 @@ export default function Sidebar({ isOpen, onClose }) {
         </div>
         <button
           className="sidebar-close-btn"
-          onClick={(e) => { e.preventDefault(); if (onClose) onClose() }}
-          aria-label="Cerrar menú"
+          onClick={(event) => {
+            event.preventDefault()
+            if (onClose) onClose()
+          }}
+          aria-label="Cerrar menu"
         >
-          ✕
+          X
         </button>
       </NavLink>
 
       <nav className="sidebar-nav">
         <div className="nav-section-label">Finanzas</div>
-        {navItems.map(({ to, icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
-            onClick={handleNavClick}
-          >
-            <span style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>
-            {label}
-          </NavLink>
+        {FINANCE_NAV_ITEMS.map(({ to, icon, label }) => (
+          <NavItem key={to} to={to} icon={icon} label={label} onClick={handleNavClick} />
         ))}
 
         <div className="nav-section-label" style={{ marginTop: 8 }}>Herramientas</div>
-        <NavLink
-          to="/presupuesto"
-          className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
-          onClick={handleNavClick}
-        >
-          <span style={{ fontSize: 16, lineHeight: 1 }}>◑</span>
-          Categorías
-        </NavLink>
-        <NavLink
-          to="/simulador"
-          className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
-          onClick={handleNavClick}
-        >
-          <span style={{ fontSize: 16, lineHeight: 1 }}>⬡</span>
-          Simulador
-        </NavLink>
-        <NavLink
-          to="/importar"
-          className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
-          onClick={handleNavClick}
-        >
-          <span style={{ fontSize: 16, lineHeight: 1 }}>⤒</span>
-          Importar historial
-        </NavLink>
-        <NavLink
-          to="/reporte"
-          className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
-          onClick={handleNavClick}
-        >
-          <span style={{ fontSize: 16, lineHeight: 1 }}>≡</span>
-          Reportes
-        </NavLink>
+        <NavItem to="/presupuesto" icon={Tags} label="Categorias" onClick={handleNavClick} />
+        <NavItem to="/simulador" icon={Calculator} label="Simulador" onClick={handleNavClick} />
+        <NavItem to="/importar" icon={Upload} label="Importar historial" onClick={handleNavClick} />
+        <NavItem to="/reporte" icon={BarChart3} label="Reportes" onClick={handleNavClick} />
+
+        {user?.is_superuser && (
+          <>
+            <div className="nav-section-label" style={{ marginTop: 8 }}>Admin</div>
+            <NavItem to="/superadmin" icon={ShieldCheck} label="Super Admin" onClick={handleNavClick} />
+          </>
+        )}
       </nav>
 
       <div className="sidebar-footer">
-        <NavLink
-          to="/perfil"
-          className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
-          onClick={handleNavClick}
-        >
-          <span style={{ fontSize: 16, lineHeight: 1 }}>◎</span>
-          {user?.username || 'Mi perfil'}
-        </NavLink>
+        <NavItem to="/perfil" icon={UserRound} label={user?.username || 'Mi perfil'} onClick={handleNavClick} />
         <button
           onClick={handleLogout}
           className="nav-item nav-item-danger"
         >
-          <span style={{ fontSize: 16, lineHeight: 1 }}>⊗</span>
-          Cerrar sesión
+          <span className="nav-item-icon" aria-hidden="true">
+            <LogOut size={17} strokeWidth={2.1} />
+          </span>
+          Cerrar sesion
         </button>
       </div>
     </aside>

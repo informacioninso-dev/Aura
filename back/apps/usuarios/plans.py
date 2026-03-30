@@ -1,0 +1,170 @@
+from django.utils import timezone
+
+from .models import Feature, Plan, PlanFeature, UserPlanAssignment
+
+
+FEATURE_IMPORT_MAX_ROWS = 'import_max_rows'
+
+FEATURE_CATALOG = {
+    FEATURE_IMPORT_MAX_ROWS: {
+        'name': 'Maximo de filas por importacion',
+        'description': 'Cantidad maxima de filas permitidas en una carga historica.',
+        'value_type': 'int',
+        'is_highlighted': True,
+        'is_active': True,
+    },
+}
+
+FEATURE_DEFAULTS = {
+    FEATURE_IMPORT_MAX_ROWS: 2000,
+}
+
+
+def sync_feature_catalog():
+    synced_codes = []
+    for code, definition in FEATURE_CATALOG.items():
+        feature, created = Feature.objects.get_or_create(
+            code=code,
+            defaults={
+                'name': definition['name'],
+                'description': definition.get('description', ''),
+                'value_type': definition.get('value_type', 'bool'),
+                'is_highlighted': definition.get('is_highlighted', True),
+                'is_active': definition.get('is_active', True),
+            },
+        )
+        if not created:
+            changed_fields = []
+            for field, value in (
+                ('name', definition['name']),
+                ('description', definition.get('description', '')),
+                ('value_type', definition.get('value_type', 'bool')),
+                ('is_highlighted', definition.get('is_highlighted', True)),
+                ('is_active', definition.get('is_active', True)),
+            ):
+                if getattr(feature, field) != value:
+                    setattr(feature, field, value)
+                    changed_fields.append(field)
+            if changed_fields:
+                feature.save(update_fields=changed_fields + ['updated_at'])
+        synced_codes.append(code)
+
+    return Feature.objects.filter(code__in=synced_codes).order_by('name')
+
+
+def get_default_plan():
+    plan = Plan.objects.filter(is_default=True, is_active=True).order_by('sort_order', 'name').first()
+    if plan:
+        return plan
+    return Plan.objects.filter(is_active=True).order_by('sort_order', 'name').first()
+
+
+def get_active_plan_assignment(user):
+    if not getattr(user, 'is_authenticated', False):
+        return None
+
+    now = timezone.now()
+    return (
+        UserPlanAssignment.objects.select_related('plan')
+        .filter(
+            user=user,
+            is_active=True,
+            starts_at__lte=now,
+        )
+        .filter(ends_at__isnull=True)
+        .order_by('-starts_at', '-pk')
+        .first()
+        or UserPlanAssignment.objects.select_related('plan')
+        .filter(
+            user=user,
+            is_active=True,
+            starts_at__lte=now,
+            ends_at__gte=now,
+        )
+        .order_by('-starts_at', '-pk')
+        .first()
+    )
+
+
+def get_current_plan(user):
+    assignment = get_active_plan_assignment(user)
+    if assignment:
+        return assignment.plan, assignment
+    return get_default_plan(), None
+
+
+def get_plan_feature_values(plan):
+    if not plan:
+        return dict(FEATURE_DEFAULTS)
+
+    values = dict(FEATURE_DEFAULTS)
+    for plan_feature in PlanFeature.objects.select_related('feature').filter(plan=plan, feature__is_active=True):
+        values[plan_feature.feature.code] = plan_feature.typed_value
+    return values
+
+
+def get_user_feature_access(user):
+    plan, _ = get_current_plan(user)
+    return get_plan_feature_values(plan)
+
+
+def get_user_feature_value(user, feature_code, default=None):
+    fallback = FEATURE_DEFAULTS.get(feature_code, default)
+    return get_user_feature_access(user).get(feature_code, fallback)
+
+
+def assign_plan_to_user(*, user, plan, assigned_by=None, notes=''):
+    now = timezone.now()
+    current_assignments = UserPlanAssignment.objects.filter(user=user, is_active=True).order_by('-starts_at', '-pk')
+    current = current_assignments.first()
+
+    if current:
+        current_assignments.exclude(pk=current.pk).update(is_active=False, ends_at=now)
+
+        current.plan = plan
+        current.assigned_by = assigned_by
+        current.notes = notes
+        current.starts_at = now
+        current.ends_at = None
+        current.is_active = True
+        current.save()
+        return current
+
+    return UserPlanAssignment.objects.create(
+        user=user,
+        plan=plan,
+        assigned_by=assigned_by,
+        notes=notes,
+        starts_at=now,
+        is_active=True,
+    )
+
+
+def serialize_plan_summary(plan):
+    if not plan:
+        return None
+
+    return {
+        'id': plan.id,
+        'slug': plan.slug,
+        'name': plan.name,
+        'description': plan.description,
+        'is_default': plan.is_default,
+        'is_active': plan.is_active,
+    }
+
+
+def serialize_feature_value(feature, plan_feature=None):
+    return {
+        'feature_id': feature.id,
+        'code': feature.code,
+        'name': feature.name,
+        'description': feature.description,
+        'value_type': feature.value_type,
+        'is_highlighted': feature.is_highlighted,
+        'is_active': feature.is_active,
+        'value_bool': plan_feature.value_bool if plan_feature else False,
+        'value_int': plan_feature.value_int if plan_feature else None,
+        'value_text': plan_feature.value_text if plan_feature else '',
+        'value': plan_feature.typed_value if plan_feature else FEATURE_DEFAULTS.get(feature.code),
+    }

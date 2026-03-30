@@ -1,6 +1,9 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Upload, FileSpreadsheet, CheckCircle, XCircle, AlertTriangle, Download } from 'lucide-react'
+
 import api from '../../api/client'
+import { useAuth } from '../../context/useAuth'
+import { formatNumber } from '../../utils/formatters'
 import '../../components/ui/app.css'
 
 const TEMPLATE_CSV = `fecha,descripcion,monto,tipo,categoria
@@ -10,97 +13,163 @@ const TEMPLATE_CSV = `fecha,descripcion,monto,tipo,categoria
 2025-12-15,Freelance,200000,ingreso,
 2025-12-20,Farmacia,-32000,gasto,salud`
 
+const PREVIEW_PAGE_SIZE = 100
+
 export default function Importar() {
-  const inputRef      = useRef(null)
-  const [fase, setFase]           = useState('upload')   // upload | preview | confirmado
-  const [drag, setDrag]           = useState(false)
-  const [cargando, setCargando]   = useState(false)
-  const [error, setError]         = useState('')
-  const [preview, setPreview]     = useState(null)       // resultado del backend
-  const [seleccion, setSeleccion] = useState([])         // índices de filas seleccionadas
+  const { user } = useAuth()
+  const inputRef = useRef(null)
+
+  const [fase, setFase] = useState('upload')
+  const [drag, setDrag] = useState(false)
+  const [cargando, setCargando] = useState(false)
+  const [error, setError] = useState('')
+  const [preview, setPreview] = useState(null)
+  const [seleccion, setSeleccion] = useState([])
   const [resultado, setResultado] = useState(null)
+  const [previewPage, setPreviewPage] = useState(1)
+
+  const maxFilasPlan = user?.feature_access?.import_max_rows ?? 2000
+  const maxFilasDetectadas = preview?.max_filas_permitidas ?? maxFilasPlan
+
+  const totalValidas = preview?.filas_ok?.length ?? 0
+  const previewPageCount = Math.max(1, Math.ceil(totalValidas / PREVIEW_PAGE_SIZE))
+  const safePreviewPage = Math.min(previewPage, previewPageCount)
+  const previewSliceStart = (safePreviewPage - 1) * PREVIEW_PAGE_SIZE
+  const previewSliceEnd = previewSliceStart + PREVIEW_PAGE_SIZE
+  const visibleRows = useMemo(
+    () => (preview?.filas_ok || []).slice(previewSliceStart, previewSliceEnd),
+    [preview, previewSliceStart, previewSliceEnd],
+  )
+  const visibleIndexes = useMemo(
+    () => visibleRows.map((_, index) => previewSliceStart + index),
+    [visibleRows, previewSliceStart],
+  )
+  const visibleSelectedCount = visibleIndexes.filter((index) => seleccion.includes(index)).length
 
   function descargarTemplate() {
     const blob = new Blob([TEMPLATE_CSV], { type: 'text/csv;charset=utf-8;' })
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href = url; a.download = 'plantilla_aura.csv'; a.click()
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'plantilla_aura.csv'
+    anchor.click()
     URL.revokeObjectURL(url)
   }
 
   async function procesarArchivo(file) {
     if (!file) return
-    const ext = file.name.split('.').pop().toLowerCase()
-    if (!['csv', 'xlsx', 'xls'].includes(ext)) {
-      setError('Solo se aceptan archivos .csv o .xlsx'); return
+
+    const ext = file.name.split('.').pop()?.toLowerCase()
+    if (!['csv', 'xlsx'].includes(ext)) {
+      setError('Solo se aceptan archivos .csv o .xlsx')
+      return
     }
-    setError(''); setCargando(true)
+
+    setError('')
+    setCargando(true)
     try {
-      const fd = new FormData()
-      fd.append('archivo', file)
-      const { data } = await api.post('/finanzas/importar/preview/', fd, {
+      const formData = new FormData()
+      formData.append('archivo', file)
+
+      const { data } = await api.post('/finanzas/importar/preview/', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
+
       setPreview(data)
-      setSeleccion(data.filas_ok.map((_, i) => i))  // todo seleccionado por defecto
+      setSeleccion(data.filas_ok.map((_, index) => index))
+      setPreviewPage(1)
       setFase('preview')
     } catch (err) {
       setError(err.response?.data?.error || 'Error al procesar el archivo')
-    } finally { setCargando(false) }
+    } finally {
+      setCargando(false)
+    }
   }
 
-  function onDrop(e) {
-    e.preventDefault(); setDrag(false)
-    procesarArchivo(e.dataTransfer.files[0])
+  function onDrop(event) {
+    event.preventDefault()
+    setDrag(false)
+    procesarArchivo(event.dataTransfer.files?.[0])
   }
 
-  function toggleFila(i) {
-    setSeleccion(prev => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i])
+  function toggleFila(index) {
+    setSeleccion((prev) => (
+      prev.includes(index) ? prev.filter((item) => item !== index) : [...prev, index]
+    ))
   }
 
   function toggleTodo() {
-    setSeleccion(prev => prev.length === preview.filas_ok.length ? [] : preview.filas_ok.map((_, i) => i))
+    if (!preview) return
+    setSeleccion((prev) => (
+      prev.length === preview.filas_ok.length ? [] : preview.filas_ok.map((_, index) => index)
+    ))
+  }
+
+  function togglePaginaActual() {
+    const allVisibleSelected = visibleIndexes.every((index) => seleccion.includes(index))
+    if (allVisibleSelected) {
+      setSeleccion((prev) => prev.filter((index) => !visibleIndexes.includes(index)))
+      return
+    }
+
+    setSeleccion((prev) => {
+      const merged = new Set(prev)
+      visibleIndexes.forEach((index) => merged.add(index))
+      return Array.from(merged).sort((a, b) => a - b)
+    })
   }
 
   async function confirmar() {
-    setCargando(true); setError('')
+    setCargando(true)
+    setError('')
     try {
-      const filas = seleccion.map(i => preview.filas_ok[i])
+      const filas = seleccion.map((index) => preview.filas_ok[index])
       const { data } = await api.post('/finanzas/importar/confirmar/', { filas })
       setResultado(data)
       setFase('confirmado')
     } catch (err) {
       setError(err.response?.data?.error || 'Error al importar')
-    } finally { setCargando(false) }
+    } finally {
+      setCargando(false)
+    }
   }
 
   function reiniciar() {
-    setFase('upload'); setPreview(null); setSeleccion([]); setResultado(null); setError('')
+    setFase('upload')
+    setPreview(null)
+    setSeleccion([])
+    setResultado(null)
+    setError('')
+    setPreviewPage(1)
   }
 
-  // ── FASE: CONFIRMADO ──
   if (fase === 'confirmado' && resultado) {
     return (
       <div>
         <div className="page-header">
-          <h1 className="page-title">Importación completada</h1>
+          <h1 className="page-title">Importacion completada</h1>
         </div>
+
         <div className="card" style={{ maxWidth: 520, textAlign: 'center', padding: 40 }}>
           <CheckCircle size={56} style={{ color: '#10B981', marginBottom: 16 }} />
-          <p style={{ fontWeight: 800, fontSize: 20, marginBottom: 8 }}>¡Todo importado!</p>
+          <p style={{ fontWeight: 800, fontSize: 20, marginBottom: 8 }}>Todo importado</p>
+
           <div style={{ display: 'flex', justifyContent: 'center', gap: 32, margin: '20px 0' }}>
             <div>
               <p style={{ fontWeight: 700, fontSize: 28, color: '#10B981' }}>{resultado.ingresos_creados}</p>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>ingresos históricos</p>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>ingresos historicos</p>
             </div>
             <div>
               <p style={{ fontWeight: 700, fontSize: 28, color: '#F87171' }}>{resultado.gastos_creados}</p>
               <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>gastos registrados</p>
             </div>
           </div>
+
           <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 24 }}>
-            Los ingresos históricos se guardan como <strong>inactivos</strong> para no distorsionar tu proyección mensual. Puedes activarlos en el módulo "Lo que entra".
+            Los ingresos historicos se guardan como <strong>inactivos</strong> para no distorsionar tu proyeccion mensual.
+            Luego puedes activarlos desde el modulo &quot;Lo que entra&quot; si corresponde.
           </p>
+
           <button className="btn-modal-save" style={{ padding: '11px 28px' }} onClick={reiniciar}>
             Importar otro archivo
           </button>
@@ -109,98 +178,195 @@ export default function Importar() {
     )
   }
 
-  // ── FASE: PREVIEW ──
   if (fase === 'preview' && preview) {
-    const filasSeleccionadas = seleccion.length
     return (
       <div>
-        <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div
+          className="page-header"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}
+        >
           <div>
-            <h1 className="page-title">Revisar importación</h1>
+            <h1 className="page-title">Revisar importacion</h1>
             <p className="page-subtitle">
-              {preview.total} filas detectadas — {preview.filas_ok.length} válidas, {preview.filas_error.length} con error
+              {preview.total} filas detectadas, {preview.filas_ok.length} validas, {preview.filas_error.length} con error y un limite actual de {formatNumber(maxFilasDetectadas)} filas.
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button className="btn-modal-cancel" onClick={reiniciar}>Cancelar</button>
-            <button className="btn-modal-save" onClick={confirmar}
-              disabled={cargando || filasSeleccionadas === 0}
-              style={{ padding: '10px 22px' }}>
-              {cargando ? 'Importando...' : `Importar ${filasSeleccionadas} filas`}
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button type="button" className="btn-modal-cancel" onClick={reiniciar}>
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="btn-modal-save"
+              onClick={confirmar}
+              disabled={cargando || seleccion.length === 0}
+              style={{ padding: '10px 22px' }}
+            >
+              {cargando ? 'Importando...' : `Importar ${seleccion.length} filas`}
             </button>
           </div>
         </div>
 
-        {/* Columnas detectadas */}
         <div className="card" style={{ marginBottom: 16, padding: '14px 20px' }}>
-          <p style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Columnas detectadas</p>
+          <p
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: 'rgba(255,255,255,0.35)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              marginBottom: 8,
+            }}
+          >
+            Columnas detectadas
+          </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {Object.entries(preview.mapa_columnas).map(([campo, col]) => (
+            {Object.entries(preview.mapa_columnas || {}).map(([campo, columna]) => (
               <span key={campo} className="badge badge-gray">
-                <span style={{ color: '#C487F6' }}>{campo}</span> ← {col}
+                <span style={{ color: '#C487F6' }}>{campo}</span> {'<-'} {columna}
               </span>
             ))}
           </div>
         </div>
 
-        {/* Filas válidas */}
         {preview.filas_ok.length > 0 && (
           <div className="card" style={{ padding: 0, marginBottom: 16 }}>
-            <div style={{ padding: '14px 20px 10px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div
+              style={{
+                padding: '14px 20px 10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                flexWrap: 'wrap',
+              }}
+            >
               <CheckCircle size={16} style={{ color: '#10B981' }} />
-              <span style={{ fontWeight: 700, fontSize: 14 }}>Filas válidas ({preview.filas_ok.length})</span>
-              <button onClick={toggleTodo}
-                style={{ marginLeft: 'auto', fontSize: 12, color: '#C487F6', background: 'none', border: 'none', cursor: 'pointer' }}>
-                {seleccion.length === preview.filas_ok.length ? 'Deseleccionar todo' : 'Seleccionar todo'}
-              </button>
+              <span style={{ fontWeight: 700, fontSize: 14 }}>Filas validas ({preview.filas_ok.length})</span>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.40)' }}>
+                Mostrando {previewSliceStart + 1}-{Math.min(previewSliceEnd, preview.filas_ok.length)} de {preview.filas_ok.length}
+              </span>
+
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={togglePaginaActual}
+                  style={{ fontSize: 12, color: '#C487F6', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  {visibleSelectedCount === visibleIndexes.length ? 'Deseleccionar pagina' : 'Seleccionar pagina'}
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleTodo}
+                  style={{ fontSize: 12, color: '#C487F6', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  {seleccion.length === preview.filas_ok.length ? 'Deseleccionar todo' : 'Seleccionar todo'}
+                </button>
+              </div>
             </div>
-            <div className="table-wrap" style={{ border: 'none', maxHeight: 380, overflowY: 'auto' }}>
+
+            <div style={{ padding: '0 20px 14px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn-modal-cancel"
+                onClick={() => setPreviewPage((page) => Math.max(1, page - 1))}
+                disabled={safePreviewPage <= 1}
+                style={{ padding: '8px 10px' }}
+              >
+                Anterior
+              </button>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', minWidth: 70, textAlign: 'center' }}>
+                {safePreviewPage}/{previewPageCount}
+              </span>
+              <button
+                type="button"
+                className="btn-modal-cancel"
+                onClick={() => setPreviewPage((page) => Math.min(previewPageCount, page + 1))}
+                disabled={safePreviewPage >= previewPageCount}
+                style={{ padding: '8px 10px' }}
+              >
+                Siguiente
+              </button>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
+                La tabla se pagina para mantener la carga rapida aun con archivos grandes.
+              </span>
+            </div>
+
+            <div className="table-wrap" style={{ border: 'none', maxHeight: 420, overflowY: 'auto' }}>
               <table className="table">
                 <thead>
                   <tr>
                     <th style={{ width: 36 }}></th>
-                    {['Fecha', 'Descripción', 'Monto', 'Tipo', 'Categoría'].map(h => <th key={h}>{h}</th>)}
+                    {['Fecha', 'Descripcion', 'Monto', 'Tipo', 'Categoria'].map((header) => (
+                      <th key={header}>{header}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {preview.filas_ok.map((f, i) => (
-                    <tr key={i} style={{ opacity: seleccion.includes(i) ? 1 : 0.35 }}>
-                      <td>
-                        <input type="checkbox" checked={seleccion.includes(i)} onChange={() => toggleFila(i)}
-                          style={{ accentColor: '#C487F6', cursor: 'pointer' }} />
-                      </td>
-                      <td style={{ fontSize: 13 }}>{f.fecha}</td>
-                      <td style={{ fontWeight: 600, fontSize: 13 }}>{f.descripcion}</td>
-                      <td className={`table-amount ${f.tipo === 'ingreso' ? 'positive' : 'negative'}`}>
-                        {f.tipo === 'ingreso' ? '+' : '-'}${parseFloat(f.monto).toLocaleString('es-CL')}
-                      </td>
-                      <td>
-                        <span className={`badge ${f.tipo === 'ingreso' ? 'badge-green' : 'badge-gray'}`}
-                          style={{ textTransform: 'capitalize' }}>{f.tipo}</span>
-                      </td>
-                      <td style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', textTransform: 'capitalize' }}>{f.categoria}</td>
-                    </tr>
-                  ))}
+                  {visibleRows.map((fila, visibleIndex) => {
+                    const absoluteIndex = previewSliceStart + visibleIndex
+                    const selected = seleccion.includes(absoluteIndex)
+                    return (
+                      <tr key={`${fila.fecha}-${absoluteIndex}`} style={{ opacity: selected ? 1 : 0.35 }}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => toggleFila(absoluteIndex)}
+                            style={{ accentColor: '#C487F6', cursor: 'pointer' }}
+                          />
+                        </td>
+                        <td style={{ fontSize: 13 }}>{fila.fecha}</td>
+                        <td style={{ fontWeight: 600, fontSize: 13 }}>{fila.descripcion}</td>
+                        <td className={`table-amount ${fila.tipo === 'ingreso' ? 'positive' : 'negative'}`}>
+                          {fila.tipo === 'ingreso' ? '+' : '-'}${formatNumber(parseFloat(fila.monto))}
+                        </td>
+                        <td>
+                          <span
+                            className={`badge ${fila.tipo === 'ingreso' ? 'badge-green' : 'badge-gray'}`}
+                            style={{ textTransform: 'capitalize' }}
+                          >
+                            {fila.tipo}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', textTransform: 'capitalize' }}>
+                          {fila.categoria}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
         )}
 
-        {/* Filas con error */}
         {preview.filas_error.length > 0 && (
-          <div className="card" style={{ padding: '14px 20px', background: 'rgba(248,113,113,0.05)', border: '1px solid rgba(248,113,113,0.15)' }}>
+          <div
+            className="card"
+            style={{
+              padding: '14px 20px',
+              background: 'rgba(248,113,113,0.05)',
+              border: '1px solid rgba(248,113,113,0.15)',
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <XCircle size={16} style={{ color: '#F87171' }} />
-              <span style={{ fontWeight: 700, fontSize: 14, color: '#F87171' }}>Filas con error ({preview.filas_error.length}) — no se importarán</span>
+              <span style={{ fontWeight: 700, fontSize: 14, color: '#F87171' }}>
+                Filas con error ({preview.filas_error.length}) - no se importaran
+              </span>
             </div>
-            {preview.filas_error.slice(0, 5).map((e, i) => (
-              <div key={i} style={{ fontSize: 12, color: 'rgba(255,255,255,0.50)', marginBottom: 4 }}>
-                Fila {e.fila}: {e.error}
+
+            {preview.filas_error.slice(0, 5).map((filaError, index) => (
+              <div key={`${filaError.fila}-${index}`} style={{ fontSize: 12, color: 'rgba(255,255,255,0.50)', marginBottom: 4 }}>
+                Fila {filaError.fila}: {filaError.error}
               </div>
             ))}
+
             {preview.filas_error.length > 5 && (
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.30)' }}>…y {preview.filas_error.length - 5} más</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.30)' }}>
+                ...y {preview.filas_error.length - 5} mas
+              </div>
             )}
           </div>
         )}
@@ -210,17 +376,18 @@ export default function Importar() {
     )
   }
 
-  // ── FASE: UPLOAD ──
   return (
     <div>
       <div className="page-header">
         <h1 className="page-title">Importar historial</h1>
-        <p className="page-subtitle">Sube tu estado de cuenta o planilla de gastos anteriores en Excel o CSV.</p>
+        <p className="page-subtitle">Sube tu estado de cuenta o tu planilla de movimientos en Excel o CSV.</p>
       </div>
 
-      {/* Zona de drop */}
       <div
-        onDragOver={e => { e.preventDefault(); setDrag(true) }}
+        onDragOver={(event) => {
+          event.preventDefault()
+          setDrag(true)
+        }}
         onDragLeave={() => setDrag(false)}
         onDrop={onDrop}
         onClick={() => inputRef.current?.click()}
@@ -233,9 +400,16 @@ export default function Importar() {
           background: drag ? 'rgba(196,135,246,0.06)' : 'rgba(255,255,255,0.02)',
           transition: 'all 0.2s',
           marginBottom: 24,
-        }}>
-        <input ref={inputRef} type="file" accept=".csv,.xlsx,.xls" style={{ display: 'none' }}
-          onChange={e => procesarArchivo(e.target.files[0])} />
+        }}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".csv,.xlsx"
+          style={{ display: 'none' }}
+          onChange={(event) => procesarArchivo(event.target.files?.[0])}
+        />
+
         {cargando ? (
           <>
             <div className="spinner" style={{ margin: '0 auto 16px' }} />
@@ -245,45 +419,59 @@ export default function Importar() {
           <>
             <Upload size={44} style={{ color: drag ? '#C487F6' : 'rgba(255,255,255,0.25)', marginBottom: 16 }} />
             <p style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>
-              {drag ? 'Suelta aquí el archivo' : 'Arrastra tu archivo aquí'}
+              {drag ? 'Suelta aqui el archivo' : 'Arrastra tu archivo aqui'}
             </p>
             <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.40)' }}>o haz clic para seleccionarlo</p>
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', marginTop: 10 }}>.csv · .xlsx · .xls · máx. 5 MB</p>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', marginTop: 10 }}>.csv · .xlsx · max. 5 MB</p>
           </>
         )}
       </div>
 
       {error && (
-        <div style={{ background: 'rgba(248,113,113,0.10)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 12, padding: '12px 16px', color: '#F87171', fontSize: 13, marginBottom: 20 }}>
+        <div
+          style={{
+            background: 'rgba(248,113,113,0.10)',
+            border: '1px solid rgba(248,113,113,0.25)',
+            borderRadius: 12,
+            padding: '12px 16px',
+            color: '#F87171',
+            fontSize: 13,
+            marginBottom: 20,
+          }}
+        >
           {error}
         </div>
       )}
 
-      {/* Instrucciones + template */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <div className="card" style={{ padding: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
             <FileSpreadsheet size={18} style={{ color: '#C487F6' }} />
             <span style={{ fontWeight: 700, fontSize: 14 }}>Formato esperado</span>
           </div>
+
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 10 }}>
-            El archivo debe tener al menos estas columnas (el nombre puede variar):
+            El archivo debe tener al menos estas columnas. Los nombres pueden variar y el sistema intenta detectarlos.
           </p>
+
           {[
-            { col: 'fecha', desc: 'YYYY-MM-DD, DD/MM/YYYY, etc.' },
-            { col: 'descripcion', desc: 'Concepto o glosa del movimiento' },
-            { col: 'monto', desc: 'Positivo = ingreso, negativo = gasto' },
-            { col: 'tipo', desc: '"ingreso" o "gasto" (opcional)' },
-            { col: 'categoria', desc: 'Nombre de categoría (opcional)' },
-          ].map(r => (
-            <div key={r.col} style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-              <span style={{ fontWeight: 700, color: '#C487F6', minWidth: 90, fontSize: 12 }}>{r.col}</span>
-              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.40)' }}>{r.desc}</span>
+            { col: 'fecha', desc: 'YYYY-MM-DD, DD/MM/YYYY o formatos equivalentes.' },
+            { col: 'descripcion', desc: 'Concepto o glosa del movimiento.' },
+            { col: 'monto', desc: 'Positivo para ingreso, negativo para gasto.' },
+            { col: 'tipo', desc: '"ingreso" o "gasto" si ya lo conoces. Es opcional.' },
+            { col: 'categoria', desc: 'Nombre libre de la categoria. Es opcional.' },
+          ].map((item) => (
+            <div key={item.col} style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+              <span style={{ fontWeight: 700, color: '#C487F6', minWidth: 90, fontSize: 12 }}>{item.col}</span>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.40)' }}>{item.desc}</span>
             </div>
           ))}
+
           <div style={{ marginTop: 14, padding: '10px 14px', background: 'rgba(255,255,255,0.04)', borderRadius: 10 }}>
-            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.30)', marginBottom: 2 }}>También detecta:</p>
-            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>concepto, detalle, glosa, importe, valor, amount, abono, cargo…</p>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.30)', marginBottom: 2 }}>Tambien detecta alias comunes:</p>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>
+              concepto, detalle, glosa, importe, valor, amount, abono, cargo, movement.
+            </p>
           </div>
         </div>
 
@@ -293,22 +481,56 @@ export default function Importar() {
               <AlertTriangle size={16} style={{ color: '#FBBF24' }} />
               <span style={{ fontWeight: 700, fontSize: 14 }}>A tener en cuenta</span>
             </div>
+
             {[
-              'Los ingresos históricos se guardan como inactivos para no afectar la proyección.',
-              'Los gastos puntuales (no corrientes) se registran con la fecha exacta.',
-              'Máximo 2.000 filas por importación.',
-              'Puedes revisar y deseleccionar filas antes de confirmar.',
-            ].map((t, i) => (
-              <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 7, alignItems: 'flex-start' }}>
+              'Los ingresos historicos se guardan como inactivos para no afectar la proyeccion mensual actual.',
+              'Los gastos se importan como gastos puntuales del historial.',
+              `Tu plan permite hasta ${formatNumber(maxFilasPlan)} filas por importacion.`,
+              'La vista previa se pagina para mantener una carga rapida aun con archivos grandes.',
+            ].map((text, index) => (
+              <div key={`${index}-${text}`} style={{ display: 'flex', gap: 8, marginBottom: 7, alignItems: 'flex-start' }}>
                 <span style={{ color: '#C487F6', marginTop: 1 }}>·</span>
-                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>{t}</span>
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>{text}</span>
               </div>
             ))}
           </div>
 
-          <button onClick={descargarTemplate}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px 0', border: '1.5px solid rgba(196,135,246,0.30)', borderRadius: 12, background: 'rgba(196,135,246,0.07)', color: '#C487F6', fontSize: 13, fontWeight: 600, cursor: 'pointer', marginTop: 'auto' }}>
-            <Download size={15} /> Descargar plantilla CSV
+          <div
+            style={{
+              marginTop: 4,
+              padding: '10px 14px',
+              borderRadius: 10,
+              background: 'rgba(196,135,246,0.08)',
+              border: '1px solid rgba(196,135,246,0.20)',
+              fontSize: 12,
+              color: 'rgba(255,255,255,0.55)',
+            }}
+          >
+            Si necesitas una carga masiva con reglas especiales o mas volumen, ese flujo debe vivir en un plan superior y con un
+            proceso mas controlado.
+          </div>
+
+          <button
+            type="button"
+            onClick={descargarTemplate}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              padding: '11px 0',
+              border: '1.5px solid rgba(196,135,246,0.30)',
+              borderRadius: 12,
+              background: 'rgba(196,135,246,0.07)',
+              color: '#C487F6',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              marginTop: 'auto',
+            }}
+          >
+            <Download size={15} />
+            Descargar plantilla CSV
           </button>
         </div>
       </div>

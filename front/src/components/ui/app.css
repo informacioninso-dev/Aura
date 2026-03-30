@@ -406,6 +406,28 @@
   transform: translateY(-1px);
 }
 .btn-modal-save:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-modal-danger {
+  flex: 2;
+  background: linear-gradient(135deg, #F87171, #EF4444);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+  box-shadow: 0 4px 18px rgba(248,113,113,0.30);
+  font-family: inherit;
+}
+.btn-modal-danger:hover:not(:disabled) {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+.btn-modal-danger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 /* ── DIFERIDOS ── */
 .diferidos-grid {
@@ -490,6 +512,12 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+.simulador-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
 }
 
 /* ── PERFIL ── */
@@ -599,6 +627,7 @@
   /* Simulador */
   .sim-form-card, .sim-result-card { padding: 20px 16px; }
   .sim-kpi-value { font-size: 22px; }
+  .simulador-main-grid { grid-template-columns: 1fr; }
 
   /* Perfil */
   .perfil-card {
@@ -608,6 +637,10 @@
 
   /* Empty state */
   .empty-state { padding: 36px 16px; }
+}
+
+@media (max-width: 1024px) {
+  .simulador-main-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {

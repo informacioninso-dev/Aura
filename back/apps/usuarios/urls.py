@@ -1,10 +1,44 @@
 from django.urls import path
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .views import RegistroView, PerfilView
+from rest_framework_simplejwt.views import TokenRefreshView
+from .views import (
+    LoginTokenObtainPairView,
+    RegistroView,
+    PerfilView,
+    PasswordForgotView,
+    PasswordResetConfirmView,
+    PasswordChangeView,
+    SuperAdminAuditView,
+    SuperAdminDashboardView,
+    SuperAdminEmailConfigView,
+    SuperAdminEmailTestView,
+    SuperAdminFeaturesView,
+    SuperAdminPlanDetailView,
+    SuperAdminPlanFeaturesView,
+    SuperAdminPlansView,
+    SuperAdminResetPasswordView,
+    SuperAdminUsersView,
+    SuperAdminUserPlanView,
+    SuperAdminUserStatusView,
+)
 
 urlpatterns = [
     path('registro/', RegistroView.as_view(), name='registro'),
-    path('login/', TokenObtainPairView.as_view(), name='login'),
+    path('login/', LoginTokenObtainPairView.as_view(), name='login'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('perfil/', PerfilView.as_view(), name='perfil'),
+    path('password/forgot/', PasswordForgotView.as_view(), name='password_forgot'),
+    path('password/reset/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+    path('password/change/', PasswordChangeView.as_view(), name='password_change'),
+    path('superadmin/dashboard/', SuperAdminDashboardView.as_view(), name='superadmin_dashboard'),
+    path('superadmin/usuarios/', SuperAdminUsersView.as_view(), name='superadmin_users'),
+    path('superadmin/usuarios/<int:user_id>/estado/', SuperAdminUserStatusView.as_view(), name='superadmin_user_status'),
+    path('superadmin/usuarios/<int:user_id>/plan/', SuperAdminUserPlanView.as_view(), name='superadmin_user_plan'),
+    path('superadmin/usuarios/<int:user_id>/reset-password/', SuperAdminResetPasswordView.as_view(), name='superadmin_user_reset_password'),
+    path('superadmin/auditoria/', SuperAdminAuditView.as_view(), name='superadmin_audit'),
+    path('superadmin/features/', SuperAdminFeaturesView.as_view(), name='superadmin_features'),
+    path('superadmin/planes/', SuperAdminPlansView.as_view(), name='superadmin_plans'),
+    path('superadmin/planes/<int:plan_id>/', SuperAdminPlanDetailView.as_view(), name='superadmin_plan_detail'),
+    path('superadmin/planes/<int:plan_id>/features/', SuperAdminPlanFeaturesView.as_view(), name='superadmin_plan_features'),
+    path('superadmin/email/config/', SuperAdminEmailConfigView.as_view(), name='superadmin_email_config'),
+    path('superadmin/email/test/', SuperAdminEmailTestView.as_view(), name='superadmin_email_test'),
 ]

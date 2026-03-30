@@ -36,13 +36,40 @@ export function AuthProvider({ children }) {
     await login(datos.email, datos.password)
   }
 
+  async function forgotPassword(email) {
+    const { data } = await api.post('/usuarios/password/forgot/', { email })
+    return data
+  }
+
+  async function resetPassword(payload) {
+    const { data } = await api.post('/usuarios/password/reset/', payload)
+    return data
+  }
+
+  async function changePassword(payload) {
+    const { data } = await api.post('/usuarios/password/change/', payload)
+    return data
+  }
+
   function logout() {
     clearAuthTokens()
     setUser(null)
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, registro, logout, fetchPerfil }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        registro,
+        logout,
+        fetchPerfil,
+        forgotPassword,
+        resetPassword,
+        changePassword,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

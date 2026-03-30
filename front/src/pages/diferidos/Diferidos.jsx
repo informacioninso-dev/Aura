@@ -1,10 +1,24 @@
 import { useEffect, useState } from 'react'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import api from '../../api/client'
+import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import Modal from '../../components/ui/Modal'
 import { useCategorias } from '../../hooks/useCategorias'
+import { formatNumber } from '../../utils/formatters'
 import '../../components/ui/app.css'
 const EMPTY = { descripcion: '', categoria: 'otro', monto_total: '', num_cuotas: '', cuota_mensual: '', fecha_inicio: '', fecha_fin: '', activo: true }
+
+function parseLocalDate(value) {
+  const [y, m, d] = value.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+function formatDateLocal(date) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
 
 export default function Diferidos() {
   const [items, setItems]     = useState([])
@@ -12,6 +26,8 @@ export default function Diferidos() {
   const [form, setForm]       = useState(EMPTY)
   const [editId, setEditId]   = useState(null)
   const [loading, setLoading] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const { categorias }        = useCategorias()
 
   useEffect(() => { fetchItems() }, [])
@@ -29,9 +45,9 @@ export default function Diferidos() {
 
   function calcularFechaFin(fechaInicio, numCuotas) {
     if (!fechaInicio || !numCuotas || parseInt(numCuotas) <= 0) return ''
-    const d = new Date(fechaInicio + 'T00:00:00')
-    d.setMonth(d.getMonth() + parseInt(numCuotas))
-    return d.toISOString().split('T')[0]
+    const d = parseLocalDate(fechaInicio)
+    d.setMonth(d.getMonth() + (parseInt(numCuotas, 10) - 1))
+    return formatDateLocal(d)
   }
 
   function handleMontoOrCuotas(field, value) {
@@ -69,17 +85,29 @@ export default function Diferidos() {
     } finally { setLoading(false) }
   }
 
-  async function handleDelete(id) {
-    if (!confirm('¿Eliminar este diferido?')) return
-    await api.delete(`/finanzas/diferidos/${id}/`)
-    fetchItems()
+  function openDeleteConfirm(id) {
+    if (deletingId) return
+    setConfirmDeleteId(id)
+  }
+
+  async function handleDelete() {
+    const id = confirmDeleteId
+    if (!id || deletingId) return
+    setConfirmDeleteId(null)
+    setDeletingId(id)
+    try {
+      await api.delete(`/finanzas/diferidos/${id}/`)
+      fetchItems()
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   const totalMensual = items.filter(i => i.activo).reduce((s, i) => s + parseFloat(i.cuota_mensual), 0)
 
   function progreso(item) {
-    const ini  = new Date(item.fecha_inicio)
-    const fin  = new Date(item.fecha_fin)
+    const ini  = parseLocalDate(item.fecha_inicio)
+    const fin  = parseLocalDate(item.fecha_fin)
     const hoy  = new Date()
     const total  = (fin - ini) / (1000 * 60 * 60 * 24 * 30)
     const pasado = (hoy - ini) / (1000 * 60 * 60 * 24 * 30)
@@ -94,7 +122,7 @@ export default function Diferidos() {
           <p className="page-subtitle">
             Total mensual en cuotas:&nbsp;
             <span style={{ color: '#C487F6', fontWeight: 700 }}>
-              ${totalMensual.toLocaleString('es-CL', { maximumFractionDigits: 0 })}
+              ${formatNumber(totalMensual, { maximumFractionDigits: 0 })}
             </span>
           </p>
         </div>
@@ -122,18 +150,18 @@ export default function Diferidos() {
                   </div>
                   <div style={{ display: 'flex', gap: 4 }}>
                     <button className="btn-icon edit" onClick={() => openEdit(item)}><Pencil size={14} /></button>
-                    <button className="btn-icon danger" onClick={() => handleDelete(item.id)}><Trash2 size={14} /></button>
+                    <button className="btn-icon danger" disabled={deletingId === item.id} onClick={() => openDeleteConfirm(item.id)}><Trash2 size={14} /></button>
                   </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', marginBottom: 14 }}>
                   <div>
                     <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>Total</p>
-                    <p style={{ fontWeight: 600, color: '#fff' }}>${parseFloat(item.monto_total).toLocaleString('es-CL')}</p>
+                    <p style={{ fontWeight: 600, color: '#fff' }}>${formatNumber(parseFloat(item.monto_total))}</p>
                   </div>
                   <div>
                     <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>Cuota mensual</p>
-                    <p style={{ fontWeight: 700, color: '#C487F6' }}>${parseFloat(item.cuota_mensual).toLocaleString('es-CL')}</p>
+                    <p style={{ fontWeight: 700, color: '#C487F6' }}>${formatNumber(parseFloat(item.cuota_mensual))}</p>
                   </div>
                   <div>
                     <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>Cuotas</p>
@@ -222,6 +250,17 @@ export default function Diferidos() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="Eliminar diferido"
+        message="Este diferido se eliminara de tus cuotas activas y del historial."
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        loading={deletingId !== null}
+        onConfirm={handleDelete}
+        onClose={() => setConfirmDeleteId(null)}
+      />
     </div>
   )
 }

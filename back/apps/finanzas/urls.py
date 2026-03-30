@@ -1,6 +1,17 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import CategoriaViewSet, IngresoViewSet, GastoCorrienteViewSet, GastoNoCorrienteViewSet, DeferidoViewSet, NotificacionViewSet, SaldoMesViewSet, ImportarView, ReporteView
+from .views import (
+    CategoriaViewSet,
+    IngresoViewSet,
+    GastoCorrienteViewSet,
+    GastoNoCorrienteViewSet,
+    DeferidoViewSet,
+    NotificacionViewSet,
+    SaldoMesViewSet,
+    ImportarView,
+    ReporteView,
+    ReportePDFView,
+)
 
 router = DefaultRouter()
 router.register('categorias',           CategoriaViewSet,       basename='categoria')
@@ -15,4 +26,5 @@ urlpatterns = [
     path('', include(router.urls)),
     path('importar/<str:accion>/', ImportarView.as_view(), name='importar'),
     path('reporte/', ReporteView.as_view(), name='reporte'),
+    path('reporte/pdf/', ReportePDFView.as_view(), name='reporte-pdf'),
 ]

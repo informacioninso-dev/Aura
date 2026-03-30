@@ -43,6 +43,7 @@ class TestSimuladorAPI(APITestCase):
             'banco': self.banco_activo.id,
             'tasa_anual': '12.00',
             'plazo_meses': 12,
+            'colchon_minimo': '300.00',
             'cuota_mensual': '1.00',
             'total_a_pagar': '1.00',
             'total_intereses': '1.00',
@@ -70,6 +71,7 @@ class TestSimuladorAPI(APITestCase):
             'banco': self.banco_inactivo.id,
             'tasa_anual': '10.00',
             'plazo_meses': 10,
+            'colchon_minimo': '200.00',
             'fecha_inicio': '2026-01-01',
         }
 
@@ -77,6 +79,39 @@ class TestSimuladorAPI(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('banco', response.data)
+
+    def test_simulacion_rechaza_si_no_se_envia_colchon_minimo(self):
+        self.client.force_authenticate(user=self.user_a)
+        payload = {
+            'nombre': 'Moto',
+            'monto': '5000.00',
+            'banco': self.banco_activo.id,
+            'tasa_anual': '11.00',
+            'plazo_meses': 24,
+            'fecha_inicio': '2026-01-01',
+        }
+
+        response = self.client.post('/api/simulador/simulaciones/', payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('colchon_minimo', response.data)
+
+    def test_simulacion_rechaza_colchon_minimo_no_positivo(self):
+        self.client.force_authenticate(user=self.user_a)
+        payload = {
+            'nombre': 'Moto',
+            'monto': '5000.00',
+            'banco': self.banco_activo.id,
+            'tasa_anual': '11.00',
+            'plazo_meses': 24,
+            'colchon_minimo': '0',
+            'fecha_inicio': '2026-01-01',
+        }
+
+        response = self.client.post('/api/simulador/simulaciones/', payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('colchon_minimo', response.data)
 
     def test_simulaciones_lista_solo_las_del_usuario_autenticado(self):
         Simulacion.objects.create(
@@ -86,6 +121,7 @@ class TestSimuladorAPI(APITestCase):
             monto=Decimal('1000.00'),
             tasa_anual=Decimal('10.00'),
             plazo_meses=10,
+            colchon_minimo=Decimal('200.00'),
             cuota_mensual=Decimal('105.58'),
             total_a_pagar=Decimal('1055.80'),
             total_intereses=Decimal('55.80'),
@@ -98,6 +134,7 @@ class TestSimuladorAPI(APITestCase):
             monto=Decimal('1500.00'),
             tasa_anual=Decimal('10.00'),
             plazo_meses=10,
+            colchon_minimo=Decimal('200.00'),
             cuota_mensual=Decimal('158.37'),
             total_a_pagar=Decimal('1583.70'),
             total_intereses=Decimal('83.70'),

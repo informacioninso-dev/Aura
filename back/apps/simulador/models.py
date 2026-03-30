@@ -1,3 +1,6 @@
+from decimal import Decimal
+
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.conf import settings
 
@@ -27,6 +30,12 @@ class Simulacion(models.Model):
     banco = models.ForeignKey(Banco, on_delete=models.SET_NULL, null=True, blank=True)
     tasa_anual = models.DecimalField(max_digits=5, decimal_places=2, help_text='Tasa anual en %')
     plazo_meses = models.PositiveIntegerField()
+    colchon_minimo = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))],
+        help_text='Colchon minimo mensual requerido para considerar factible la simulacion',
+    )
     cuota_mensual = models.DecimalField(max_digits=12, decimal_places=2)
     total_a_pagar = models.DecimalField(max_digits=14, decimal_places=2)
     total_intereses = models.DecimalField(max_digits=14, decimal_places=2)
@@ -35,6 +44,12 @@ class Simulacion(models.Model):
 
     class Meta:
         ordering = ['-creado_en']
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(colchon_minimo__gt=0),
+                name='simulacion_colchon_minimo_gt_0',
+            ),
+        ]
         verbose_name = 'Simulación'
         verbose_name_plural = 'Simulaciones'
 

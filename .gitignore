@@ -8,6 +8,8 @@
 # Local environment files
 .env
 .env.*
+!.env.example
+!back/.env.example
 
 # Backend local database/media
 back/db.sqlite3

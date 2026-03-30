@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Bell, CheckCheck, AlertTriangle, TrendingDown } from 'lucide-react'
 import api from '../../api/client'
 
@@ -7,24 +7,29 @@ export default function NotificationBell() {
   const [open, setOpen]       = useState(false)
   const ref                   = useRef(null)
 
-  useEffect(() => {
-    fetchNotifs()
-    const id = setInterval(fetchNotifs, 60_000) // refresca cada minuto
-    return () => clearInterval(id)
+  const fetchNotifs = useCallback(async () => {
+    try {
+      const { data } = await api.get('/finanzas/notificaciones/')
+      setNotifs(data)
+    } catch {
+      // silencioso
+    }
   }, [])
+
+  useEffect(() => {
+    const bootstrapId = setTimeout(fetchNotifs, 0)
+    const id = setInterval(fetchNotifs, 60_000) // refresca cada minuto
+    return () => {
+      clearTimeout(bootstrapId)
+      clearInterval(id)
+    }
+  }, [fetchNotifs])
 
   useEffect(() => {
     function handler(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
-
-  async function fetchNotifs() {
-    try {
-      const { data } = await api.get('/finanzas/notificaciones/')
-      setNotifs(data)
-    } catch { /* silencioso */ }
-  }
 
   async function marcarLeida(id) {
     await api.patch(`/finanzas/notificaciones/${id}/leer/`)

@@ -59,8 +59,10 @@ cd "$APP_DIR/back"
 if [ ! -f .env ]; then
     cp .env.example .env
     SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(50))")
+    ENCRYPTION_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(48))")
     sed -i "s|cambia-esto-por-una-clave-secreta-real|$SECRET_KEY|" .env
     sed -i "s|cambia-esto-por-una-password-segura|$DB_PASS|" .env
+    sed -i "s|cambia-esto-por-una-passphrase-larga-y-unica|$ENCRYPTION_KEY|" .env
     echo "  Archivo .env creado. Revísalo antes de continuar:"
     echo "  nano $APP_DIR/back/.env"
 fi
@@ -72,14 +74,16 @@ python3 -m venv .venv
 
 # Instalar dependencias del proyecto (sin Poetry en producción)
 .venv/bin/pip install \
-    "django>=6.0.2,<7.0.0" \
+    "django>=5.2.7,<6.0.0" \
     "pillow>=12.1.0" \
     "djangorestframework>=3.17.1" \
     "djangorestframework-simplejwt>=5.5.1" \
     "django-cors-headers>=4.9.0" \
     "gunicorn>=23.0.0" \
     "psycopg2-binary>=2.9.0" \
-    "openpyxl>=3.1.0"
+    "openpyxl>=3.1.0" \
+    "cryptography>=45.0.0" \
+    "reportlab>=4.4.0"
 
 # Migraciones y archivos estáticos
 set -a; source .env; set +a

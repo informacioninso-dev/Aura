@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+
+import { getApiErrorMessage } from '../../api/errors'
 import { useAuth } from '../../context/useAuth'
 import './auth.css'
 
@@ -13,13 +15,14 @@ export default function Login() {
 
   async function handleSubmit(e) {
     e.preventDefault()
+    if (loading) return
     setError('')
     setLoading(true)
     try {
       await login(form.email, form.password)
       navigate('/dashboard')
-    } catch {
-      setError('Correo o contraseña incorrectos.')
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Correo o clave incorrectos.'))
     } finally {
       setLoading(false)
     }
@@ -31,7 +34,7 @@ export default function Login() {
         <div className="auth-logo">
           <div className="auth-logo-icon">A</div>
           <div className="auth-logo-name">AURA</div>
-          <div className="auth-logo-tag">Clara Proyección, Futuro Sólido.</div>
+          <div className="auth-logo-tag">Clara proyeccion, futuro solido.</div>
         </div>
 
         <div className="auth-card">
@@ -41,31 +44,36 @@ export default function Login() {
 
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label className="form-label">Correo electrónico</label>
+              <label className="form-label">Correo electronico</label>
               <input
                 type="email"
                 required
                 className="form-input"
                 placeholder="tu@correo.com"
                 value={form.email}
-                onChange={e => setForm({ ...form, email: e.target.value })}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
             </div>
 
             <div className="form-group">
-              <label className="form-label">Contraseña</label>
+              <label className="form-label">Clave</label>
               <div className="form-input-wrap">
                 <input
                   type={showPass ? 'text' : 'password'}
                   required
                   className="form-input"
-                  placeholder="••••••••"
+                  placeholder="********"
                   value={form.password}
-                  onChange={e => setForm({ ...form, password: e.target.value })}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
                 />
-                <button type="button" className="form-eye-btn" onClick={() => setShowPass(!showPass)}>
-                  {showPass ? '🙈' : '👁️'}
+                <button type="button" className="form-eye-btn" onClick={() => setShowPass((v) => !v)}>
+                  {showPass ? 'Ocultar' : 'Ver'}
                 </button>
+              </div>
+              <div style={{ marginTop: 8, textAlign: 'right' }}>
+                <Link to="/forgot-password" style={{ fontSize: 12, color: '#C487F6', textDecoration: 'none' }}>
+                  Olvide mi clave
+                </Link>
               </div>
             </div>
 
@@ -76,11 +84,10 @@ export default function Login() {
         </div>
 
         <p className="auth-footer">
-          ¿No tienes cuenta?{' '}
-          <Link to="/registro">Créala gratis aquí</Link>
+          No tienes cuenta? <Link to="/registro">Crea la tuya gratis</Link>
         </p>
         <p className="auth-footer" style={{ marginTop: 8 }}>
-          <Link to="/">← Volver al inicio</Link>
+          <Link to="/">Volver al inicio</Link>
         </p>
       </div>
     </div>

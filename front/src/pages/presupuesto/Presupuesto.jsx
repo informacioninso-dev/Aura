@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Plus, Pencil, Trash2, Check, X } from 'lucide-react'
 import api from '../../api/client'
+import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import Modal from '../../components/ui/Modal'
+import { formatNumber } from '../../utils/formatters'
 import '../../components/ui/app.css'
 
 const FREQ = { diario: 30, semanal: 4.33, quincenal: 2, mensual: 1, bimestral: 0.5, trimestral: 0.333, semestral: 0.167, anual: 0.083 }
@@ -10,6 +12,11 @@ const ICONOS_SUGERIDOS = ['📦','🏠','🛒','🚗','💊','📚','🎬','👕
 
 const EMPTY_FORM = { nombre: '', icono: '📦', limite_mensual: '' }
 
+function parseLocalDate(value) {
+  const [y, m, d] = value.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
 export default function Presupuesto() {
   const [categorias, setCategorias] = useState([])
   const [gastos, setGastos]         = useState({})
@@ -17,6 +24,8 @@ export default function Presupuesto() {
   const [form, setForm]             = useState(EMPTY_FORM)
   const [editId, setEditId]         = useState(null)
   const [saving, setSaving]         = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [editPresup, setEditPresup] = useState(null) // id de cat editando presupuesto inline
   const [valorPresup, setValorPresup] = useState('')
 
@@ -37,15 +46,15 @@ export default function Presupuesto() {
     const totales = {}
 
     gc.data.filter(g => g.activo).forEach(g => {
-      const ini   = new Date(g.fecha_inicio)
-      const fin   = g.fecha_fin ? new Date(g.fecha_fin) : null
+      const ini   = parseLocalDate(g.fecha_inicio)
+      const fin   = g.fecha_fin ? parseLocalDate(g.fecha_fin) : null
       const fecha = new Date(anio, mes, 1)
       if (ini <= fecha && (!fin || fin >= fecha)) {
         totales[g.categoria] = (totales[g.categoria] || 0) + parseFloat(g.monto) * (FREQ[g.frecuencia] || 1)
       }
     })
     gnc.data.forEach(g => {
-      const d = new Date(g.fecha)
+      const d = parseLocalDate(g.fecha)
       if (d.getMonth() === mes && d.getFullYear() === anio) {
         totales[g.categoria] = (totales[g.categoria] || 0) + parseFloat(g.monto)
       }
@@ -73,10 +82,22 @@ export default function Presupuesto() {
     } finally { setSaving(false) }
   }
 
-  async function handleDelete(id) {
-    if (!confirm('¿Eliminar esta categoría? Los gastos que la usan quedarán con ese nombre.')) return
-    await api.delete(`/finanzas/categorias/${id}/`)
-    setCategorias(prev => prev.filter(c => c.id !== id))
+  function openDeleteConfirm(id) {
+    if (deletingId) return
+    setConfirmDeleteId(id)
+  }
+
+  async function handleDelete() {
+    const id = confirmDeleteId
+    if (!id || deletingId) return
+    setConfirmDeleteId(null)
+    setDeletingId(id)
+    try {
+      await api.delete(`/finanzas/categorias/${id}/`)
+      setCategorias(prev => prev.filter(c => c.id !== id))
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   async function guardarPresupuesto(cat) {
@@ -113,7 +134,7 @@ export default function Presupuesto() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 14, marginBottom: 28 }}>
             {conLimite.map(cat => (
               <TarjetaCategoria key={cat.id} cat={cat} gasto={gastos[cat.nombre] || 0}
-                openEdit={openEdit} handleDelete={handleDelete}
+                openEdit={openEdit} handleDelete={openDeleteConfirm} deletingId={deletingId}
                 editPresup={editPresup} setEditPresup={setEditPresup}
                 valorPresup={valorPresup} setValorPresup={setValorPresup}
                 guardarPresupuesto={guardarPresupuesto} quitarPresupuesto={quitarPresupuesto} />
@@ -129,7 +150,7 @@ export default function Presupuesto() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 14 }}>
             {sinLimite.map(cat => (
               <TarjetaCategoria key={cat.id} cat={cat} gasto={gastos[cat.nombre] || 0}
-                openEdit={openEdit} handleDelete={handleDelete}
+                openEdit={openEdit} handleDelete={openDeleteConfirm} deletingId={deletingId}
                 editPresup={editPresup} setEditPresup={setEditPresup}
                 valorPresup={valorPresup} setValorPresup={setValorPresup}
                 guardarPresupuesto={guardarPresupuesto} quitarPresupuesto={quitarPresupuesto} />
@@ -174,11 +195,22 @@ export default function Presupuesto() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="Eliminar categoria"
+        message="Si eliminas esta categoria, los gastos existentes conservaran el texto actual en sus registros."
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        loading={deletingId !== null}
+        onConfirm={handleDelete}
+        onClose={() => setConfirmDeleteId(null)}
+      />
     </div>
   )
 }
 
-function TarjetaCategoria({ cat, gasto, openEdit, handleDelete, editPresup, setEditPresup, valorPresup, setValorPresup, guardarPresupuesto, quitarPresupuesto }) {
+function TarjetaCategoria({ cat, gasto, openEdit, handleDelete, deletingId, editPresup, setEditPresup, valorPresup, setValorPresup, guardarPresupuesto, quitarPresupuesto }) {
   const limite = cat.limite_mensual ? parseFloat(cat.limite_mensual) : null
   const pct    = limite ? Math.min(100, Math.round((gasto / limite) * 100)) : null
   const over   = pct !== null && pct >= 100
@@ -195,7 +227,7 @@ function TarjetaCategoria({ cat, gasto, openEdit, handleDelete, editPresup, setE
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
           <button className="btn-icon edit" onClick={() => openEdit(cat)}><Pencil size={13} /></button>
-          <button className="btn-icon danger" onClick={() => handleDelete(cat.id)}><Trash2 size={13} /></button>
+          <button className="btn-icon danger" disabled={deletingId === cat.id} onClick={() => handleDelete(cat.id)}><Trash2 size={13} /></button>
         </div>
       </div>
 
@@ -204,10 +236,10 @@ function TarjetaCategoria({ cat, gasto, openEdit, handleDelete, editPresup, setE
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 5 }}>
             <span style={{ color: over ? '#F87171' : warn ? '#FBBF24' : 'rgba(255,255,255,0.55)' }}>
-              ${Math.round(gasto).toLocaleString('es-CL')}
+              ${formatNumber(Math.round(gasto))}
               {over && ' ⚠'}
             </span>
-            <span style={{ color: 'rgba(255,255,255,0.30)' }}>${Math.round(limite).toLocaleString('es-CL')}</span>
+            <span style={{ color: 'rgba(255,255,255,0.30)' }}>${formatNumber(Math.round(limite))}</span>
           </div>
           <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 99, height: 6, marginBottom: 4 }}>
             <div style={{ width: `${pct}%`, height: 6, borderRadius: 99, background: barColor, transition: 'width 0.4s' }} />
@@ -219,7 +251,7 @@ function TarjetaCategoria({ cat, gasto, openEdit, handleDelete, editPresup, setE
       {/* Sin límite: solo muestra gasto si hay */}
       {limite === null && gasto > 0 && (
         <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 10 }}>
-          Gastado este mes: <strong style={{ color: '#fff' }}>${Math.round(gasto).toLocaleString('es-CL')}</strong>
+          Gastado este mes: <strong style={{ color: '#fff' }}>${formatNumber(Math.round(gasto))}</strong>
         </div>
       )}
 

@@ -34,15 +34,20 @@ class SimulacionSerializer(serializers.ModelSerializer):
         monto = self._get_value(attrs, 'monto')
         tasa_anual = self._get_value(attrs, 'tasa_anual')
         plazo_meses = self._get_value(attrs, 'plazo_meses')
+        colchon_minimo = self._get_value(attrs, 'colchon_minimo')
         banco = self._get_value(attrs, 'banco')
 
         errors = {}
+        if self.instance is None and 'colchon_minimo' not in self.initial_data:
+            errors['colchon_minimo'] = 'Debes definir un colchon minimo mensual para simular.'
         if monto is not None and monto <= 0:
             errors['monto'] = 'El monto debe ser mayor que 0.'
         if tasa_anual is not None and tasa_anual < 0:
             errors['tasa_anual'] = 'La tasa anual no puede ser negativa.'
         if plazo_meses is not None and plazo_meses <= 0:
             errors['plazo_meses'] = 'El plazo debe ser mayor que 0.'
+        if (self.instance is None or 'colchon_minimo' in attrs) and (colchon_minimo is None or colchon_minimo <= 0):
+            errors['colchon_minimo'] = 'El colchon minimo debe ser mayor que 0.'
         if banco is not None and not banco.activo:
             errors['banco'] = 'No se puede simular con un banco inactivo.'
         if errors:

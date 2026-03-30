@@ -6,16 +6,18 @@ authors = [
     {name = "Your Name",email = "you@example.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.10,<4"
 dependencies = [
-    "django (>=6.0.2,<7.0.0)",
+    "django (>=5.2.7,<6.0.0)",
     "pillow (>=12.1.0,<13.0.0)",
     "djangorestframework (>=3.17.1,<4.0.0)",
     "djangorestframework-simplejwt (>=5.5.1,<6.0.0)",
     "django-cors-headers (>=4.9.0,<5.0.0)",
+    "cryptography (>=45.0.7,<46.0.0)",
     "gunicorn (>=23.0.0,<24.0.0)",
     "psycopg2-binary (>=2.9.0,<3.0.0)",
-    "openpyxl (>=3.1.5,<4.0.0)"
+    "openpyxl (>=3.1.5,<4.0.0)",
+    "reportlab (>=4.4.4,<5.0.0)"
 ]
 
 

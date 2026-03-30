@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from datetime import timedelta
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -35,9 +36,18 @@ AURA_ENV = os.getenv('AURA_ENV', 'development').strip().lower()
 DEBUG = env_bool('DJANGO_DEBUG', AURA_ENV != 'production')
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'aura-dev-fallback-X7S9h3L0k4M2p8Q1r5T6u9V2w7Y3z8A4b6C1d5E9f0G2')
+_secret_key = os.getenv('DJANGO_SECRET_KEY', '').strip()
+if _secret_key:
+    SECRET_KEY = _secret_key
+elif DEBUG:
+    SECRET_KEY = 'aura-dev-only-unsafe-secret-key-change-me'
+else:
+    raise ImproperlyConfigured('DJANGO_SECRET_KEY es obligatorio cuando DEBUG=False.')
 
-ALLOWED_HOSTS = env_list('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,aura.binnso.com')
+ALLOWED_HOSTS = env_list(
+    'DJANGO_ALLOWED_HOSTS',
+    'localhost,127.0.0.1,aura.binnso.com' if DEBUG else 'aura.binnso.com',
+)
 AUTH_USER_MODEL = 'usuarios.Usuario'
 
 
@@ -92,7 +102,13 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-if os.getenv('DB_ENGINE') == 'django.db.backends.postgresql':
+db_engine = os.getenv('DB_ENGINE', '').strip()
+if not db_engine and AURA_ENV == 'production':
+    raise ImproperlyConfigured(
+        'DB_ENGINE es obligatorio en produccion. Configura PostgreSQL para evitar SQLite en produccion.'
+    )
+
+if db_engine == 'django.db.backends.postgresql':
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -101,9 +117,14 @@ if os.getenv('DB_ENGINE') == 'django.db.backends.postgresql':
             'PASSWORD': os.getenv('DB_PASSWORD', ''),
             'HOST': os.getenv('DB_HOST', 'localhost'),
             'PORT': os.getenv('DB_PORT', '5432'),
+            'CONN_MAX_AGE': int(os.getenv('DB_CONN_MAX_AGE', '120' if not DEBUG else '0')),
         }
     }
 else:
+    if AURA_ENV == 'production':
+        raise ImproperlyConfigured(
+            'SQLite no es permitido en produccion. Usa DB_ENGINE=django.db.backends.postgresql.'
+        )
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -142,6 +163,9 @@ USE_I18N = True
 
 USE_TZ = True
 
+# Keep PK strategy stable across apps and environments.
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
@@ -150,6 +174,31 @@ STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://127.0.0.1:5173').rstrip('/')
+DEFAULT_FROM_EMAIL = os.getenv('DJANGO_DEFAULT_FROM_EMAIL', 'no-reply@aura.local')
+
+# Email delivery:
+# - In development we default to console backend (prints emails in server logs).
+# - In production we default to SMTP backend configured via environment variables.
+EMAIL_BACKEND = os.getenv(
+    'DJANGO_EMAIL_BACKEND',
+    'django.core.mail.backends.console.EmailBackend'
+    if DEBUG
+    else 'django.core.mail.backends.smtp.EmailBackend',
+)
+EMAIL_HOST = os.getenv('DJANGO_EMAIL_HOST', 'localhost')
+EMAIL_PORT = int(os.getenv('DJANGO_EMAIL_PORT', '25'))
+EMAIL_HOST_USER = os.getenv('DJANGO_EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('DJANGO_EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = env_bool('DJANGO_EMAIL_USE_TLS', not DEBUG)
+EMAIL_USE_SSL = env_bool('DJANGO_EMAIL_USE_SSL', False)
+EMAIL_TIMEOUT = int(os.getenv('DJANGO_EMAIL_TIMEOUT', '20'))
+EMAIL_SUBJECT_PREFIX = os.getenv('DJANGO_EMAIL_SUBJECT_PREFIX', '[Aura] ')
+
+if not DEBUG and EMAIL_BACKEND.endswith('smtp.EmailBackend') and not EMAIL_HOST:
+    raise ImproperlyConfigured(
+        'DJANGO_EMAIL_HOST es obligatorio en produccion cuando se usa SMTP.'
+    )
 
 # Security defaults:
 # In production (DEBUG=False), secure settings are enabled by default.
@@ -157,13 +206,26 @@ SECURE_SSL_REDIRECT = env_bool('DJANGO_SECURE_SSL_REDIRECT', not DEBUG)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SESSION_COOKIE_SECURE = env_bool('DJANGO_SESSION_COOKIE_SECURE', not DEBUG)
 CSRF_COOKIE_SECURE = env_bool('DJANGO_CSRF_COOKIE_SECURE', not DEBUG)
-CSRF_TRUSTED_ORIGINS = env_list('DJANGO_CSRF_TRUSTED_ORIGINS', '')
+CSRF_TRUSTED_ORIGINS = env_list(
+    'DJANGO_CSRF_TRUSTED_ORIGINS',
+    '' if DEBUG else 'https://aura.binnso.com',
+)
 SECURE_HSTS_SECONDS = int(os.getenv('DJANGO_SECURE_HSTS_SECONDS', '31536000' if not DEBUG else '0'))
 SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool('DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS', not DEBUG)
 SECURE_HSTS_PRELOAD = env_bool('DJANGO_SECURE_HSTS_PRELOAD', not DEBUG)
+SECURE_CONTENT_TYPE_NOSNIFF = env_bool('DJANGO_SECURE_CONTENT_TYPE_NOSNIFF', True)
+SECURE_REFERRER_POLICY = os.getenv('DJANGO_SECURE_REFERRER_POLICY', 'same-origin')
+X_FRAME_OPTIONS = os.getenv('DJANGO_X_FRAME_OPTIONS', 'DENY')
 
 # CORS
-CORS_ALLOWED_ORIGINS = env_list('DJANGO_CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:5174,https://aura.binnso.com')
+CORS_ALLOWED_ORIGINS = env_list(
+    'DJANGO_CORS_ALLOWED_ORIGINS',
+    (
+        'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,https://aura.binnso.com'
+        if DEBUG
+        else 'https://aura.binnso.com'
+    ),
+)
 
 # DRF
 REST_FRAMEWORK = {
@@ -173,6 +235,16 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    'DEFAULT_THROTTLE_CLASSES': (
+        'rest_framework.throttling.ScopedRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'auth_login': os.getenv('DJANGO_RATE_AUTH_LOGIN', '12/min'),
+        'auth_register': os.getenv('DJANGO_RATE_AUTH_REGISTER', '20/min'),
+        'auth_password_recovery': os.getenv('DJANGO_RATE_AUTH_PASSWORD_RECOVERY', '8/min'),
+        'auth_password_change': os.getenv('DJANGO_RATE_AUTH_PASSWORD_CHANGE', '20/min'),
+        'superadmin_ops': os.getenv('DJANGO_RATE_SUPERADMIN_OPS', '120/min'),
+    },
 }
 
 # JWT
