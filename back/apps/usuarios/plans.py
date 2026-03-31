@@ -4,6 +4,8 @@ from .models import Feature, Plan, PlanFeature, UserPlanAssignment
 
 
 FEATURE_IMPORT_MAX_ROWS = 'import_max_rows'
+FEATURE_BULK_DELETE_MAX = 'bulk_delete_max'
+FEATURE_PROJECTION_MONTHS = 'projection_months'
 
 FEATURE_CATALOG = {
     FEATURE_IMPORT_MAX_ROWS: {
@@ -13,10 +15,26 @@ FEATURE_CATALOG = {
         'is_highlighted': True,
         'is_active': True,
     },
+    FEATURE_BULK_DELETE_MAX: {
+        'name': 'Maximo de registros a eliminar en bloque',
+        'description': 'Cantidad maxima de registros que se pueden eliminar en una sola operacion masiva.',
+        'value_type': 'int',
+        'is_highlighted': True,
+        'is_active': True,
+    },
+    FEATURE_PROJECTION_MONTHS: {
+        'name': 'Meses de proyeccion de flujo de caja',
+        'description': 'Cantidad de meses que se muestran en el grafico de proyeccion del dashboard.',
+        'value_type': 'int',
+        'is_highlighted': True,
+        'is_active': True,
+    },
 }
 
 FEATURE_DEFAULTS = {
     FEATURE_IMPORT_MAX_ROWS: 2000,
+    FEATURE_BULK_DELETE_MAX: 10,
+    FEATURE_PROJECTION_MONTHS: 6,
 }
 
 

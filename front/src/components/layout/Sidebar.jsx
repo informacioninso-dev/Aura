@@ -20,8 +20,8 @@ import './layout.css'
 
 const FINANCE_NAV_ITEMS = [
   { to: '/dashboard', icon: Wallet, label: 'Mi dinero' },
-  { to: '/ingresos', icon: ArrowDownCircle, label: 'Lo que entra' },
-  { to: '/gastos-corrientes', icon: ArrowUpCircle, label: 'Lo que sale' },
+  { to: '/ingresos', icon: ArrowDownCircle, label: 'Lo que ganas' },
+  { to: '/gastos-corrientes', icon: ArrowUpCircle, label: 'Gastos frecuentes' },
   { to: '/gastos-no-corrientes', icon: ReceiptText, label: 'Gastos puntuales' },
   { to: '/diferidos', icon: CreditCard, label: 'Cuotas' },
 ]

@@ -167,7 +167,7 @@ export default function Importar() {
 
           <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 24 }}>
             Los ingresos historicos se guardan como <strong>inactivos</strong> para no distorsionar tu proyeccion mensual.
-            Luego puedes activarlos desde el modulo &quot;Lo que entra&quot; si corresponde.
+            Luego puedes activarlos desde el modulo &quot;Lo que ganas&quot; si corresponde.
           </p>
 
           <button className="btn-modal-save" style={{ padding: '11px 28px' }} onClick={reiniciar}>

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, GitBranch } from 'lucide-react'
 
 import { getApiErrorMessage } from '../../api/errors'
 import api from '../../api/client'
+import { useAuth } from '../../context/useAuth'
 import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import ListControls from '../../components/ui/ListControls'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
@@ -22,6 +23,12 @@ function getTodayDate() {
   return `${y}-${m}-${d}`
 }
 
+function dayBefore(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00')
+  d.setDate(d.getDate() - 1)
+  return d.toISOString().slice(0, 10)
+}
+
 function buildEmptyForm() {
   const savedFreq = typeof window !== 'undefined' ? window.localStorage.getItem(FRECUENCIA_STORAGE_KEY) : null
   return {
@@ -35,18 +42,36 @@ function buildEmptyForm() {
 }
 
 export default function Ingresos() {
+  const { user } = useAuth()
+
+  // — lista y paginacion —
   const [items, setItems] = useState([])
+  const [query, setQuery] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+
+  // — modal crear/editar —
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState(buildEmptyForm())
   const [editId, setEditId] = useState(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  // — eliminar —
   const [deletingId, setDeletingId] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
+
+  // — seleccion masiva —
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
+  // — versionado —
+  const [versioningItem, setVersioningItem] = useState(null)
+  const [versionForm, setVersionForm] = useState({ descripcion: '', monto: '', frecuencia: 'mensual', nuevaFecha: '' })
+  const [versionLoading, setVersionLoading] = useState(false)
+
   const [feedback, setFeedback] = useState({ type: '', message: '' })
-  const [query, setQuery] = useState('')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
 
   useEffect(() => { fetchItems() }, [])
 
@@ -59,6 +84,7 @@ export default function Ingresos() {
     }
   }
 
+  // — crear / editar —
   function openNew() {
     setForm(buildEmptyForm())
     setEditId(null)
@@ -89,10 +115,7 @@ export default function Ingresos() {
       const payload = { ...form, fecha_fin: form.fecha_fin || null }
       if (editId) await api.put(`/finanzas/ingresos/${editId}/`, payload)
       else await api.post('/finanzas/ingresos/', payload)
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(FRECUENCIA_STORAGE_KEY, payload.frecuencia)
-      }
-
+      if (typeof window !== 'undefined') window.localStorage.setItem(FRECUENCIA_STORAGE_KEY, payload.frecuencia)
       setModal(false)
       await fetchItems()
       setFeedback({ type: 'success', message: editId ? 'Ingreso actualizado correctamente.' : 'Ingreso creado correctamente.' })
@@ -103,6 +126,7 @@ export default function Ingresos() {
     }
   }
 
+  // — eliminar —
   function openDeleteConfirm(id) {
     if (deletingId) return
     setConfirmDeleteId(id)
@@ -125,6 +149,43 @@ export default function Ingresos() {
     }
   }
 
+  // — versionado —
+  function openVersion(item) {
+    setVersioningItem(item)
+    setVersionForm({
+      descripcion: item.descripcion,
+      monto: item.monto,
+      frecuencia: item.frecuencia,
+      nuevaFecha: getTodayDate(),
+    })
+  }
+
+  async function handleVersion(e) {
+    e.preventDefault()
+    if (versionLoading) return
+    setVersionLoading(true)
+    setFeedback({ type: '', message: '' })
+    try {
+      await api.patch(`/finanzas/ingresos/${versioningItem.id}/`, { fecha_fin: dayBefore(versionForm.nuevaFecha) })
+      await api.post('/finanzas/ingresos/', {
+        descripcion: versionForm.descripcion,
+        monto: versionForm.monto,
+        frecuencia: versionForm.frecuencia,
+        fecha_inicio: versionForm.nuevaFecha,
+        fecha_fin: null,
+        activo: versioningItem.activo,
+      })
+      setVersioningItem(null)
+      await fetchItems()
+      setFeedback({ type: 'success', message: 'Nueva version creada. El historial anterior se conserva.' })
+    } catch (err) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo crear la nueva version.') })
+    } finally {
+      setVersionLoading(false)
+    }
+  }
+
+  // — computos derivados —
   const total = items
     .filter((i) => i.activo)
     .reduce((s, i) => s + parseFloat(i.monto) * (FREQ_FACTOR[i.frecuencia] || 1), 0)
@@ -143,6 +204,58 @@ export default function Ingresos() {
   const safePage = Math.min(page, pageCount)
   const start = (safePage - 1) * pageSize
   const paginatedItems = filteredItems.slice(start, start + pageSize)
+
+  // — seleccion masiva (necesita paginatedItems) —
+  const bulkDeleteMax = user?.feature_access?.bulk_delete_max ?? 10
+  const allPageSelected = paginatedItems.length > 0 && paginatedItems.every((i) => selectedIds.has(i.id))
+
+  function toggleSelectAll() {
+    if (allPageSelected) {
+      setSelectedIds((prev) => { const next = new Set(prev); paginatedItems.forEach((i) => next.delete(i.id)); return next })
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        let count = next.size
+        for (const i of paginatedItems) {
+          if (next.has(i.id)) continue
+          if (count >= bulkDeleteMax) break
+          next.add(i.id)
+          count++
+        }
+        return next
+      })
+      if (paginatedItems.filter((i) => !selectedIds.has(i.id)).length + selectedIds.size > bulkDeleteMax) {
+        setFeedback({ type: 'error', message: `Tu plan permite seleccionar hasta ${bulkDeleteMax} registros a la vez.` })
+      }
+    }
+  }
+
+  function toggleSelect(id) {
+    setSelectedIds((prev) => {
+      if (prev.has(id)) { const next = new Set(prev); next.delete(id); return next }
+      if (prev.size >= bulkDeleteMax) {
+        setFeedback({ type: 'error', message: `Tu plan permite seleccionar hasta ${bulkDeleteMax} registros a la vez.` })
+        return prev
+      }
+      const next = new Set(prev); next.add(id); return next
+    })
+  }
+
+  async function handleBulkDelete() {
+    setBulkDeleting(true)
+    setConfirmBulkDelete(false)
+    setFeedback({ type: '', message: '' })
+    const ids = [...selectedIds]
+    let errors = 0
+    for (const id of ids) {
+      try { await api.delete(`/finanzas/ingresos/${id}/`) } catch { errors++ }
+    }
+    setSelectedIds(new Set())
+    await fetchItems()
+    setBulkDeleting(false)
+    if (errors === 0) setFeedback({ type: 'success', message: `${ids.length} ingreso${ids.length !== 1 ? 's' : ''} eliminado${ids.length !== 1 ? 's' : ''}.` })
+    else setFeedback({ type: 'error', message: `Se eliminaron ${ids.length - errors} de ${ids.length}. Algunos fallaron.` })
+  }
 
   return (
     <div>
@@ -174,7 +287,7 @@ export default function Ingresos() {
           <>
             <ListControls
               query={query}
-              onQueryChange={(value) => { setQuery(value); setPage(1) }}
+              onQueryChange={(value) => { setQuery(value); setPage(1); setSelectedIds(new Set()) }}
               placeholder="Buscar por descripcion o frecuencia..."
               page={safePage}
               pageCount={pageCount}
@@ -186,10 +299,25 @@ export default function Ingresos() {
               filteredItems={filteredItems.length}
             />
 
+            {selectedIds.size > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', background: 'rgba(196,135,246,0.08)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', flex: 1 }}>{selectedIds.size} seleccionado{selectedIds.size !== 1 ? 's' : ''}</span>
+                <button className="btn-modal-danger" style={{ padding: '6px 14px', fontSize: 13 }} disabled={bulkDeleting} onClick={() => setConfirmBulkDelete(true)}>
+                  {bulkDeleting ? 'Eliminando...' : 'Eliminar seleccionados'}
+                </button>
+                <button className="btn-modal-cancel" style={{ padding: '6px 14px', fontSize: 13 }} onClick={() => setSelectedIds(new Set())}>
+                  Cancelar
+                </button>
+              </div>
+            )}
+
             <div className="table-wrap" style={{ border: 'none', borderRadius: 20 }}>
               <table className="table">
                 <thead>
                   <tr>
+                    <th style={{ width: 36, paddingRight: 0 }}>
+                      <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAll} style={{ cursor: 'pointer', accentColor: '#C487F6' }} />
+                    </th>
                     {['Descripcion', 'Monto', 'Frecuencia', 'Desde', 'Hasta', 'Estado', ''].map((h) => (
                       <th key={h}>{h}</th>
                     ))}
@@ -198,6 +326,9 @@ export default function Ingresos() {
                 <tbody>
                   {paginatedItems.map((item) => (
                     <tr key={item.id}>
+                      <td style={{ width: 36, paddingRight: 0 }}>
+                        <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} style={{ cursor: 'pointer', accentColor: '#C487F6' }} />
+                      </td>
                       <td style={{ fontWeight: 600 }}>{item.descripcion}</td>
                       <td className="table-amount positive">${formatNumber(parseFloat(item.monto))}</td>
                       <td><span className="badge badge-gray" style={{ textTransform: 'capitalize' }}>{item.frecuencia}</span></td>
@@ -210,8 +341,9 @@ export default function Ingresos() {
                       </td>
                       <td className="table-actions-cell">
                         <div className="table-actions-row">
-                          <button className="btn-icon edit" onClick={() => openEdit(item)}><Pencil size={15} /></button>
-                          <button className="btn-icon danger" disabled={deletingId === item.id} onClick={() => openDeleteConfirm(item.id)}><Trash2 size={15} /></button>
+                          <button className="btn-icon edit" title="Editar" onClick={() => openEdit(item)}><Pencil size={15} /></button>
+                          <button className="btn-icon" title="Nueva version" style={{ color: '#FBBF24' }} onClick={() => openVersion(item)}><GitBranch size={15} /></button>
+                          <button className="btn-icon danger" title="Eliminar" disabled={deletingId === item.id} onClick={() => openDeleteConfirm(item.id)}><Trash2 size={15} /></button>
                         </div>
                       </td>
                     </tr>
@@ -223,6 +355,7 @@ export default function Ingresos() {
         )}
       </div>
 
+      {/* Modal crear / editar */}
       <Modal open={modal} onClose={() => setModal(false)} title={editId ? 'Editar ingreso' : '+ Nuevo ingreso'}>
         <form onSubmit={handleSubmit}>
           {!editId && (
@@ -256,12 +389,7 @@ export default function Ingresos() {
           </div>
 
           {!editId && (
-            <button
-              type="button"
-              className="btn-modal-cancel"
-              onClick={() => setShowAdvanced((v) => !v)}
-              style={{ width: '100%', marginBottom: 14 }}
-            >
+            <button type="button" className="btn-modal-cancel" onClick={() => setShowAdvanced((v) => !v)} style={{ width: '100%', marginBottom: 14 }}>
               {showAdvanced ? 'Ocultar opciones avanzadas' : 'Ver opciones avanzadas'}
             </button>
           )}
@@ -312,6 +440,73 @@ export default function Ingresos() {
         </form>
       </Modal>
 
+      {/* Modal versionar */}
+      <Modal open={versioningItem !== null} onClose={() => setVersioningItem(null)} title="Nueva version">
+        {versioningItem && (
+          <form onSubmit={handleVersion}>
+            <p style={{ marginTop: -8, marginBottom: 16, fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+              El registro actual se cerrara el dia anterior a la fecha que elijas. El historial queda intacto.
+            </p>
+
+            <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
+              <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>Actual: </span>
+              {versioningItem.descripcion} — ${formatNumber(parseFloat(versioningItem.monto))} {versioningItem.frecuencia}
+            </div>
+
+            <div className="form-modal-group">
+              <label className="form-modal-label">Descripcion</label>
+              <input
+                className="form-modal-input"
+                required
+                value={versionForm.descripcion}
+                onChange={(e) => setVersionForm({ ...versionForm, descripcion: e.target.value })}
+              />
+            </div>
+
+            <div className="form-modal-row">
+              <div className="form-modal-group">
+                <label className="form-modal-label">Nuevo monto</label>
+                <input
+                  className="form-modal-input"
+                  type="number"
+                  required
+                  min="0"
+                  step="0.01"
+                  value={versionForm.monto}
+                  onChange={(e) => setVersionForm({ ...versionForm, monto: e.target.value })}
+                />
+              </div>
+              <div className="form-modal-group">
+                <label className="form-modal-label">Frecuencia</label>
+                <select className="form-modal-select" value={versionForm.frecuencia} onChange={(e) => setVersionForm({ ...versionForm, frecuencia: e.target.value })}>
+                  {FRECUENCIAS.map((f) => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="form-modal-group">
+              <label className="form-modal-label">Aplica desde</label>
+              <div className="date-input-wrap">
+                <input
+                  className="form-modal-input"
+                  type="date"
+                  required
+                  value={versionForm.nuevaFecha}
+                  onChange={(e) => setVersionForm({ ...versionForm, nuevaFecha: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="form-modal-actions">
+              <button type="button" className="btn-modal-cancel" onClick={() => setVersioningItem(null)}>Cancelar</button>
+              <button type="submit" className="btn-modal-save" disabled={versionLoading}>
+                {versionLoading ? 'Guardando...' : 'Crear nueva version'}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
       <ConfirmDialog
         open={confirmDeleteId !== null}
         title="Eliminar ingreso"
@@ -321,6 +516,17 @@ export default function Ingresos() {
         loading={deletingId !== null}
         onConfirm={handleDelete}
         onClose={() => setConfirmDeleteId(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        title="Eliminar seleccionados"
+        message={`Se eliminaran ${selectedIds.size} ingreso${selectedIds.size !== 1 ? 's' : ''}. Esta accion no se puede deshacer.`}
+        confirmText="Eliminar todos"
+        cancelText="Cancelar"
+        loading={bulkDeleting}
+        onConfirm={handleBulkDelete}
+        onClose={() => setConfirmBulkDelete(false)}
       />
     </div>
   )

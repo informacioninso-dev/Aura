@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2 } from 'lucide-react'
 
 import { getApiErrorMessage } from '../../api/errors'
 import api from '../../api/client'
+import { useAuth } from '../../context/useAuth'
 import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import ListControls from '../../components/ui/ListControls'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
@@ -33,6 +34,7 @@ function buildEmptyForm() {
 }
 
 export default function GastosNoCorrientes() {
+  const { user } = useAuth()
   const [items, setItems] = useState([])
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState(buildEmptyForm())
@@ -45,6 +47,9 @@ export default function GastosNoCorrientes() {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
   const { categorias } = useCategorias()
 
   useEffect(() => { fetchItems() }, [])
@@ -115,6 +120,59 @@ export default function GastosNoCorrientes() {
     }
   }
 
+  const bulkDeleteMax = user?.feature_access?.bulk_delete_max ?? 10
+  const allPageSelected = paginatedItems.length > 0 && paginatedItems.every((i) => selectedIds.has(i.id))
+
+  function toggleSelectAll() {
+    if (allPageSelected) {
+      setSelectedIds((prev) => { const next = new Set(prev); paginatedItems.forEach((i) => next.delete(i.id)); return next })
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        let count = next.size
+        for (const i of paginatedItems) {
+          if (next.has(i.id)) continue
+          if (count >= bulkDeleteMax) break
+          next.add(i.id)
+          count++
+        }
+        return next
+      })
+      if (paginatedItems.filter((i) => !selectedIds.has(i.id)).length + selectedIds.size > bulkDeleteMax) {
+        setFeedback({ type: 'error', message: `Tu plan permite seleccionar hasta ${bulkDeleteMax} registros a la vez.` })
+      }
+    }
+  }
+
+  function toggleSelect(id) {
+    setSelectedIds((prev) => {
+      if (prev.has(id)) {
+        const next = new Set(prev); next.delete(id); return next
+      }
+      if (prev.size >= bulkDeleteMax) {
+        setFeedback({ type: 'error', message: `Tu plan permite seleccionar hasta ${bulkDeleteMax} registros a la vez.` })
+        return prev
+      }
+      const next = new Set(prev); next.add(id); return next
+    })
+  }
+
+  async function handleBulkDelete() {
+    setBulkDeleting(true)
+    setConfirmBulkDelete(false)
+    setFeedback({ type: '', message: '' })
+    const ids = [...selectedIds]
+    let errors = 0
+    for (const id of ids) {
+      try { await api.delete(`/finanzas/gastos-no-corrientes/${id}/`) } catch { errors++ }
+    }
+    setSelectedIds(new Set())
+    await fetchItems()
+    setBulkDeleting(false)
+    if (errors === 0) setFeedback({ type: 'success', message: `${ids.length} gasto${ids.length !== 1 ? 's' : ''} eliminado${ids.length !== 1 ? 's' : ''}.` })
+    else setFeedback({ type: 'error', message: `Se eliminaron ${ids.length - errors} de ${ids.length}. Algunos fallaron.` })
+  }
+
   const total = items.reduce((s, i) => s + parseFloat(i.monto), 0)
 
   const filteredItems = items.filter((item) => {
@@ -161,7 +219,7 @@ export default function GastosNoCorrientes() {
           <>
             <ListControls
               query={query}
-              onQueryChange={(value) => { setQuery(value); setPage(1) }}
+              onQueryChange={(value) => { setQuery(value); setPage(1); setSelectedIds(new Set()) }}
               placeholder="Buscar por descripcion, categoria o nota..."
               page={safePage}
               pageCount={pageCount}
@@ -173,14 +231,33 @@ export default function GastosNoCorrientes() {
               filteredItems={filteredItems.length}
             />
 
+            {selectedIds.size > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', background: 'rgba(196,135,246,0.08)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', flex: 1 }}>{selectedIds.size} seleccionado{selectedIds.size !== 1 ? 's' : ''}</span>
+                <button className="btn-modal-danger" style={{ padding: '6px 14px', fontSize: 13 }} disabled={bulkDeleting} onClick={() => setConfirmBulkDelete(true)}>
+                  {bulkDeleting ? 'Eliminando...' : 'Eliminar seleccionados'}
+                </button>
+                <button className="btn-modal-cancel" style={{ padding: '6px 14px', fontSize: 13 }} onClick={() => setSelectedIds(new Set())}>
+                  Cancelar
+                </button>
+              </div>
+            )}
             <div className="table-wrap" style={{ border: 'none', borderRadius: 20 }}>
               <table className="table">
                 <thead>
-                  <tr>{['Descripcion', 'Categoria', 'Monto', 'Fecha', 'Notas', ''].map((h) => <th key={h}>{h}</th>)}</tr>
+                  <tr>
+                    <th style={{ width: 36, paddingRight: 0 }}>
+                      <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAll} style={{ cursor: 'pointer', accentColor: '#C487F6' }} />
+                    </th>
+                    {['Descripcion', 'Categoria', 'Monto', 'Fecha', 'Notas', ''].map((h) => <th key={h}>{h}</th>)}
+                  </tr>
                 </thead>
                 <tbody>
                   {paginatedItems.map((item) => (
                     <tr key={item.id}>
+                      <td style={{ width: 36, paddingRight: 0 }}>
+                        <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} style={{ cursor: 'pointer', accentColor: '#C487F6' }} />
+                      </td>
                       <td style={{ fontWeight: 600 }}>{item.descripcion}</td>
                       <td><span className="badge badge-gray" style={{ textTransform: 'capitalize' }}>{item.categoria}</span></td>
                       <td className="table-amount negative">${formatNumber(parseFloat(item.monto))}</td>
@@ -277,6 +354,17 @@ export default function GastosNoCorrientes() {
         loading={deletingId !== null}
         onConfirm={handleDelete}
         onClose={() => setConfirmDeleteId(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        title="Eliminar seleccionados"
+        message={`Se eliminaran ${selectedIds.size} gasto${selectedIds.size !== 1 ? 's' : ''}. Esta accion no se puede deshacer.`}
+        confirmText="Eliminar todos"
+        cancelText="Cancelar"
+        loading={bulkDeleting}
+        onConfirm={handleBulkDelete}
+        onClose={() => setConfirmBulkDelete(false)}
       />
     </div>
   )

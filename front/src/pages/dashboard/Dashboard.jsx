@@ -82,9 +82,11 @@ export default function Dashboard() {
   const totalGastos = totalGC + totalDif
   const balance = totalIng - totalGastos
 
+  const projectionMonths = user?.feature_access?.projection_months ?? 6
+
   const flujoCaja = useMemo(() => {
     const hoy = new Date()
-    return Array.from({ length: 12 }, (_, i) => {
+    return Array.from({ length: projectionMonths }, (_, i) => {
       const fecha = new Date(hoy.getFullYear(), hoy.getMonth() + i, 1)
       const mes = `${MESES[fecha.getMonth()]} ${fecha.getFullYear()}`
 
@@ -126,7 +128,7 @@ export default function Dashboard() {
         balance: ingresos - gastos,
       }
     })
-  }, [data, saldoActivo])
+  }, [data, saldoActivo, projectionMonths])
 
   async function guardarSaldo() {
     if (savingSaldo) return
@@ -437,7 +439,7 @@ export default function Dashboard() {
       <div className="stats-grid">
         <div className="stat-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-            <span className="stat-label">Lo que entra</span>
+            <span className="stat-label">Lo que ganas</span>
             <TrendingUp size={18} style={{ color: '#10B981', opacity: 0.8 }} />
           </div>
           <div className="stat-value green">{fmt(totalIng)}</div>
@@ -446,7 +448,7 @@ export default function Dashboard() {
 
         <div className="stat-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-            <span className="stat-label">Lo que sale</span>
+            <span className="stat-label">Gastos frecuentes</span>
             <TrendingDown size={18} style={{ color: '#F87171', opacity: 0.8 }} />
           </div>
           <div className="stat-value red">{fmt(totalGastos)}</div>
@@ -474,7 +476,7 @@ export default function Dashboard() {
 
       <div className="card">
         <div className="card-header">
-          <h2 className="card-title">Tu flujo de caja - proximos 12 meses</h2>
+          <h2 className="card-title">Tu flujo de caja - proximos {projectionMonths} meses</h2>
         </div>
 
         {flujoCaja.every((row) => row.ingresos === 0 && row.gastos === 0) ? (

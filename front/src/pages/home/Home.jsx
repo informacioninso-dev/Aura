@@ -10,7 +10,7 @@ const features = [
   {
     icon: BarChart3,
     title: 'Flujo claro',
-    desc: 'Ve lo que entra, lo que sale y lo que queda sin sacar Excel.',
+    desc: 'Ve lo que ganas, tus gastos y lo que queda sin sacar Excel.',
   },
   {
     icon: Wallet,
