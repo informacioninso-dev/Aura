@@ -120,6 +120,24 @@ export default function GastosNoCorrientes() {
     }
   }
 
+  const total = items.reduce((s, i) => s + parseFloat(i.monto), 0)
+
+  const filteredItems = items.filter((item) => {
+    const q = query.trim().toLowerCase()
+    if (!q) return true
+    return (
+      item.descripcion.toLowerCase().includes(q)
+      || item.categoria.toLowerCase().includes(q)
+      || (item.notas || '').toLowerCase().includes(q)
+      || String(item.monto).toLowerCase().includes(q)
+    )
+  })
+
+  const pageCount = Math.max(1, Math.ceil(filteredItems.length / pageSize))
+  const safePage = Math.min(page, pageCount)
+  const start = (safePage - 1) * pageSize
+  const paginatedItems = filteredItems.slice(start, start + pageSize)
+
   const bulkDeleteMax = user?.feature_access?.bulk_delete_max ?? 10
   const allPageSelected = paginatedItems.length > 0 && paginatedItems.every((i) => selectedIds.has(i.id))
 
@@ -172,24 +190,6 @@ export default function GastosNoCorrientes() {
     if (errors === 0) setFeedback({ type: 'success', message: `${ids.length} gasto${ids.length !== 1 ? 's' : ''} eliminado${ids.length !== 1 ? 's' : ''}.` })
     else setFeedback({ type: 'error', message: `Se eliminaron ${ids.length - errors} de ${ids.length}. Algunos fallaron.` })
   }
-
-  const total = items.reduce((s, i) => s + parseFloat(i.monto), 0)
-
-  const filteredItems = items.filter((item) => {
-    const q = query.trim().toLowerCase()
-    if (!q) return true
-    return (
-      item.descripcion.toLowerCase().includes(q)
-      || item.categoria.toLowerCase().includes(q)
-      || (item.notas || '').toLowerCase().includes(q)
-      || String(item.monto).toLowerCase().includes(q)
-    )
-  })
-
-  const pageCount = Math.max(1, Math.ceil(filteredItems.length / pageSize))
-  const safePage = Math.min(page, pageCount)
-  const start = (safePage - 1) * pageSize
-  const paginatedItems = filteredItems.slice(start, start + pageSize)
 
   return (
     <div>

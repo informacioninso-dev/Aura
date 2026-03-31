@@ -197,7 +197,10 @@ export default function GastosCorrientes() {
   }
 
   // — computos derivados —
-  const total = items.filter((i) => i.activo).reduce((s, i) => s + parseFloat(i.monto) * (FREQ[i.frecuencia] || 1), 0)
+  const hoy = getTodayDate()
+  const total = items
+    .filter((i) => i.activo && i.fecha_inicio <= hoy && (!i.fecha_fin || i.fecha_fin >= hoy))
+    .reduce((s, i) => s + parseFloat(i.monto) * (FREQ[i.frecuencia] || 1), 0)
 
   const filteredItems = items.filter((item) => {
     const q = query.trim().toLowerCase()

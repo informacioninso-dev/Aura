@@ -244,9 +244,11 @@ def validar_filas_confirmacion(filas: list[dict], max_filas: int = MAX_FILAS) ->
 def crear_registros(usuario, filas: list[dict]) -> dict:
     """Crea Ingreso y GastoNoCorriente a partir de filas parseadas y validadas."""
     from .models import Ingreso, GastoNoCorriente
+    from .utils import recalcular_saldo_mes_para
 
     ingresos = []
     gastos = []
+    fechas_gastos = []
 
     with transaction.atomic():
         for f in filas:
@@ -272,9 +274,12 @@ def crear_registros(usuario, filas: list[dict]) -> dict:
                         notas='Importado desde archivo',
                     )
                 )
+                fechas_gastos.append(datetime.date.fromisoformat(f['fecha']))
         if ingresos:
             Ingreso.objects.bulk_create(ingresos, batch_size=500)
         if gastos:
             GastoNoCorriente.objects.bulk_create(gastos, batch_size=500)
+            for fecha in sorted(set(fechas_gastos)):
+                recalcular_saldo_mes_para(usuario, fecha, fecha)
 
     return {'ingresos_creados': len(ingresos), 'gastos_creados': len(gastos)}

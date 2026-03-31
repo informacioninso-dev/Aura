@@ -186,8 +186,9 @@ export default function Ingresos() {
   }
 
   // — computos derivados —
+  const hoy = getTodayDate()
   const total = items
-    .filter((i) => i.activo)
+    .filter((i) => i.activo && i.fecha_inicio <= hoy && (!i.fecha_fin || i.fecha_fin >= hoy))
     .reduce((s, i) => s + parseFloat(i.monto) * (FREQ_FACTOR[i.frecuencia] || 1), 0)
 
   const filteredItems = items.filter((item) => {

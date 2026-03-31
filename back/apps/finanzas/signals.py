@@ -1,10 +1,11 @@
 import datetime
 from decimal import Decimal
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
 from django.conf import settings
 
-from .models import Categoria, CATEGORIAS_DEFAULT, GastoCorriente, GastoNoCorriente, Notificacion
+from .models import Categoria, CATEGORIAS_DEFAULT, GastoCorriente, GastoNoCorriente, Notificacion, Ingreso, Diferido
+from .utils import recalcular_saldo_mes_para
 
 FREQ = {
     'diario': 30, 'semanal': Decimal('4.33'), 'quincenal': 2,
@@ -22,6 +23,8 @@ def crear_categorias_default(sender, instance, created, **kwargs):
         ])
 
 
+# ─── Notificaciones de presupuesto ────────────────────────────────────────────
+
 def _gasto_mensual_categoria(usuario, categoria, anio, mes):
     """Calcula el total de gasto del mes para una categoría dada."""
     import calendar as cal
@@ -30,14 +33,12 @@ def _gasto_mensual_categoria(usuario, categoria, anio, mes):
 
     from django.db.models import Q
 
-    # Gastos corrientes activos que cubren este mes
     gc = GastoCorriente.objects.filter(
         usuario=usuario, activo=True, categoria=categoria,
         fecha_inicio__lte=ultimo_dia,
     ).filter(Q(fecha_fin__isnull=True) | Q(fecha_fin__gte=primer_dia))
     total = sum(Decimal(str(g.monto)) * FREQ.get(g.frecuencia, 1) for g in gc)
 
-    # Gastos no corrientes del mes
     gnc = GastoNoCorriente.objects.filter(
         usuario=usuario, categoria=categoria,
         fecha__gte=primer_dia, fecha__lte=ultimo_dia,
@@ -64,7 +65,6 @@ def _evaluar_presupuesto(usuario, categoria):
     icono = cat.icono
 
     if pct >= 100:
-        # Superado — upsert notificación "superado", borrar "cercano"
         Notificacion.objects.update_or_create(
             usuario=usuario, tipo='presupuesto_superado',
             categoria=categoria, anio=anio, mes=mes,
@@ -79,7 +79,6 @@ def _evaluar_presupuesto(usuario, categoria):
             categoria=categoria, anio=anio, mes=mes,
         ).delete()
     elif pct >= 75:
-        # Cercano — upsert "cercano", borrar "superado"
         Notificacion.objects.update_or_create(
             usuario=usuario, tipo='limite_cercano',
             categoria=categoria, anio=anio, mes=mes,
@@ -94,7 +93,6 @@ def _evaluar_presupuesto(usuario, categoria):
             categoria=categoria, anio=anio, mes=mes,
         ).delete()
     else:
-        # Dentro del presupuesto — limpiar cualquier notificación existente
         Notificacion.objects.filter(
             usuario=usuario, categoria=categoria, anio=anio, mes=mes,
         ).delete()
@@ -110,3 +108,41 @@ def on_gasto_guardado(sender, instance, **kwargs):
 @receiver(post_delete, sender=GastoNoCorriente)
 def on_gasto_eliminado(sender, instance, **kwargs):
     _evaluar_presupuesto(instance.usuario, instance.categoria)
+
+# pre_save: captura valores anteriores para detectar cambios de rango
+@receiver(pre_save, sender=Ingreso)
+@receiver(pre_save, sender=GastoCorriente)
+@receiver(pre_save, sender=Diferido)
+def on_recurrente_pre_save(sender, instance, **kwargs):
+    if instance.pk:
+        try:
+            old = sender.objects.get(pk=instance.pk)
+            instance._old_fecha_inicio = old.fecha_inicio
+            instance._old_fecha_fin = old.fecha_fin
+        except sender.DoesNotExist:
+            pass
+
+
+@receiver(post_save, sender=Ingreso)
+@receiver(post_save, sender=GastoCorriente)
+@receiver(post_save, sender=Diferido)
+def on_recurrente_guardado(sender, instance, **kwargs):
+    recalcular_saldo_mes_para(instance.usuario, instance.fecha_inicio, instance.fecha_fin)
+    # Si las fechas cambiaron, también recalcular el rango anterior
+    old_inicio = getattr(instance, '_old_fecha_inicio', None)
+    old_fin = getattr(instance, '_old_fecha_fin', None)
+    if old_inicio and (old_inicio != instance.fecha_inicio or old_fin != instance.fecha_fin):
+        recalcular_saldo_mes_para(instance.usuario, old_inicio, old_fin)
+
+
+@receiver(post_delete, sender=Ingreso)
+@receiver(post_delete, sender=GastoCorriente)
+@receiver(post_delete, sender=Diferido)
+def on_recurrente_eliminado(sender, instance, **kwargs):
+    recalcular_saldo_mes_para(instance.usuario, instance.fecha_inicio, instance.fecha_fin)
+
+
+@receiver(post_save, sender=GastoNoCorriente)
+@receiver(post_delete, sender=GastoNoCorriente)
+def on_gasto_nc_cambiado(sender, instance, **kwargs):
+    recalcular_saldo_mes_para(instance.usuario, instance.fecha, instance.fecha)

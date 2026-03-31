@@ -27,6 +27,13 @@ function parseLocalDate(value) {
   return new Date(y, m - 1, d)
 }
 
+function isActiveOnDate(item, date) {
+  if (!item.activo) return false
+  const ini = parseLocalDate(item.fecha_inicio)
+  const fin = item.fecha_fin ? parseLocalDate(item.fecha_fin) : null
+  return ini <= date && (!fin || fin >= date)
+}
+
 export default function Dashboard() {
   const { user } = useAuth()
 
@@ -39,7 +46,6 @@ export default function Dashboard() {
   const [valorSaldo, setValorSaldo] = useState('')
   const [savingSaldo, setSavingSaldo] = useState(false)
   const [recalculando, setRecalculando] = useState(false)
-  const [recalcError, setRecalcError] = useState('')
 
   useEffect(() => {
     loadDashboard()
@@ -74,11 +80,12 @@ export default function Dashboard() {
   const moneda = user?.moneda_preferida || 'USD'
   const fmt = (value) => formatMoney(value, { currency: moneda })
   const mensualizado = (monto, freq) => Number(monto) * (FREQ[freq] || 1)
+  const hoy = new Date()
 
   const saldoActivo = saldo && saldo.activo ? Number(saldo.monto) : 0
-  const totalIng = data.ingresos.filter((i) => i.activo).reduce((sum, i) => sum + mensualizado(i.monto, i.frecuencia), 0) + saldoActivo
-  const totalGC = data.gastosCorrientes.filter((g) => g.activo).reduce((sum, g) => sum + mensualizado(g.monto, g.frecuencia), 0)
-  const totalDif = data.diferidos.filter((d) => d.activo).reduce((sum, d) => sum + Number(d.cuota_mensual), 0)
+  const totalIng = data.ingresos.filter((i) => isActiveOnDate(i, hoy)).reduce((sum, i) => sum + mensualizado(i.monto, i.frecuencia), 0) + saldoActivo
+  const totalGC = data.gastosCorrientes.filter((g) => isActiveOnDate(g, hoy)).reduce((sum, g) => sum + mensualizado(g.monto, g.frecuencia), 0)
+  const totalDif = data.diferidos.filter((d) => isActiveOnDate(d, hoy)).reduce((sum, d) => sum + Number(d.cuota_mensual), 0)
   const totalGastos = totalGC + totalDif
   const balance = totalIng - totalGastos
 
@@ -167,17 +174,13 @@ export default function Dashboard() {
     if (recalculando) return
 
     setRecalculando(true)
-    setRecalcError('')
     setFeedback({ type: '', message: '' })
     try {
       const { data: d } = await api.post('/finanzas/saldo-mes/recalcular/', {})
       setSaldo({ ...d, existe: true })
-      setFeedback({ type: 'success', message: 'Saldo recalculado correctamente.' })
+      setFeedback({ type: 'success', message: 'Saldo actualizado.' })
     } catch (err) {
-      const message = getApiErrorMessage(err, 'Error al recalcular el saldo.')
-      setRecalcError(message)
-      setFeedback({ type: 'error', message })
-      setTimeout(() => setRecalcError(''), 5000)
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'Error al recalcular el saldo.') })
     } finally {
       setRecalculando(false)
     }
@@ -400,7 +403,7 @@ export default function Dashboard() {
             <div className="dashboard-saldo-recalc">
               <button
                 onClick={recalcular}
-                disabled={recalculando || (saldo.recalculos_restantes === 0)}
+                disabled={recalculando}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -409,30 +412,18 @@ export default function Dashboard() {
                   border: '1px solid rgba(255,255,255,0.12)',
                   borderRadius: 10,
                   padding: '7px 14px',
-                  cursor: recalculando || saldo.recalculos_restantes === 0 ? 'not-allowed' : 'pointer',
-                  color: recalculando || saldo.recalculos_restantes === 0 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.65)',
+                  cursor: recalculando ? 'not-allowed' : 'pointer',
+                  color: recalculando ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.65)',
                   fontSize: 13,
                   fontWeight: 600,
-                  opacity: saldo.recalculos_restantes === 0 ? 0.5 : 1,
                 }}
               >
                 <RefreshCw size={14} style={{ animation: recalculando ? 'spin 1s linear infinite' : 'none' }} />
-                {recalculando ? 'Calculando...' : 'Recalcular'}
+                {recalculando ? 'Calculando...' : 'Actualizar'}
               </button>
-
-              {saldo.recalculos_restantes !== undefined && (
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>
-                  {saldo.recalculos_restantes} recalculos restantes hoy
-                </span>
-              )}
             </div>
           </div>
 
-          {recalcError && (
-            <div style={{ marginTop: 10, fontSize: 12, color: '#F87171', background: 'rgba(248,113,113,0.10)', borderRadius: 8, padding: '6px 12px' }}>
-              {recalcError}
-            </div>
-          )}
         </div>
       )}
 

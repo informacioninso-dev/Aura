@@ -20,8 +20,8 @@ from .models import (
     Notificacion,
     SaldoMes,
     CATEGORIAS_DEFAULT,
-    MAX_RECALCULOS_DIA,
 )
+from .utils import asegurar_saldo_mes, calcular_balance_mes, FREQ_FACTOR
 from .serializers import (
     CategoriaSerializer,
     IngresoSerializer,
@@ -80,18 +80,6 @@ class DeferidoViewSet(BaseFinanzasViewSet):
     serializer_class = DeferidoSerializer
 
 
-FREQ_FACTOR = {
-    'diario': 30,
-    'semanal': Decimal('4.33'),
-    'quincenal': 2,
-    'mensual': 1,
-    'bimestral': Decimal('0.5'),
-    'trimestral': Decimal('0.333'),
-    'semestral': Decimal('0.167'),
-    'anual': Decimal('0.083'),
-}
-
-
 def _parse_anio_mes(anio_raw, mes_raw):
     try:
         anio = int(anio_raw)
@@ -105,47 +93,6 @@ def _parse_anio_mes(anio_raw, mes_raw):
         raise ValueError('anio fuera de rango permitido (1900-2100).')
 
     return anio, mes
-
-
-def _calcular_balance_mes(usuario, anio, mes):
-    """Calcula ingresos - gastos para un mes/anio dado. Puede ser negativo."""
-    import calendar as cal
-
-    primer_dia = datetime.date(anio, mes, 1)
-    ultimo_dia = datetime.date(anio, mes, cal.monthrange(anio, mes)[1])
-
-    ingresos = Ingreso.objects.filter(
-        usuario=usuario,
-        activo=True,
-        fecha_inicio__lte=ultimo_dia,
-    ).filter(models.Q(fecha_fin__isnull=True) | models.Q(fecha_fin__gte=primer_dia))
-
-    total_ing = sum(Decimal(str(i.monto)) * FREQ_FACTOR.get(i.frecuencia, 1) for i in ingresos)
-
-    gastos_c = GastoCorriente.objects.filter(
-        usuario=usuario,
-        activo=True,
-        fecha_inicio__lte=ultimo_dia,
-    ).filter(models.Q(fecha_fin__isnull=True) | models.Q(fecha_fin__gte=primer_dia))
-
-    total_gc = sum(Decimal(str(g.monto)) * FREQ_FACTOR.get(g.frecuencia, 1) for g in gastos_c)
-
-    diferidos = Diferido.objects.filter(
-        usuario=usuario,
-        activo=True,
-        fecha_inicio__lte=ultimo_dia,
-        fecha_fin__gte=primer_dia,
-    )
-    total_dif = sum(Decimal(str(d.cuota_mensual)) for d in diferidos)
-
-    gnc = GastoNoCorriente.objects.filter(
-        usuario=usuario,
-        fecha__gte=primer_dia,
-        fecha__lte=ultimo_dia,
-    )
-    total_gnc = sum(Decimal(str(g.monto)) for g in gnc)
-
-    return round(total_ing - total_gc - total_dif - total_gnc, 2)
 
 
 class SaldoMesViewSet(BaseFinanzasViewSet):
@@ -163,36 +110,17 @@ class SaldoMesViewSet(BaseFinanzasViewSet):
         else:
             anio_ant, mes_ant = anio, mes - 1
 
-        try:
-            saldo = SaldoMes.objects.get(usuario=request.user, anio=anio_ant, mes=mes_ant)
-            data = SaldoMesSerializer(saldo).data
-            data['existe'] = True
-            data['sugerido'] = False
-            data['anio_origen'] = anio_ant
-            data['mes_origen'] = mes_ant
-            return Response(data)
-        except SaldoMes.DoesNotExist:
-            pass
-
-        monto = _calcular_balance_mes(request.user, anio_ant, mes_ant)
-        return Response(
-            {
-                'existe': False,
-                'id': None,
-                'anio': anio_ant,
-                'mes': mes_ant,
-                'monto': monto,
-                'activo': True,
-                'sugerido': True,
-                'recalculos_restantes': MAX_RECALCULOS_DIA,
-            }
-        )
+        saldo = asegurar_saldo_mes(request.user, anio_ant, mes_ant)
+        data = SaldoMesSerializer(saldo).data
+        data['existe'] = True
+        data['sugerido'] = False
+        data['anio_origen'] = anio_ant
+        data['mes_origen'] = mes_ant
+        return Response(data)
 
     @action(detail=False, methods=['post'])
     def recalcular(self, request):
-        """Recalcula y guarda el balance del mes indicado con rate limit diario."""
-        import django.utils.timezone as tz
-
+        """Recalcula y guarda el balance del mes indicado."""
         hoy = datetime.date.today()
         anio = request.data.get('anio')
         mes = request.data.get('mes')
@@ -215,20 +143,8 @@ class SaldoMesViewSet(BaseFinanzasViewSet):
             defaults={'monto': 0, 'activo': True},
         )
 
-        hoy_dt = tz.now().date()
-        if saldo.ultimo_recalculo and saldo.ultimo_recalculo.date() == hoy_dt:
-            if saldo.recalculos_hoy >= MAX_RECALCULOS_DIA:
-                return Response(
-                    {'error': f'Limite de {MAX_RECALCULOS_DIA} recalculos por dia alcanzado. Intentalo manana.'},
-                    status=status.HTTP_429_TOO_MANY_REQUESTS,
-                )
-            saldo.recalculos_hoy += 1
-        else:
-            saldo.recalculos_hoy = 1
-
-        saldo.monto = _calcular_balance_mes(request.user, anio, mes)
-        saldo.ultimo_recalculo = tz.now()
-        saldo.save()
+        saldo.monto = calcular_balance_mes(request.user, anio, mes)
+        saldo.save(update_fields=['monto', 'actualizado_en'])
 
         data = SaldoMesSerializer(saldo).data
         data['existe'] = True

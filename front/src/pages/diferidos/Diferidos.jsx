@@ -20,6 +20,14 @@ function formatDateLocal(date) {
   return `${y}-${m}-${d}`
 }
 
+function getTodayDate() {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
 export default function Diferidos() {
   const [items, setItems]     = useState([])
   const [modal, setModal]     = useState(false)
@@ -103,7 +111,10 @@ export default function Diferidos() {
     }
   }
 
-  const totalMensual = items.filter(i => i.activo).reduce((s, i) => s + parseFloat(i.cuota_mensual), 0)
+  const hoy = getTodayDate()
+  const totalMensual = items
+    .filter((i) => i.activo && i.fecha_inicio <= hoy && i.fecha_fin >= hoy)
+    .reduce((s, i) => s + parseFloat(i.cuota_mensual), 0)
 
   function progreso(item) {
     const ini  = parseLocalDate(item.fecha_inicio)
