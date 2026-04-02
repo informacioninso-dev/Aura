@@ -136,28 +136,39 @@ def on_recurrente_pre_save(sender, instance, **kwargs):
 @receiver(post_save, sender=GastoCorriente)
 @receiver(post_save, sender=Diferido)
 def on_recurrente_guardado(sender, instance, **kwargs):
-    recalcular_saldo_mes_para(instance.usuario, instance.fecha_inicio, instance.fecha_fin)
-    # Si las fechas cambiaron, también recalcular el rango anterior
-    old_inicio = getattr(instance, '_old_fecha_inicio', None)
-    old_fin = getattr(instance, '_old_fecha_fin', None)
-    if old_inicio and (old_inicio != instance.fecha_inicio or old_fin != instance.fecha_fin):
-        recalcular_saldo_mes_para(instance.usuario, old_inicio, old_fin)
+    try:
+        recalcular_saldo_mes_para(instance.usuario, instance.fecha_inicio, instance.fecha_fin)
+        old_inicio = getattr(instance, '_old_fecha_inicio', None)
+        old_fin = getattr(instance, '_old_fecha_fin', None)
+        if old_inicio and (old_inicio != instance.fecha_inicio or old_fin != instance.fecha_fin):
+            recalcular_saldo_mes_para(instance.usuario, old_inicio, old_fin)
+    except Exception:
+        pass
 
 
 @receiver(post_delete, sender=Ingreso)
 @receiver(post_delete, sender=GastoCorriente)
 @receiver(post_delete, sender=Diferido)
 def on_recurrente_eliminado(sender, instance, **kwargs):
-    recalcular_saldo_mes_para(instance.usuario, instance.fecha_inicio, instance.fecha_fin)
+    try:
+        recalcular_saldo_mes_para(instance.usuario, instance.fecha_inicio, instance.fecha_fin)
+    except Exception:
+        pass
 
 
 @receiver(post_save, sender=GastoNoCorriente)
 @receiver(post_delete, sender=GastoNoCorriente)
 def on_gasto_nc_cambiado(sender, instance, **kwargs):
-    recalcular_saldo_mes_para(instance.usuario, instance.fecha, instance.fecha)
+    try:
+        recalcular_saldo_mes_para(instance.usuario, instance.fecha, instance.fecha)
+    except Exception:
+        pass
 
 
 @receiver(post_save, sender=IngresoPuntual)
 @receiver(post_delete, sender=IngresoPuntual)
 def on_ingreso_puntual_cambiado(sender, instance, **kwargs):
-    recalcular_saldo_mes_para(instance.usuario, instance.fecha, instance.fecha)
+    try:
+        recalcular_saldo_mes_para(instance.usuario, instance.fecha, instance.fecha)
+    except Exception:
+        pass
