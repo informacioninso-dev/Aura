@@ -22,6 +22,13 @@ const FREQ = {
   anual: 0.083,
 }
 
+const SERIES_FOCUS_OPTIONS = [
+  { value: 'all', label: 'Todas' },
+  { value: 'balance', label: 'Balance neto' },
+  { value: 'income', label: 'Ingresos' },
+  { value: 'expense', label: 'Gastos' },
+]
+
 function parseLocalDate(value) {
   const [y, m, d] = value.split('-').map(Number)
   return new Date(y, m - 1, d)
@@ -59,6 +66,13 @@ function normalizePositiveInt(value, fallback) {
   return parsed
 }
 
+function getSeriesFamily(dataKey = '') {
+  if (dataKey.startsWith('balance_')) return 'balance'
+  if (dataKey.startsWith('ing_')) return 'income'
+  if (dataKey.startsWith('gasto_')) return 'expense'
+  return 'all'
+}
+
 export default function Dashboard() {
   const { user } = useAuth()
 
@@ -77,6 +91,7 @@ export default function Dashboard() {
   const [projectionError, setProjectionError] = useState('')
   const [pastMonths, setPastMonths] = useState(6)
   const [futureMonths, setFutureMonths] = useState(12)
+  const [seriesFocus, setSeriesFocus] = useState('all')
 
   const advancedProjectionEnabled = Boolean(user?.feature_access?.advanced_projection_enabled)
   const advancedProjectionMaxMonths = normalizePositiveInt(user?.feature_access?.advanced_projection_months, 60)
@@ -216,6 +231,51 @@ export default function Dashboard() {
       }
     })
   }, [advancedSeries])
+
+  function shouldShowSeries(kind) {
+    return seriesFocus === 'all' || seriesFocus === kind
+  }
+
+  function toggleSeriesFocus(kind) {
+    setSeriesFocus((current) => (current === kind ? 'all' : kind))
+  }
+
+  function renderProjectionLegend({ payload = [] }) {
+    return (
+      <div className="dashboard-chart-toggle-group dashboard-legend-group">
+        {payload.map((entry) => {
+          const family = getSeriesFamily(entry.dataKey)
+          const isActive = family !== 'all' && seriesFocus === family
+          return (
+            <button
+              key={entry.dataKey}
+              type="button"
+              className={`dashboard-chart-toggle dashboard-legend-toggle ${isActive ? 'active' : ''}`}
+              onClick={() => toggleSeriesFocus(family)}
+              aria-pressed={isActive}
+              title="Filtrar esta curva"
+            >
+              <span
+                className="dashboard-legend-dot"
+                style={{
+                  background: entry.color,
+                  opacity: entry.dataKey.endsWith('_proj') ? 0.7 : 1,
+                }}
+              />
+              {({
+                ing_real: 'Ingresos (real)',
+                ing_proj: 'Ingresos (proy.)',
+                gasto_real: 'Gastos (real)',
+                gasto_proj: 'Gastos (proy.)',
+                balance_real: 'Balance neto (real)',
+                balance_proj: 'Balance neto (proy.)',
+              }[entry.dataKey] || entry.value)}
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
 
   const advancedChartEmpty = advancedSeries.length === 0 || advancedSeries.every(
     (point) => point.cumulative_ingresos === 0 && point.cumulative_gastos === 0,
@@ -408,6 +468,19 @@ export default function Dashboard() {
                 <option value={60}>5 años</option>
               </select>
             </label>
+            <div className="dashboard-chart-toggle-group" role="tablist" aria-label="Curvas de la proyeccion">
+              {SERIES_FOCUS_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`dashboard-chart-toggle ${seriesFocus === option.value ? 'active' : ''}`}
+                  onClick={() => setSeriesFocus(option.value)}
+                  aria-pressed={seriesFocus === option.value}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {projectionLoading ? (
@@ -424,6 +497,8 @@ export default function Dashboard() {
               {(() => {
                 const histMeses = advancedProjection?.history_months_used ?? 0
                 const svgap = advancedProjection?.smoothed_variable_gap ?? 0
+                const svi = advancedProjection?.smoothed_variable_ingresos ?? 0
+                const svg = advancedProjection?.smoothed_variable_gastos ?? 0
                 return (
                   <div className="dashboard-premium-meta">
                     <div className="dashboard-premium-stat">
@@ -431,7 +506,19 @@ export default function Dashboard() {
                       <strong className="dashboard-premium-stat-value">{fmt(advancedProjection?.starting_balance ?? 0)}</strong>
                     </div>
                     <div className="dashboard-premium-stat">
-                      <span className="dashboard-premium-stat-label">Variable mensual promedio</span>
+                      <span className="dashboard-premium-stat-label">Puntuales prom. ingresos</span>
+                      <strong className="dashboard-premium-stat-value" style={{ color: '#10B981' }}>
+                        {fmt(svi)}
+                      </strong>
+                    </div>
+                    <div className="dashboard-premium-stat">
+                      <span className="dashboard-premium-stat-label">Puntuales prom. gastos</span>
+                      <strong className="dashboard-premium-stat-value" style={{ color: '#F87171' }}>
+                        {fmt(svg)}
+                      </strong>
+                    </div>
+                    <div className="dashboard-premium-stat">
+                      <span className="dashboard-premium-stat-label">Gap variable neto</span>
                       <strong className="dashboard-premium-stat-value" style={{ color: svgap >= 0 ? '#10B981' : '#F87171' }}>
                         {svgap >= 0 ? '+' : ''}{fmt(svgap)}
                       </strong>
@@ -461,6 +548,12 @@ export default function Dashboard() {
                 )
                 return null
               })()}
+
+              {advancedProjection?.starting_balance_applied && (
+                <div style={{ marginBottom: 14, fontSize: 12, color: 'rgba(255,255,255,0.50)' }}>
+                  El saldo inicial de {fmt(advancedProjection?.starting_balance ?? 0)} se muestra aparte. La curva neta representa ingresos acumulados menos gastos acumulados.
+                </div>
+              )}
 
               {advancedChartEmpty ? (
                 <div className="empty-state">
@@ -516,7 +609,7 @@ export default function Dashboard() {
                         const labels = {
                           ing_real: 'Ingresos acum. (real)', ing_proj: 'Ingresos acum. (proy.)',
                           gasto_real: 'Gastos acum. (real)',  gasto_proj: 'Gastos acum. (proy.)',
-                          balance_real: 'Balance acum. (real)', balance_proj: 'Balance acum. (proy.)',
+                          balance_real: 'Balance neto acum. (real)', balance_proj: 'Balance neto acum. (proy.)',
                         }
                         return [fmt(value), labels[name] || name]
                       }}
@@ -525,17 +618,25 @@ export default function Dashboard() {
                         return point ? `${label} · ${point.is_real ? 'Real' : 'Proyectado'}` : label
                       }}
                     />
-                    <Legend formatter={(name) => ({
-                      ing_real: 'Ingresos (real)', ing_proj: 'Ingresos (proy.)',
-                      gasto_real: 'Gastos (real)', gasto_proj: 'Gastos (proy.)',
-                      balance_real: 'Balance (real)', balance_proj: 'Balance (proy.)',
-                    }[name] || name)} />
-                    <Area connectNulls={false} type="monotone" dataKey="balance_real" stroke="#C487F6" strokeWidth={2.5} fill="url(#gBalReal)"   dot={false} />
-                    <Area connectNulls={false} type="monotone" dataKey="balance_proj" stroke="#C487F6" strokeWidth={2}   fill="url(#gBalProj)"   strokeDasharray="5 4" dot={false} />
-                    <Area connectNulls={false} type="monotone" dataKey="ing_real"     stroke="#10B981" strokeWidth={2.5} fill="url(#gIngReal)"   dot={false} />
-                    <Area connectNulls={false} type="monotone" dataKey="ing_proj"     stroke="#10B981" strokeWidth={2}   fill="url(#gIngProj)"   strokeDasharray="5 4" dot={false} />
-                    <Area connectNulls={false} type="monotone" dataKey="gasto_real"   stroke="#F87171" strokeWidth={2.5} fill="url(#gGastoReal)" dot={false} />
-                    <Area connectNulls={false} type="monotone" dataKey="gasto_proj"   stroke="#F87171" strokeWidth={2}   fill="url(#gGastoProj)" strokeDasharray="5 4" dot={false} />
+                    <Legend content={renderProjectionLegend} />
+                    {shouldShowSeries('balance') && (
+                      <>
+                        <Area connectNulls={false} type="monotone" dataKey="balance_real" stroke="#C487F6" strokeWidth={2.5} fill="url(#gBalReal)" dot={false} />
+                        <Area connectNulls={false} type="monotone" dataKey="balance_proj" stroke="#C487F6" strokeWidth={2} fill="url(#gBalProj)" strokeDasharray="5 4" dot={false} />
+                      </>
+                    )}
+                    {shouldShowSeries('income') && (
+                      <>
+                        <Area connectNulls={false} type="monotone" dataKey="ing_real" stroke="#10B981" strokeWidth={2.5} fill="url(#gIngReal)" dot={false} />
+                        <Area connectNulls={false} type="monotone" dataKey="ing_proj" stroke="#10B981" strokeWidth={2} fill="url(#gIngProj)" strokeDasharray="5 4" dot={false} />
+                      </>
+                    )}
+                    {shouldShowSeries('expense') && (
+                      <>
+                        <Area connectNulls={false} type="monotone" dataKey="gasto_real" stroke="#F87171" strokeWidth={2.5} fill="url(#gGastoReal)" dot={false} />
+                        <Area connectNulls={false} type="monotone" dataKey="gasto_proj" stroke="#F87171" strokeWidth={2} fill="url(#gGastoProj)" strokeDasharray="5 4" dot={false} />
+                      </>
+                    )}
                   </AreaChart>
                 </ResponsiveContainer>
               )}

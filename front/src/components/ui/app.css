@@ -932,6 +932,56 @@
   color: rgba(255,255,255,0.45);
 }
 
+.dashboard-chart-toggle-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.dashboard-chart-toggle {
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.62);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.dashboard-chart-toggle:hover {
+  border-color: rgba(196,135,246,0.30);
+  color: #FFFFFF;
+}
+
+.dashboard-chart-toggle.active {
+  background: rgba(196,135,246,0.16);
+  border-color: rgba(196,135,246,0.38);
+  color: #F5ECFF;
+  box-shadow: 0 8px 24px rgba(196,135,246,0.16);
+}
+
+.dashboard-legend-group {
+  margin-top: 8px;
+  justify-content: flex-start;
+}
+
+.dashboard-legend-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dashboard-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex: 0 0 8px;
+}
+
 .dashboard-chart-select {
   min-width: 108px;
   border-radius: 12px;
@@ -1687,6 +1737,10 @@
   }
   .dashboard-chart-control {
     width: 100%;
+  }
+  .dashboard-chart-toggle-group {
+    width: 100%;
+    justify-content: flex-start;
   }
   .dashboard-chart-select {
     flex: 1 1 auto;

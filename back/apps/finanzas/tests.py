@@ -358,11 +358,21 @@ class TestFinanzasAPI(APITestCase):
         self.assertEqual(response.data['months'], 6)
         self.assertEqual(response.data['history_months_used'], 12)
         self.assertEqual(Decimal(str(response.data['starting_balance'])), Decimal('200.00'))
+        self.assertEqual(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('80.0'))
+        self.assertEqual(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('20.0'))
         self.assertEqual(Decimal(str(response.data['smoothed_variable_gap'])), Decimal('60.0'))
-        self.assertEqual(len(response.data['series']), 6)
-        self.assertEqual(Decimal(str(response.data['series'][0]['projected_gap'])), Decimal('560.0'))
-        self.assertEqual(Decimal(str(response.data['series'][0]['cumulative_balance'])), Decimal('760.0'))
-        self.assertEqual(Decimal(str(response.data['series'][1]['cumulative_balance'])), Decimal('1320.0'))
+        self.assertEqual(len(response.data['series']), 12)
+        self.assertTrue(all(point['is_real'] for point in response.data['series'][:6]))
+        self.assertTrue(all(not point['is_real'] for point in response.data['series'][6:]))
+        self.assertEqual(Decimal(str(response.data['series'][6]['projected_gap'])), Decimal('560.0'))
+        self.assertEqual(Decimal(str(response.data['series'][6]['cumulative_balance'])), Decimal('2720.0'))
+        self.assertEqual(Decimal(str(response.data['series'][7]['cumulative_balance'])), Decimal('3280.0'))
+        self.assertEqual(
+            Decimal(str(response.data['series'][6]['cumulative_balance'])),
+            Decimal(str(response.data['series'][6]['cumulative_ingresos']))
+            - Decimal(str(response.data['series'][6]['cumulative_gastos'])),
+        )
+        self.assertEqual(Decimal(str(response.data['series'][6]['cumulative_cash_position'])), Decimal('2920.0'))
 
     def test_proyeccion_acumulada_suaviza_outliers_de_puntuales(self):
         current_month = first_day_of_month(datetime.date.today())
@@ -407,5 +417,7 @@ class TestFinanzasAPI(APITestCase):
         response = self.client.get('/api/finanzas/proyeccion-acumulada/?months=1')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('100.0'))
+        self.assertEqual(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('50.0'))
         self.assertEqual(Decimal(str(response.data['smoothed_variable_gap'])), Decimal('50.0'))
         self.assertEqual(Decimal(str(response.data['series'][0]['projected_gap'])), Decimal('50.0'))

@@ -285,20 +285,21 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real
         key = (item.fecha.year, item.fecha.month)
         gastos_puntuales_por_mes[key] = gastos_puntuales_por_mes.get(key, Decimal('0.00')) + _money(item.monto)
 
-    # Compute smoothed variable gap from full history window
+    # Compute smoothed variable incomes/expenses from full history window
     earliest_history_month = max(earliest_user_month, history_start)
     history_cursor = earliest_history_month
-    variable_gaps = []
+    variable_ingresos = []
+    variable_gastos = []
     while history_cursor < current_month:
         key = (history_cursor.year, history_cursor.month)
-        variable_gaps.append(
-            ingresos_puntuales_por_mes.get(key, Decimal('0.00'))
-            - gastos_puntuales_por_mes.get(key, Decimal('0.00'))
-        )
+        variable_ingresos.append(ingresos_puntuales_por_mes.get(key, Decimal('0.00')))
+        variable_gastos.append(gastos_puntuales_por_mes.get(key, Decimal('0.00')))
         history_cursor = _sumar_meses_fecha(history_cursor, 1)
 
-    smoothed_variable_gap = _winsorized_weighted_average(variable_gaps)
-    history_months_used = len(variable_gaps)
+    smoothed_variable_ingresos = _winsorized_weighted_average(variable_ingresos)
+    smoothed_variable_gastos = _winsorized_weighted_average(variable_gastos)
+    smoothed_variable_gap = (smoothed_variable_ingresos - smoothed_variable_gastos).quantize(Decimal('0.01'))
+    history_months_used = max(len(variable_ingresos), len(variable_gastos))
 
     def _ing_fijos_mes(month_start, month_end):
         return sum(
@@ -324,9 +325,11 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real
             Decimal('0.00'),
         )
 
+    seeded_balance = _money(starting_balance)
     cum_ingresos = Decimal('0.00')
     cum_gastos = Decimal('0.00')
-    cumulative_balance = _money(starting_balance)
+    cumulative_balance = Decimal('0.00')
+    cumulative_cash_position = seeded_balance
     series = []
 
     # ── Meses reales (histórico) ──────────────────────────────────────────────
@@ -347,7 +350,8 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real
 
         cum_ingresos = (cum_ingresos + ing_mes).quantize(Decimal('0.01'))
         cum_gastos = (cum_gastos + gasto_mes).quantize(Decimal('0.01'))
-        cumulative_balance = (cumulative_balance + ing_mes - gasto_mes).quantize(Decimal('0.01'))
+        cumulative_balance = (cum_ingresos - cum_gastos).quantize(Decimal('0.01'))
+        cumulative_cash_position = (seeded_balance + cumulative_balance).quantize(Decimal('0.01'))
 
         series.append({
             'month': f'{month_start.year}-{month_start.month:02d}',
@@ -356,6 +360,7 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real
             'cumulative_ingresos': float(cum_ingresos),
             'cumulative_gastos': float(cum_gastos),
             'cumulative_balance': float(cumulative_balance),
+            'cumulative_cash_position': float(cumulative_cash_position),
             'is_real': True,
         })
 
@@ -370,17 +375,14 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real
         total_gastos_fijos = _gastos_fijos_mes(month_start, month_end)
         total_cuotas = _cuotas_mes(month_start, month_end)
 
-        deterministic_gap = (total_ing_fijos - total_gastos_fijos - total_cuotas).quantize(Decimal('0.01'))
-        projected_gap = (deterministic_gap + smoothed_variable_gap).quantize(Decimal('0.01'))
+        projected_ingresos = (total_ing_fijos + smoothed_variable_ingresos).quantize(Decimal('0.01'))
+        projected_gastos = (total_gastos_fijos + total_cuotas + smoothed_variable_gastos).quantize(Decimal('0.01'))
+        projected_gap = (projected_ingresos - projected_gastos).quantize(Decimal('0.01'))
 
-        # Distribuir smoothed_variable_gap entre ingresos y gastos proyectados
-        svgap = smoothed_variable_gap
-        ing_variable = svgap if svgap > 0 else Decimal('0.00')
-        gasto_variable = -svgap if svgap < 0 else Decimal('0.00')
-
-        cum_ingresos = (cum_ingresos + total_ing_fijos + ing_variable).quantize(Decimal('0.01'))
-        cum_gastos = (cum_gastos + total_gastos_fijos + total_cuotas + gasto_variable).quantize(Decimal('0.01'))
-        cumulative_balance = (cumulative_balance + projected_gap).quantize(Decimal('0.01'))
+        cum_ingresos = (cum_ingresos + projected_ingresos).quantize(Decimal('0.01'))
+        cum_gastos = (cum_gastos + projected_gastos).quantize(Decimal('0.01'))
+        cumulative_balance = (cum_ingresos - cum_gastos).quantize(Decimal('0.01'))
+        cumulative_cash_position = (seeded_balance + cumulative_balance).quantize(Decimal('0.01'))
 
         series.append({
             'month': f'{month_start.year}-{month_start.month:02d}',
@@ -389,6 +391,7 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real
             'cumulative_ingresos': float(cum_ingresos),
             'cumulative_gastos': float(cum_gastos),
             'cumulative_balance': float(cumulative_balance),
+            'cumulative_cash_position': float(cumulative_cash_position),
             'is_real': False,
         })
 
@@ -396,6 +399,8 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real
         'months': months,
         'history_months_used': history_months_used,
         'starting_balance': float(_money(starting_balance)),
+        'smoothed_variable_ingresos': float(smoothed_variable_ingresos),
+        'smoothed_variable_gastos': float(smoothed_variable_gastos),
         'smoothed_variable_gap': float(smoothed_variable_gap),
         'current_month': f'{current_month.year}-{current_month.month:02d}',
         'series': series,
