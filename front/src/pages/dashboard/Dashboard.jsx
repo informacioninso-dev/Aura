@@ -530,12 +530,12 @@ export default function Dashboard() {
                       gasto_real: 'Gastos (real)', gasto_proj: 'Gastos (proy.)',
                       balance_real: 'Balance (real)', balance_proj: 'Balance (proy.)',
                     }[name] || name)} />
+                    <Area connectNulls={false} type="monotone" dataKey="balance_real" stroke="#C487F6" strokeWidth={2.5} fill="url(#gBalReal)"   dot={false} />
+                    <Area connectNulls={false} type="monotone" dataKey="balance_proj" stroke="#C487F6" strokeWidth={2}   fill="url(#gBalProj)"   strokeDasharray="5 4" dot={false} />
                     <Area connectNulls={false} type="monotone" dataKey="ing_real"     stroke="#10B981" strokeWidth={2.5} fill="url(#gIngReal)"   dot={false} />
                     <Area connectNulls={false} type="monotone" dataKey="ing_proj"     stroke="#10B981" strokeWidth={2}   fill="url(#gIngProj)"   strokeDasharray="5 4" dot={false} />
                     <Area connectNulls={false} type="monotone" dataKey="gasto_real"   stroke="#F87171" strokeWidth={2.5} fill="url(#gGastoReal)" dot={false} />
                     <Area connectNulls={false} type="monotone" dataKey="gasto_proj"   stroke="#F87171" strokeWidth={2}   fill="url(#gGastoProj)" strokeDasharray="5 4" dot={false} />
-                    <Area connectNulls={false} type="monotone" dataKey="balance_real" stroke="#C487F6" strokeWidth={2.5} fill="url(#gBalReal)"   dot={false} />
-                    <Area connectNulls={false} type="monotone" dataKey="balance_proj" stroke="#C487F6" strokeWidth={2}   fill="url(#gBalProj)"   strokeDasharray="5 4" dot={false} />
                   </AreaChart>
                 </ResponsiveContainer>
               )}
