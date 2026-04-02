@@ -446,7 +446,7 @@ export default function Dashboard() {
 
               {(() => {
                 const histMesesAviso = advancedProjection?.history_months_used ?? 0
-                if (histMesesAviso < 3) return (
+                if (histMesesAviso === 0) return (
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 12, padding: '10px 14px', marginBottom: 14 }}>
                     <span style={{ fontSize: 16, lineHeight: 1 }}>⚠️</span>
                     <div>
