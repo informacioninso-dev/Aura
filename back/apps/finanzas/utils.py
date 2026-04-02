@@ -223,35 +223,40 @@ def obtener_o_sembrar_saldo_mes(usuario, anio, mes):
     return saldo, True
 
 
-def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, starting_balance=Decimal('0.00')):
+def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real_past_months=6, starting_balance=Decimal('0.00')):
     from .models import Diferido, GastoCorriente, GastoNoCorriente, Ingreso, IngresoPuntual
 
     today = datetime.date.today()
     current_month = datetime.date(today.year, today.month, 1)
+    real_start = _restar_meses(current_month, real_past_months)
+    earliest_user_month = _primer_dia_mes(getattr(usuario, 'date_joined', today))
+    real_start = max(real_start, earliest_user_month)
+
     history_start = _restar_meses(current_month, history_months)
     history_end = current_month - datetime.timedelta(days=1)
     projection_end = _ultimo_dia_mes(*_sumar_meses_fecha(current_month, months - 1).timetuple()[:2])
 
+    # Fetch recurrentes covering both past (real) and future (projected) window
     ingresos = list(
         Ingreso.objects.filter(
             usuario=usuario,
             activo=True,
             fecha_inicio__lte=projection_end,
-        ).filter(db_models.Q(fecha_fin__isnull=True) | db_models.Q(fecha_fin__gte=current_month))
+        ).filter(db_models.Q(fecha_fin__isnull=True) | db_models.Q(fecha_fin__gte=real_start))
     )
     gastos_corrientes = list(
         GastoCorriente.objects.filter(
             usuario=usuario,
             activo=True,
             fecha_inicio__lte=projection_end,
-        ).filter(db_models.Q(fecha_fin__isnull=True) | db_models.Q(fecha_fin__gte=current_month))
+        ).filter(db_models.Q(fecha_fin__isnull=True) | db_models.Q(fecha_fin__gte=real_start))
     )
     diferidos = list(
         Diferido.objects.filter(
             usuario=usuario,
             activo=True,
             fecha_inicio__lte=projection_end,
-            fecha_fin__gte=current_month,
+            fecha_fin__gte=real_start,
         )
     )
     ingresos_puntuales = list(
@@ -279,7 +284,8 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, star
         key = (item.fecha.year, item.fecha.month)
         gastos_puntuales_por_mes[key] = gastos_puntuales_por_mes.get(key, Decimal('0.00')) + _money(item.monto)
 
-    earliest_history_month = max(_primer_dia_mes(getattr(usuario, 'date_joined', today)), history_start)
+    # Compute smoothed variable gap from full history window
+    earliest_history_month = max(earliest_user_month, history_start)
     history_cursor = earliest_history_month
     variable_gaps = []
     while history_cursor < current_month:
@@ -293,47 +299,96 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, star
     smoothed_variable_gap = _winsorized_weighted_average(variable_gaps)
     history_months_used = len(variable_gaps)
 
+    def _ing_fijos_mes(month_start, month_end):
+        return sum(
+            (_money(item.monto) * Decimal(str(FREQ_FACTOR.get(item.frecuencia, 1)))
+             for item in ingresos
+             if item.fecha_inicio <= month_end and (item.fecha_fin is None or item.fecha_fin >= month_start)),
+            Decimal('0.00'),
+        )
+
+    def _gastos_fijos_mes(month_start, month_end):
+        return sum(
+            (_money(item.monto) * Decimal(str(FREQ_FACTOR.get(item.frecuencia, 1)))
+             for item in gastos_corrientes
+             if item.fecha_inicio <= month_end and (item.fecha_fin is None or item.fecha_fin >= month_start)),
+            Decimal('0.00'),
+        )
+
+    def _cuotas_mes(month_start, month_end):
+        return sum(
+            (_money(item.cuota_mensual)
+             for item in diferidos
+             if item.fecha_inicio <= month_end and item.fecha_fin >= month_start),
+            Decimal('0.00'),
+        )
+
+    cum_ingresos = Decimal('0.00')
+    cum_gastos = Decimal('0.00')
     cumulative_balance = _money(starting_balance)
     series = []
 
+    # ── Meses reales (histórico) ──────────────────────────────────────────────
+    cursor = real_start
+    while cursor < current_month:
+        month_start = cursor
+        month_end = _ultimo_dia_mes(month_start.year, month_start.month)
+        key = (month_start.year, month_start.month)
+
+        ing_fijos = _ing_fijos_mes(month_start, month_end)
+        gasto_fijos = _gastos_fijos_mes(month_start, month_end)
+        cuotas = _cuotas_mes(month_start, month_end)
+        ing_puntuales = ingresos_puntuales_por_mes.get(key, Decimal('0.00'))
+        gasto_puntuales = gastos_puntuales_por_mes.get(key, Decimal('0.00'))
+
+        ing_mes = ing_fijos + ing_puntuales
+        gasto_mes = gasto_fijos + gasto_puntuales + cuotas
+
+        cum_ingresos = (cum_ingresos + ing_mes).quantize(Decimal('0.01'))
+        cum_gastos = (cum_gastos + gasto_mes).quantize(Decimal('0.01'))
+        cumulative_balance = (cumulative_balance + ing_mes - gasto_mes).quantize(Decimal('0.01'))
+
+        series.append({
+            'month': f'{month_start.year}-{month_start.month:02d}',
+            'label': _mes_label(month_start),
+            'projected_gap': float((ing_mes - gasto_mes).quantize(Decimal('0.01'))),
+            'cumulative_ingresos': float(cum_ingresos),
+            'cumulative_gastos': float(cum_gastos),
+            'cumulative_balance': float(cumulative_balance),
+            'is_real': True,
+        })
+
+        cursor = _sumar_meses_fecha(cursor, 1)
+
+    # ── Meses proyectados (futuro) ────────────────────────────────────────────
     for offset in range(months):
         month_start = _sumar_meses_fecha(current_month, offset)
         month_end = _ultimo_dia_mes(month_start.year, month_start.month)
 
-        total_ing_fijos = sum(
-            (
-                _money(item.monto) * Decimal(str(FREQ_FACTOR.get(item.frecuencia, 1)))
-                for item in ingresos
-                if item.fecha_inicio <= month_end and (item.fecha_fin is None or item.fecha_fin >= month_start)
-            ),
-            Decimal('0.00'),
-        )
-        total_gastos_fijos = sum(
-            (
-                _money(item.monto) * Decimal(str(FREQ_FACTOR.get(item.frecuencia, 1)))
-                for item in gastos_corrientes
-                if item.fecha_inicio <= month_end and (item.fecha_fin is None or item.fecha_fin >= month_start)
-            ),
-            Decimal('0.00'),
-        )
-        total_cuotas = sum(
-            (
-                _money(item.cuota_mensual)
-                for item in diferidos
-                if item.fecha_inicio <= month_end and item.fecha_fin >= month_start
-            ),
-            Decimal('0.00'),
-        )
+        total_ing_fijos = _ing_fijos_mes(month_start, month_end)
+        total_gastos_fijos = _gastos_fijos_mes(month_start, month_end)
+        total_cuotas = _cuotas_mes(month_start, month_end)
 
         deterministic_gap = (total_ing_fijos - total_gastos_fijos - total_cuotas).quantize(Decimal('0.01'))
         projected_gap = (deterministic_gap + smoothed_variable_gap).quantize(Decimal('0.01'))
+
+        # Distribuir smoothed_variable_gap entre ingresos y gastos proyectados
+        svgap = smoothed_variable_gap
+        ing_variable = svgap if svgap > 0 else Decimal('0.00')
+        gasto_variable = -svgap if svgap < 0 else Decimal('0.00')
+
+        cum_ingresos = (cum_ingresos + total_ing_fijos + ing_variable).quantize(Decimal('0.01'))
+        cum_gastos = (cum_gastos + total_gastos_fijos + total_cuotas + gasto_variable).quantize(Decimal('0.01'))
         cumulative_balance = (cumulative_balance + projected_gap).quantize(Decimal('0.01'))
 
         series.append({
             'month': f'{month_start.year}-{month_start.month:02d}',
             'label': _mes_label(month_start),
             'projected_gap': float(projected_gap),
+            'cumulative_ingresos': float(cum_ingresos),
+            'cumulative_gastos': float(cum_gastos),
             'cumulative_balance': float(cumulative_balance),
+            'is_real': False,
         })
 
     return {
@@ -341,5 +396,6 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, star
         'history_months_used': history_months_used,
         'starting_balance': float(_money(starting_balance)),
         'smoothed_variable_gap': float(smoothed_variable_gap),
+        'current_month': f'{current_month.year}-{current_month.month:02d}',
         'series': series,
     }

@@ -227,10 +227,17 @@ class ProyeccionAcumuladaView(APIView):
         saldo, created = obtener_o_sembrar_saldo_mes(request.user, saldo_anio, saldo_mes)
         starting_balance = Decimal(str(saldo.monto)) if saldo.activo else Decimal('0.00')
 
+        raw_past = request.query_params.get('past_months', '6')
+        try:
+            real_past_months = max(1, min(24, int(raw_past)))
+        except (TypeError, ValueError):
+            real_past_months = 6
+
         data = calcular_proyeccion_acumulada(
             request.user,
             months=months,
-            history_months=12,
+            history_months=max(12, real_past_months),
+            real_past_months=real_past_months,
             starting_balance=starting_balance,
         )
         data['max_months_allowed'] = max_months
