@@ -244,7 +244,7 @@ def validar_filas_confirmacion(filas: list[dict], max_filas: int = MAX_FILAS) ->
 def crear_registros(usuario, filas: list[dict]) -> dict:
     """Crea ingresos y gastos puntuales a partir de filas parseadas y validadas."""
     from .models import GastoNoCorriente, IngresoPuntual
-    from .utils import recalcular_saldo_mes_para
+    from .utils import invalidate_finanzas_cache
 
     ingresos = []
     gastos = []
@@ -280,7 +280,6 @@ def crear_registros(usuario, filas: list[dict]) -> dict:
         if gastos:
             GastoNoCorriente.objects.bulk_create(gastos, batch_size=500)
         if fechas_afectadas:
-            for fecha in sorted(set(fechas_afectadas)):
-                recalcular_saldo_mes_para(usuario, fecha, fecha)
+            invalidate_finanzas_cache(usuario.pk, min(fechas_afectadas))
 
     return {'ingresos_creados': len(ingresos), 'gastos_creados': len(gastos)}

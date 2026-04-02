@@ -2,6 +2,8 @@ import datetime
 from decimal import Decimal
 from io import BytesIO
 
+from django.conf import settings
+from django.core.cache import cache
 from django.db import models
 from django.http import HttpResponse
 from rest_framework import viewsets, permissions, status
@@ -31,8 +33,11 @@ from .utils import (
     calcular_proyeccion_acumulada,
     asegurar_saldo_mes,
     asegurar_saldos_historicos,
+    _primera_fecha_con_movimientos,
     _restar_meses,
+    recalcular_saldo_mes_para,
     obtener_o_sembrar_saldo_mes,
+    build_projection_cache_key,
     FREQ_FACTOR,
 )
 from .serializers import (
@@ -160,6 +165,11 @@ class SaldoMesViewSet(BaseFinanzasViewSet):
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+        primera_fecha = _primera_fecha_con_movimientos(request.user)
+        if primera_fecha:
+            recalcular_saldo_mes_para(request.user, primera_fecha)
+        else:
+            asegurar_saldos_historicos(request.user)
         saldo = asegurar_saldo_mes(request.user, anio, mes)
 
         data = SaldoMesSerializer(saldo).data
@@ -228,6 +238,15 @@ class ProyeccionAcumuladaView(APIView):
             real_past_months = max(1, min(24, int(raw_past)))
         except (TypeError, ValueError):
             real_past_months = 6
+        cache_key = build_projection_cache_key(
+            request.user.pk,
+            months=months,
+            past_months=real_past_months,
+        )
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return Response(cached_data)
+
         current_month = datetime.date(hoy.year, hoy.month, 1)
         history_end = current_month - datetime.timedelta(days=1)
         history_start = _restar_meses(current_month, max(12, real_past_months))
@@ -247,6 +266,7 @@ class ProyeccionAcumuladaView(APIView):
         data['starting_balance_applied'] = bool(saldo.activo)
         data['starting_balance_month'] = f'{saldo_anio}-{saldo_mes:02d}'
         data['starting_balance_seeded'] = created
+        cache.set(cache_key, data, getattr(settings, 'FINANZAS_PROJECTION_CACHE_TTL', 300))
         return Response(data)
 
 

@@ -1,9 +1,12 @@
 import datetime
 from decimal import Decimal
 
+from django.core.cache import cache
 from django.db import models as db_models
 
 MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+FINANZAS_CACHE_VERSION_PREFIX = 'finanzas:version'
+FINANZAS_DIRTY_FROM_PREFIX = 'finanzas:dirty-from'
 
 FREQ_FACTOR = {
     'diario': 30,
@@ -64,6 +67,72 @@ def _money(value):
     return Decimal(str(value or 0)).quantize(Decimal('0.01'))
 
 
+def _iter_month_starts(start_month, end_month):
+    cursor = _primer_dia_mes(start_month)
+    end_month = _primer_dia_mes(end_month)
+    while cursor <= end_month:
+        yield cursor
+        cursor = _sumar_meses_fecha(cursor, 1)
+
+
+def _cache_version_key(user_id):
+    return f'{FINANZAS_CACHE_VERSION_PREFIX}:{user_id}'
+
+
+def _dirty_from_key(user_id):
+    return f'{FINANZAS_DIRTY_FROM_PREFIX}:{user_id}'
+
+
+def get_finanzas_cache_version(user_id):
+    key = _cache_version_key(user_id)
+    version = cache.get(key)
+    if version is None:
+        version = 1
+        cache.set(key, version, None)
+    return version
+
+
+def build_projection_cache_key(user_id, *, months, past_months):
+    version = get_finanzas_cache_version(user_id)
+    return f'finanzas:projection:{user_id}:v{version}:m{months}:p{past_months}'
+
+
+def get_finanzas_dirty_from(user_id):
+    raw_value = cache.get(_dirty_from_key(user_id))
+    if not raw_value:
+        return None
+    if isinstance(raw_value, datetime.date):
+        return _primer_dia_mes(raw_value)
+    try:
+        return _primer_dia_mes(datetime.date.fromisoformat(raw_value))
+    except (TypeError, ValueError):
+        cache.delete(_dirty_from_key(user_id))
+        return None
+
+
+def _set_finanzas_dirty_from(user_id, dirty_from):
+    key = _dirty_from_key(user_id)
+    if dirty_from is None:
+        cache.delete(key)
+    else:
+        cache.set(key, _primer_dia_mes(dirty_from).isoformat(), None)
+
+
+def invalidate_finanzas_cache(user_or_id, fecha_desde=None):
+    user_id = getattr(user_or_id, 'pk', user_or_id)
+    if fecha_desde is not None:
+        new_dirty_from = _primer_dia_mes(_coerce_date(fecha_desde))
+        current_dirty_from = get_finanzas_dirty_from(user_id)
+        if current_dirty_from is None or new_dirty_from < current_dirty_from:
+            _set_finanzas_dirty_from(user_id, new_dirty_from)
+
+    key = _cache_version_key(user_id)
+    try:
+        cache.incr(key)
+    except ValueError:
+        cache.set(key, 2, None)
+
+
 def _primera_fecha_con_movimientos(usuario):
     from .models import Diferido, GastoCorriente, GastoNoCorriente, Ingreso, IngresoPuntual
 
@@ -79,13 +148,46 @@ def _primera_fecha_con_movimientos(usuario):
 
 
 def asegurar_saldos_historicos(usuario, fecha_hasta=None):
+    from .models import SaldoMes
+
     primera_fecha = _primera_fecha_con_movimientos(usuario)
     if not primera_fecha:
         return False
 
     hoy = datetime.date.today()
     limite = _coerce_date(fecha_hasta) or hoy
-    recalcular_saldo_mes_para(usuario, primera_fecha, min(limite, hoy))
+    limite_mes = _primer_dia_mes(min(limite, hoy))
+    primera_mes = _primer_dia_mes(primera_fecha)
+    dirty_from = get_finanzas_dirty_from(usuario.pk)
+
+    first_exists = SaldoMes.objects.filter(
+        usuario=usuario,
+        anio=primera_mes.year,
+        mes=primera_mes.month,
+    ).exists()
+    latest_saldo = SaldoMes.objects.filter(
+        usuario=usuario,
+    ).filter(
+        db_models.Q(anio__lt=limite_mes.year)
+        | db_models.Q(anio=limite_mes.year, mes__lte=limite_mes.month)
+    ).order_by('-anio', '-mes').first()
+
+    recalc_candidates = []
+    if not first_exists:
+        recalc_candidates.append(primera_mes)
+    if latest_saldo is None:
+        recalc_candidates.append(primera_mes)
+    else:
+        latest_mes = datetime.date(latest_saldo.anio, latest_saldo.mes, 1)
+        if latest_mes < limite_mes:
+            recalc_candidates.append(_sumar_meses_fecha(latest_mes, 1))
+    if dirty_from and dirty_from <= limite_mes:
+        recalc_candidates.append(dirty_from)
+
+    if not recalc_candidates:
+        return False
+
+    recalcular_saldo_mes_para(usuario, min(recalc_candidates), limite_mes)
     return True
 
 
@@ -167,6 +269,82 @@ def calcular_balance_mes(usuario, anio, mes):
     return round(total_ing + total_ip - total_gc - total_dif - total_gnc, 2)
 
 
+def _calcular_neto_mensual_en_rango(usuario, desde_mes, hasta_mes):
+    from .models import Diferido, GastoCorriente, GastoNoCorriente, Ingreso, IngresoPuntual
+
+    hasta_dia = _ultimo_dia_mes(hasta_mes.year, hasta_mes.month)
+    monthly_net = {}
+
+    def add_amount(month_date, amount):
+        key = (month_date.year, month_date.month)
+        monthly_net[key] = monthly_net.get(key, Decimal('0.00')) + _money(amount)
+
+    def add_recurrente(items, *, amount_fn):
+        for item in items:
+            item_start = max(_primer_dia_mes(item['fecha_inicio']), desde_mes)
+            raw_end = item['fecha_fin'] or hasta_mes
+            item_end = min(_primer_dia_mes(raw_end), hasta_mes)
+            if item_start > item_end:
+                continue
+
+            amount = _money(amount_fn(item))
+            for month_date in _iter_month_starts(item_start, item_end):
+                add_amount(month_date, amount)
+
+    ingresos = Ingreso.objects.filter(
+        usuario=usuario,
+        activo=True,
+        fecha_inicio__lte=hasta_dia,
+    ).filter(
+        db_models.Q(fecha_fin__isnull=True) | db_models.Q(fecha_fin__gte=desde_mes)
+    ).values('monto', 'frecuencia', 'fecha_inicio', 'fecha_fin')
+    add_recurrente(
+        ingresos,
+        amount_fn=lambda item: Decimal(str(item['monto'])) * Decimal(str(FREQ_FACTOR.get(item['frecuencia'], 1))),
+    )
+
+    ingresos_puntuales = IngresoPuntual.objects.filter(
+        usuario=usuario,
+        fecha__gte=desde_mes,
+        fecha__lte=hasta_dia,
+    ).values('monto', 'fecha')
+    for item in ingresos_puntuales:
+        add_amount(_primer_dia_mes(item['fecha']), item['monto'])
+
+    gastos_corrientes = GastoCorriente.objects.filter(
+        usuario=usuario,
+        activo=True,
+        fecha_inicio__lte=hasta_dia,
+    ).filter(
+        db_models.Q(fecha_fin__isnull=True) | db_models.Q(fecha_fin__gte=desde_mes)
+    ).values('monto', 'frecuencia', 'fecha_inicio', 'fecha_fin')
+    add_recurrente(
+        gastos_corrientes,
+        amount_fn=lambda item: -Decimal(str(item['monto'])) * Decimal(str(FREQ_FACTOR.get(item['frecuencia'], 1))),
+    )
+
+    diferidos = Diferido.objects.filter(
+        usuario=usuario,
+        activo=True,
+        fecha_inicio__lte=hasta_dia,
+        fecha_fin__gte=desde_mes,
+    ).values('cuota_mensual', 'fecha_inicio', 'fecha_fin')
+    add_recurrente(
+        diferidos,
+        amount_fn=lambda item: -Decimal(str(item['cuota_mensual'])),
+    )
+
+    gastos_no_corrientes = GastoNoCorriente.objects.filter(
+        usuario=usuario,
+        fecha__gte=desde_mes,
+        fecha__lte=hasta_dia,
+    ).values('monto', 'fecha')
+    for item in gastos_no_corrientes:
+        add_amount(_primer_dia_mes(item['fecha']), -Decimal(str(item['monto'])))
+
+    return monthly_net
+
+
 def recalcular_saldo_mes_para(usuario, fecha_desde, fecha_hasta=None):
     """
     Recalcula y upserta SaldoMes como saldo acumulado al cierre de cada mes.
@@ -177,7 +355,9 @@ def recalcular_saldo_mes_para(usuario, fecha_desde, fecha_hasta=None):
 
     fecha_desde = _coerce_date(fecha_desde)
     fecha_hasta = _coerce_date(fecha_hasta)
+    user_id = getattr(usuario, 'pk', usuario)
     hoy = datetime.date.today()
+    hoy_mes = _primer_dia_mes(hoy)
     hasta = min(fecha_hasta, hoy) if fecha_hasta else hoy
     desde_mes = _primer_dia_mes(fecha_desde)
     hasta_mes = _primer_dia_mes(hasta)
@@ -193,37 +373,74 @@ def recalcular_saldo_mes_para(usuario, fecha_desde, fecha_hasta=None):
         primera_fecha = _primera_fecha_con_movimientos(usuario)
         if primera_fecha:
             cursor = min(desde_mes, _primer_dia_mes(primera_fecha))
+    dirty_from = get_finanzas_dirty_from(user_id)
+    if dirty_from and dirty_from <= hasta_mes:
+        cursor = min(cursor, dirty_from)
+
+    monthly_net = _calcular_neto_mensual_en_rango(usuario, cursor, hasta_mes)
+    existing_saldos = {
+        (saldo.anio, saldo.mes): saldo
+        for saldo in SaldoMes.objects.filter(
+            usuario=usuario,
+        ).filter(
+            db_models.Q(anio__gt=cursor.year)
+            | db_models.Q(anio=cursor.year, mes__gte=cursor.month)
+        ).filter(
+            db_models.Q(anio__lt=hasta_mes.year)
+            | db_models.Q(anio=hasta_mes.year, mes__lte=hasta_mes.month)
+        )
+    }
+    to_update = []
+    to_create = []
 
     while cursor <= hasta_mes:
-        neto_mes = _money(calcular_balance_mes(usuario, cursor.year, cursor.month))
+        neto_mes = _money(monthly_net.get((cursor.year, cursor.month), Decimal('0.00')))
         saldo_acumulado = (saldo_acumulado + neto_mes).quantize(Decimal('0.01'))
-        obj, created = SaldoMes.objects.get_or_create(
-            usuario=usuario,
-            anio=cursor.year,
-            mes=cursor.month,
-            defaults={'monto': saldo_acumulado, 'activo': True},
-        )
-        if not created:
-            SaldoMes.objects.filter(pk=obj.pk).update(monto=saldo_acumulado)
+        key = (cursor.year, cursor.month)
+        obj = existing_saldos.get(key)
+        if obj is None:
+            to_create.append(
+                SaldoMes(
+                    usuario=usuario,
+                    anio=cursor.year,
+                    mes=cursor.month,
+                    monto=saldo_acumulado,
+                    activo=True,
+                )
+            )
+        elif _money(obj.monto) != saldo_acumulado:
+            obj.monto = saldo_acumulado
+            to_update.append(obj)
 
         next_anio, next_mes = _sumar_mes(cursor.year, cursor.month)
         cursor = datetime.date(next_anio, next_mes, 1)
 
+    if to_create:
+        SaldoMes.objects.bulk_create(to_create)
+    if to_update:
+        SaldoMes.objects.bulk_update(to_update, ['monto'])
+
+    if dirty_from and dirty_from <= hasta_mes:
+        next_dirty_from = _sumar_meses_fecha(hasta_mes, 1)
+        _set_finanzas_dirty_from(user_id, None if next_dirty_from > hoy_mes else next_dirty_from)
+
 
 def asegurar_saldo_mes(usuario, anio, mes):
-    from .models import SaldoMes
-    recalcular_saldo_mes_para(usuario, datetime.date(anio, mes, 1), datetime.date(anio, mes, 1))
-    return SaldoMes.objects.get(usuario=usuario, anio=anio, mes=mes)
+    saldo, _ = obtener_o_sembrar_saldo_mes(usuario, anio, mes)
+    return saldo
 
 
 def obtener_o_sembrar_saldo_mes(usuario, anio, mes):
     from .models import SaldoMes
 
+    target_month = datetime.date(anio, mes, 1)
     saldo = SaldoMes.objects.filter(usuario=usuario, anio=anio, mes=mes).first()
-    if saldo:
+    dirty_from = get_finanzas_dirty_from(usuario.pk)
+    if saldo and (dirty_from is None or dirty_from > target_month):
         return saldo, False
 
-    recalcular_saldo_mes_para(usuario, datetime.date(anio, mes, 1), datetime.date(anio, mes, 1))
+    recalc_from = dirty_from if dirty_from and dirty_from <= target_month else target_month
+    recalcular_saldo_mes_para(usuario, recalc_from, target_month)
     saldo = SaldoMes.objects.get(usuario=usuario, anio=anio, mes=mes)
     return saldo, True
 

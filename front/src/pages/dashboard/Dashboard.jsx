@@ -218,8 +218,8 @@ export default function Dashboard() {
     return advancedSeries.map((point, i) => {
       const isConnectReal = point.is_real || i === lastRealIdx + 1
       const isConnectProj = !point.is_real || i === lastRealIdx
-        const openingCarry = Number(point.opening_balance ?? 0)
-        const gapAcumulado = Number(point.closing_balance ?? point.cumulative_balance ?? 0)
+      const openingCarry = Number(point.opening_balance ?? 0)
+      const gapAcumulado = Number(point.closing_balance ?? point.cumulative_balance ?? 0)
       let displayIngresos = Number(point.monthly_ingresos ?? 0)
       let displayGastos = Number(point.monthly_gastos ?? 0)
       displayIngresos += Math.max(openingCarry, 0)
@@ -478,6 +478,7 @@ export default function Dashboard() {
                 <option value={3}>3 meses</option>
                 <option value={6}>6 meses</option>
                 <option value={12}>12 meses</option>
+                <option value={24}>24 meses</option>
               </select>
             </label>
             <label className="dashboard-chart-control">
@@ -581,7 +582,7 @@ export default function Dashboard() {
 
               {advancedProjection?.starting_balance_applied && (
                   <div style={{ marginBottom: 14, fontSize: 12, color: 'rgba(255,255,255,0.50)' }}>
-                   La grafica muestra ingresos y gastos mensuales. El valor morado resume el saldo acumulado a lo largo del horizonte.
+                   La grafica incorpora el saldo inicial como arrastre visible: saldo positivo suma a ingresos y saldo negativo carga a egresos.
                   </div>
                 )}
 

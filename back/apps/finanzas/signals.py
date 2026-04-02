@@ -1,6 +1,8 @@
 import datetime
 from decimal import Decimal
+from functools import partial
 from django.db.models.signals import post_save, post_delete, pre_save
+from django.db import transaction
 from django.dispatch import receiver
 from django.conf import settings
 
@@ -14,7 +16,7 @@ from .models import (
     IngresoPuntual,
     Notificacion,
 )
-from .utils import recalcular_saldo_mes_para
+from .utils import invalidate_finanzas_cache, recalcular_saldo_mes_para
 
 FREQ = {
     'diario': 30, 'semanal': Decimal('4.33'), 'quincenal': 2,
@@ -107,16 +109,40 @@ def _evaluar_presupuesto(usuario, categoria):
         ).delete()
 
 
+def _merge_recalc_range(old_inicio, old_fin, new_inicio, new_fin):
+    fechas_inicio = [fecha for fecha in (old_inicio, new_inicio) if fecha]
+    if not fechas_inicio:
+        return None, None
+
+    fecha_desde = min(fechas_inicio)
+    if old_fin is None or new_fin is None:
+        fecha_hasta = None
+    else:
+        fecha_hasta = max(old_fin, new_fin)
+    return fecha_desde, fecha_hasta
+
+
+def _recalcular_e_invalidar(usuario_id, fecha_desde, fecha_hasta=None):
+    from django.contrib.auth import get_user_model
+
+    user = get_user_model().objects.filter(pk=usuario_id).first()
+    if user is None or fecha_desde is None:
+        return
+
+    recalcular_saldo_mes_para(user, fecha_desde, fecha_hasta)
+    invalidate_finanzas_cache(usuario_id, fecha_desde)
+
+
 @receiver(post_save, sender=GastoCorriente)
 @receiver(post_save, sender=GastoNoCorriente)
 def on_gasto_guardado(sender, instance, **kwargs):
-    _evaluar_presupuesto(instance.usuario, instance.categoria)
+    transaction.on_commit(partial(_evaluar_presupuesto, instance.usuario, instance.categoria))
 
 
 @receiver(post_delete, sender=GastoCorriente)
 @receiver(post_delete, sender=GastoNoCorriente)
 def on_gasto_eliminado(sender, instance, **kwargs):
-    _evaluar_presupuesto(instance.usuario, instance.categoria)
+    transaction.on_commit(partial(_evaluar_presupuesto, instance.usuario, instance.categoria))
 
 # pre_save: captura valores anteriores para detectar cambios de rango
 @receiver(pre_save, sender=Ingreso)
@@ -137,11 +163,16 @@ def on_recurrente_pre_save(sender, instance, **kwargs):
 @receiver(post_save, sender=Diferido)
 def on_recurrente_guardado(sender, instance, **kwargs):
     try:
-        recalcular_saldo_mes_para(instance.usuario, instance.fecha_inicio, instance.fecha_fin)
         old_inicio = getattr(instance, '_old_fecha_inicio', None)
         old_fin = getattr(instance, '_old_fecha_fin', None)
-        if old_inicio and (old_inicio != instance.fecha_inicio or old_fin != instance.fecha_fin):
-            recalcular_saldo_mes_para(instance.usuario, old_inicio, old_fin)
+        fecha_desde, fecha_hasta = _merge_recalc_range(
+            old_inicio,
+            old_fin,
+            instance.fecha_inicio,
+            instance.fecha_fin,
+        )
+        if fecha_desde:
+            transaction.on_commit(partial(_recalcular_e_invalidar, instance.usuario.pk, fecha_desde, fecha_hasta))
     except Exception:
         pass
 
@@ -151,7 +182,7 @@ def on_recurrente_guardado(sender, instance, **kwargs):
 @receiver(post_delete, sender=Diferido)
 def on_recurrente_eliminado(sender, instance, **kwargs):
     try:
-        recalcular_saldo_mes_para(instance.usuario, instance.fecha_inicio, instance.fecha_fin)
+        transaction.on_commit(partial(_recalcular_e_invalidar, instance.usuario.pk, instance.fecha_inicio, instance.fecha_fin))
     except Exception:
         pass
 
@@ -160,7 +191,7 @@ def on_recurrente_eliminado(sender, instance, **kwargs):
 @receiver(post_delete, sender=GastoNoCorriente)
 def on_gasto_nc_cambiado(sender, instance, **kwargs):
     try:
-        recalcular_saldo_mes_para(instance.usuario, instance.fecha, instance.fecha)
+        transaction.on_commit(partial(_recalcular_e_invalidar, instance.usuario.pk, instance.fecha, instance.fecha))
     except Exception:
         pass
 
@@ -169,6 +200,6 @@ def on_gasto_nc_cambiado(sender, instance, **kwargs):
 @receiver(post_delete, sender=IngresoPuntual)
 def on_ingreso_puntual_cambiado(sender, instance, **kwargs):
     try:
-        recalcular_saldo_mes_para(instance.usuario, instance.fecha, instance.fecha)
+        transaction.on_commit(partial(_recalcular_e_invalidar, instance.usuario.pk, instance.fecha, instance.fecha))
     except Exception:
         pass

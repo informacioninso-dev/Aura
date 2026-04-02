@@ -661,6 +661,9 @@ export default function Simulador() {
               <div className="card-header">
                 <h2 className="card-title">Flujo con prestamo · 24 meses</h2>
               </div>
+              <div style={{ marginBottom: 14, fontSize: 12, color: 'rgba(255,255,255,0.50)' }}>
+                La curva incorpora tu saldo inicial como arrastre visible: saldo positivo suma a ingresos y saldo negativo carga a egresos.
+              </div>
               <ResponsiveContainer width="100%" height={280}>
                 <AreaChart data={resultado.flujoConPrestamo} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
                   <defs>
@@ -681,13 +684,13 @@ export default function Simulador() {
                     labelStyle={{ color: '#FFFFFF', marginBottom: 4, fontWeight: 700 }}
                     formatter={(v, n) => [
                       fmt(v),
-                        n === 'ingresosVisibles'
-                          ? 'Ingresos'
-                        : 'Egresos + cuotas',
+                      n === 'ingresosVisibles'
+                        ? 'Ingresos + arrastre'
+                        : 'Egresos + cuotas + arrastre',
                     ]}
                   />
                   <Legend formatter={(v) => (
-                    v === 'ingresosVisibles' ? 'Ingresos' : 'Egresos + cuotas'
+                    v === 'ingresosVisibles' ? 'Ingresos + arrastre' : 'Egresos + cuotas + arrastre'
                   )} />
                   <ReferenceLine y={0} stroke="rgba(255,255,255,0.20)" strokeDasharray="4 4" />
                   <ReferenceLine
