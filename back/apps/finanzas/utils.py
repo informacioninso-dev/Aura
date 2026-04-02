@@ -228,9 +228,10 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real
 
     today = datetime.date.today()
     current_month = datetime.date(today.year, today.month, 1)
+    # real_start NO se restringe por date_joined — el usuario puede tener
+    # registros fijos cargados con fecha anterior a su registro en la app
     real_start = _restar_meses(current_month, real_past_months)
     earliest_user_month = _primer_dia_mes(getattr(usuario, 'date_joined', today))
-    real_start = max(real_start, earliest_user_month)
 
     history_start = _restar_meses(current_month, history_months)
     history_end = current_month - datetime.timedelta(days=1)
