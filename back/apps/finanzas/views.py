@@ -170,6 +170,9 @@ class SaldoMesViewSet(BaseFinanzasViewSet):
             recalcular_saldo_mes_para(request.user, primera_fecha)
         else:
             asegurar_saldos_historicos(request.user)
+        # El recálculo manual debe invalidar solo el cache de proyección,
+        # sin volver a marcar el historial como "dirty".
+        invalidate_finanzas_cache(request.user)
         saldo = asegurar_saldo_mes(request.user, anio, mes)
 
         data = SaldoMesSerializer(saldo).data

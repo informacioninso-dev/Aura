@@ -145,7 +145,7 @@ export default function Dashboard() {
     }
   }
 
-  async function loadAdvancedProjection(fm = futureMonths, pm = pastMonths) {
+  async function loadAdvancedProjection(fm = futureMonths, pm = pastMonths, { forceRecalculate = false } = {}) {
     if (!advancedProjectionEnabled) return
 
     const months = Math.min(fm, advancedProjectionMaxMonths)
@@ -153,6 +153,9 @@ export default function Dashboard() {
     setProjectionError('')
 
     try {
+      if (forceRecalculate) {
+        await api.post('/finanzas/saldo-mes/recalcular/')
+      }
       const { data: response } = await api.get(`/finanzas/proyeccion-acumulada/?months=${months}&past_months=${pm}`)
       setAdvancedProjection(response)
     } catch (err) {
@@ -165,7 +168,7 @@ export default function Dashboard() {
 
   function handleManualRefresh() {
     if (advancedProjectionEnabled) {
-      void loadAdvancedProjection(futureMonths, pastMonths)
+      void loadAdvancedProjection(futureMonths, pastMonths, { forceRecalculate: true })
       return
     }
     void loadDashboard({ silent: true })
