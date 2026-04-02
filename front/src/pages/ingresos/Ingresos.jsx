@@ -41,7 +41,7 @@ function buildEmptyForm() {
   }
 }
 
-export default function Ingresos() {
+export default function Ingresos({ embedded = false }) {
   const { user } = useAuth()
 
   // — lista y paginacion —
@@ -260,20 +260,37 @@ export default function Ingresos() {
 
   return (
     <div>
-      <div className="page-header page-header-actions">
-        <div className="page-header-main">
-          <h1 className="page-title">Ingresos</h1>
-          <p className="page-subtitle">
-            Total mensual estimado:&nbsp;
-            <span style={{ color: '#10B981', fontWeight: 700 }}>
-              ${formatNumber(total, { maximumFractionDigits: 0 })}
-            </span>
-          </p>
+      {embedded ? (
+        <div className="finance-panel-header">
+          <div>
+            <h2 className="finance-panel-kicker">Ingresos fijos</h2>
+            <p className="finance-panel-kpi">
+              Total al mes:&nbsp;
+              <span style={{ color: '#10B981', fontWeight: 700 }}>
+                ${formatNumber(total, { maximumFractionDigits: 0 })}
+              </span>
+            </p>
+          </div>
+          <button className="btn-add page-primary-action" onClick={openNew}>
+            <Plus size={16} /> Agregar
+          </button>
         </div>
-        <button className="btn-add page-primary-action" onClick={openNew}>
-          <Plus size={16} /> Agregar
-        </button>
-      </div>
+      ) : (
+        <div className="page-header page-header-actions">
+          <div className="page-header-main">
+            <h1 className="page-title">Ingresos</h1>
+            <p className="page-subtitle">
+              Total al mes:&nbsp;
+              <span style={{ color: '#10B981', fontWeight: 700 }}>
+                ${formatNumber(total, { maximumFractionDigits: 0 })}
+              </span>
+            </p>
+          </div>
+          <button className="btn-add page-primary-action" onClick={openNew}>
+            <Plus size={16} /> Agregar
+          </button>
+        </div>
+      )}
 
       <FeedbackAlert type={feedback.type || 'error'} message={feedback.message} />
 
@@ -281,8 +298,8 @@ export default function Ingresos() {
         {items.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">💰</div>
-            <p className="empty-text">Todavia no tienes ingresos registrados</p>
-            <p className="empty-sub">Agrega tu primer ingreso para empezar a proyectar tu flujo de caja</p>
+            <p className="empty-text">Aun no sumas ingresos</p>
+            <p className="empty-sub">Agrega uno y empieza a ver tu flujo</p>
           </div>
         ) : (
           <>
@@ -319,7 +336,7 @@ export default function Ingresos() {
                     <th style={{ width: 36, paddingRight: 0 }}>
                       <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAll} style={{ cursor: 'pointer', accentColor: '#C487F6' }} />
                     </th>
-                    {['Descripcion', 'Monto', 'Frecuencia', 'Desde', 'Hasta', 'Estado', ''].map((h) => (
+                    {['Nombre', 'Monto', 'Frecuencia', 'Desde', 'Hasta', 'Estado', ''].map((h) => (
                       <th key={h}>{h}</th>
                     ))}
                   </tr>
@@ -361,11 +378,11 @@ export default function Ingresos() {
         <form onSubmit={handleSubmit}>
           {!editId && (
             <p style={{ marginTop: -8, marginBottom: 14, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
-              Carga rapida: completa lo minimo y guarda. Lo avanzado es opcional.
+              Carga rapida: nombre y monto. Lo demas es opcional.
             </p>
           )}
           <div className="form-modal-group">
-            <label className="form-modal-label">De que es este ingreso?</label>
+            <label className="form-modal-label">De donde viene?</label>
             <input
               className="form-modal-input"
               required
@@ -391,7 +408,7 @@ export default function Ingresos() {
 
           {!editId && (
             <button type="button" className="btn-modal-cancel" onClick={() => setShowAdvanced((v) => !v)} style={{ width: '100%', marginBottom: 14 }}>
-              {showAdvanced ? 'Ocultar opciones avanzadas' : 'Ver opciones avanzadas'}
+              {showAdvanced ? 'Ocultar opciones' : 'Ver mas opciones'}
             </button>
           )}
 
@@ -405,7 +422,7 @@ export default function Ingresos() {
                   </select>
                 </div>
                 <div className="form-modal-group">
-                  <label className="form-modal-label">Desde cuando?</label>
+                  <label className="form-modal-label">Desde</label>
                   <div className="date-input-wrap">
                     <input className="form-modal-input" type="date" required value={form.fecha_inicio} onChange={(e) => setForm({ ...form, fecha_inicio: e.target.value })} />
                   </div>
@@ -413,7 +430,7 @@ export default function Ingresos() {
               </div>
 
               <div className="form-modal-group">
-                <label className="form-modal-label">Hasta cuando? <span>(opcional)</span></label>
+                <label className="form-modal-label">Hasta <span>(opcional)</span></label>
                 <div className="date-input-wrap">
                   <input className="form-modal-input" type="date" value={form.fecha_fin} onChange={(e) => setForm({ ...form, fecha_fin: e.target.value })} />
                 </div>
@@ -428,7 +445,7 @@ export default function Ingresos() {
 
           {!editId && !showAdvanced && (
             <p style={{ marginTop: -4, marginBottom: 18, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
-              Se guardara como ingreso mensual activo desde hoy.
+              Si no cambias nada, queda mensual desde hoy.
             </p>
           )}
 
@@ -446,7 +463,7 @@ export default function Ingresos() {
         {versioningItem && (
           <form onSubmit={handleVersion}>
             <p style={{ marginTop: -8, marginBottom: 16, fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-              El registro actual se cerrara el dia anterior a la fecha que elijas. El historial queda intacto.
+              Cerramos el registro actual un dia antes de la nueva fecha. El historial queda guardado.
             </p>
 
             <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
@@ -455,7 +472,7 @@ export default function Ingresos() {
             </div>
 
             <div className="form-modal-group">
-              <label className="form-modal-label">Descripcion</label>
+              <label className="form-modal-label">Nombre</label>
               <input
                 className="form-modal-input"
                 required

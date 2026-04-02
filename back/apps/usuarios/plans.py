@@ -6,6 +6,8 @@ from .models import Feature, Plan, PlanFeature, UserPlanAssignment
 FEATURE_IMPORT_MAX_ROWS = 'import_max_rows'
 FEATURE_BULK_DELETE_MAX = 'bulk_delete_max'
 FEATURE_PROJECTION_MONTHS = 'projection_months'
+FEATURE_ADVANCED_PROJECTION_ENABLED = 'advanced_projection_enabled'
+FEATURE_ADVANCED_PROJECTION_MONTHS = 'advanced_projection_months'
 
 FEATURE_CATALOG = {
     FEATURE_IMPORT_MAX_ROWS: {
@@ -29,12 +31,28 @@ FEATURE_CATALOG = {
         'is_highlighted': True,
         'is_active': True,
     },
+    FEATURE_ADVANCED_PROJECTION_ENABLED: {
+        'name': 'Proyeccion acumulada premium',
+        'description': 'Habilita la proyeccion acumulada de largo plazo en el dashboard.',
+        'value_type': 'bool',
+        'is_highlighted': True,
+        'is_active': True,
+    },
+    FEATURE_ADVANCED_PROJECTION_MONTHS: {
+        'name': 'Meses maximos de proyeccion acumulada',
+        'description': 'Horizonte maximo permitido para la proyeccion acumulada premium.',
+        'value_type': 'int',
+        'is_highlighted': True,
+        'is_active': True,
+    },
 }
 
 FEATURE_DEFAULTS = {
     FEATURE_IMPORT_MAX_ROWS: 2000,
     FEATURE_BULK_DELETE_MAX: 10,
     FEATURE_PROJECTION_MONTHS: 6,
+    FEATURE_ADVANCED_PROJECTION_ENABLED: False,
+    FEATURE_ADVANCED_PROJECTION_MONTHS: 60,
 }
 
 

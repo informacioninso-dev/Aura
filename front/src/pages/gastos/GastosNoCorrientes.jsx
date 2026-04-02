@@ -33,7 +33,7 @@ function buildEmptyForm() {
   }
 }
 
-export default function GastosNoCorrientes() {
+export default function GastosNoCorrientes({ embedded = false }) {
   const { user } = useAuth()
   const [items, setItems] = useState([])
   const [modal, setModal] = useState(false)
@@ -193,18 +193,33 @@ export default function GastosNoCorrientes() {
 
   return (
     <div>
-      <div className="page-header page-header-actions">
-        <div className="page-header-main">
-          <h1 className="page-title">Gastos puntuales</h1>
-          <p className="page-subtitle">
-            Total registrado:&nbsp;
-            <span style={{ color: '#F87171', fontWeight: 700 }}>
-              ${formatNumber(total, { maximumFractionDigits: 0 })}
-            </span>
-          </p>
+      {embedded ? (
+        <div className="finance-panel-header">
+          <div>
+            <h2 className="finance-panel-kicker">Gastos puntuales</h2>
+            <p className="finance-panel-kpi">
+              Total cargado:&nbsp;
+              <span style={{ color: '#F87171', fontWeight: 700 }}>
+                ${formatNumber(total, { maximumFractionDigits: 0 })}
+              </span>
+            </p>
+          </div>
+          <button className="btn-add page-primary-action" onClick={openNew}><Plus size={16} /> Agregar</button>
         </div>
-        <button className="btn-add page-primary-action" onClick={openNew}><Plus size={16} /> Agregar</button>
-      </div>
+      ) : (
+        <div className="page-header page-header-actions">
+          <div className="page-header-main">
+            <h1 className="page-title">Gastos puntuales</h1>
+            <p className="page-subtitle">
+              Total cargado:&nbsp;
+              <span style={{ color: '#F87171', fontWeight: 700 }}>
+                ${formatNumber(total, { maximumFractionDigits: 0 })}
+              </span>
+            </p>
+          </div>
+          <button className="btn-add page-primary-action" onClick={openNew}><Plus size={16} /> Agregar</button>
+        </div>
+      )}
 
       <FeedbackAlert type={feedback.type || 'error'} message={feedback.message} />
 
@@ -212,8 +227,8 @@ export default function GastosNoCorrientes() {
         {items.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">🧾</div>
-            <p className="empty-text">Sin gastos puntuales registrados</p>
-            <p className="empty-sub">Registra compras o gastos que no se repiten para tener historial completo</p>
+            <p className="empty-text">No hay gastos puntuales</p>
+            <p className="empty-sub">Suma compras, salidas o imprevistos</p>
           </div>
         ) : (
           <>
@@ -249,7 +264,7 @@ export default function GastosNoCorrientes() {
                     <th style={{ width: 36, paddingRight: 0 }}>
                       <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAll} style={{ cursor: 'pointer', accentColor: '#C487F6' }} />
                     </th>
-                    {['Descripcion', 'Categoria', 'Monto', 'Fecha', 'Notas', ''].map((h) => <th key={h}>{h}</th>)}
+                    {['Nombre', 'Categoria', 'Monto', 'Fecha', 'Notas', ''].map((h) => <th key={h}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -282,11 +297,11 @@ export default function GastosNoCorrientes() {
         <form onSubmit={handleSubmit}>
           {!editId && (
             <p style={{ marginTop: -8, marginBottom: 14, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
-              Carga rapida: descripcion, categoria y monto. Fecha y notas son opcionales.
+              Carga rapida: nombre, categoria y monto. Lo demas es opcional.
             </p>
           )}
           <div className="form-modal-group">
-            <label className="form-modal-label">En que gastaste?</label>
+            <label className="form-modal-label">En que se fue?</label>
             <input className="form-modal-input" required placeholder="Ej: Reparacion auto, medico, ropa..." value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />
           </div>
           <div className="form-modal-row">
@@ -299,7 +314,7 @@ export default function GastosNoCorrientes() {
               </select>
             </div>
             <div className="form-modal-group">
-              <label className="form-modal-label">Cuanto?</label>
+              <label className="form-modal-label">Monto</label>
               <input className="form-modal-input" type="number" required min="0" step="0.01" placeholder="0" value={form.monto} onChange={(e) => setForm({ ...form, monto: e.target.value })} />
             </div>
           </div>
@@ -311,14 +326,14 @@ export default function GastosNoCorrientes() {
               onClick={() => setShowAdvanced((v) => !v)}
               style={{ width: '100%', marginBottom: 14 }}
             >
-              {showAdvanced ? 'Ocultar opciones avanzadas' : 'Ver opciones avanzadas'}
+              {showAdvanced ? 'Ocultar opciones' : 'Ver mas opciones'}
             </button>
           )}
 
           {(editId || showAdvanced) && (
             <>
               <div className="form-modal-group">
-                <label className="form-modal-label">Cuando fue?</label>
+                <label className="form-modal-label">Fecha</label>
                 <div className="date-input-wrap">
                   <input className="form-modal-input" type="date" required value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
                 </div>
@@ -332,7 +347,7 @@ export default function GastosNoCorrientes() {
 
           {!editId && !showAdvanced && (
             <p style={{ marginTop: -4, marginBottom: 18, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
-              Se registrara con la fecha de hoy.
+              Si no cambias nada, queda con fecha de hoy.
             </p>
           )}
 

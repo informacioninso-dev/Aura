@@ -129,9 +129,9 @@ export default function Diferidos() {
     <div>
       <div className="page-header page-header-actions">
         <div className="page-header-main">
-          <h1 className="page-title">Cuotas y diferidos</h1>
+          <h1 className="page-title">Gastos a cuotas</h1>
           <p className="page-subtitle">
-            Total mensual en cuotas:&nbsp;
+            Total al mes:&nbsp;
             <span style={{ color: '#C487F6', fontWeight: 700 }}>
               ${formatNumber(totalMensual, { maximumFractionDigits: 0 })}
             </span>
@@ -144,8 +144,8 @@ export default function Diferidos() {
         <div className="card">
           <div className="empty-state">
             <div className="empty-icon">💳</div>
-            <p className="empty-text">Sin cuotas registradas</p>
-            <p className="empty-sub">Agrega compras en cuotas o deudas para verlas reflejadas en tu flujo de caja</p>
+            <p className="empty-text">No hay gastos a cuotas</p>
+            <p className="empty-sub">Suma una compra a cuotas y la ves en tu flujo</p>
           </div>
         </div>
       ) : (
@@ -171,7 +171,7 @@ export default function Diferidos() {
                     <p style={{ fontWeight: 600, color: '#fff' }}>${formatNumber(parseFloat(item.monto_total))}</p>
                   </div>
                   <div>
-                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>Cuota mensual</p>
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>Cuota al mes</p>
                     <p style={{ fontWeight: 700, color: '#C487F6' }}>${formatNumber(parseFloat(item.cuota_mensual))}</p>
                   </div>
                   <div>
@@ -202,15 +202,15 @@ export default function Diferidos() {
         </div>
       )}
 
-      <Modal open={modal} onClose={() => setModal(false)} title={editId ? 'Editar cuota' : '+ Nueva cuota o diferido'}>
+      <Modal open={modal} onClose={() => setModal(false)} title={editId ? 'Editar gasto a cuotas' : '+ Nuevo gasto a cuotas'}>
         <form onSubmit={handleSubmit}>
           <div className="form-modal-group">
-            <label className="form-modal-label">¿Qué compraste o debes?</label>
-            <input className="form-modal-input" required placeholder="Ej: iPhone, viaje, crédito de consumo..."
+            <label className="form-modal-label">Que estas pagando?</label>
+            <input className="form-modal-input" required placeholder="Ej: celular, viaje, credito..."
               value={form.descripcion} onChange={e => setForm({ ...form, descripcion: e.target.value })} />
           </div>
           <div className="form-modal-group">
-            <label className="form-modal-label">Categoría</label>
+            <label className="form-modal-label">Categoria</label>
             <select className="form-modal-select" value={form.categoria} onChange={e => setForm({ ...form, categoria: e.target.value })}>
               {categorias.map(c => <option key={c.nombre} value={c.nombre}>{c.icono} {c.nombre}</option>)}
             </select>
@@ -222,26 +222,26 @@ export default function Diferidos() {
                 value={form.monto_total} onChange={e => handleMontoOrCuotas('monto_total', e.target.value)} />
             </div>
             <div className="form-modal-group">
-              <label className="form-modal-label">N° de cuotas</label>
+              <label className="form-modal-label">Numero de cuotas</label>
               <input className="form-modal-input" type="number" required min="1" placeholder="12"
                 value={form.num_cuotas} onChange={e => handleMontoOrCuotas('num_cuotas', e.target.value)} />
             </div>
           </div>
           <div className="form-modal-group">
-            <label className="form-modal-label">Cuota mensual</label>
-            <input className="form-modal-input" type="number" required min="0" step="0.01" placeholder="Se calcula automático"
+            <label className="form-modal-label">Cuota al mes</label>
+            <input className="form-modal-input" type="number" required min="0" step="0.01" placeholder="Se calcula automatico"
               value={form.cuota_mensual} onChange={e => setForm({ ...form, cuota_mensual: e.target.value })} />
           </div>
           <div className="form-modal-row">
             <div className="form-modal-group">
-              <label className="form-modal-label">¿Desde cuándo?</label>
+              <label className="form-modal-label">Empieza en</label>
               <div className="date-input-wrap">
                 <input className="form-modal-input" type="date" required
                   value={form.fecha_inicio} onChange={e => handleFechaInicio(e.target.value)} />
               </div>
             </div>
             <div className="form-modal-group">
-              <label className="form-modal-label">¿Hasta cuándo? <span>(auto)</span></label>
+              <label className="form-modal-label">Termina en <span>(auto)</span></label>
               <div className="date-input-wrap">
                 <input className="form-modal-input" type="date" required
                   value={form.fecha_fin} onChange={e => setForm({ ...form, fecha_fin: e.target.value })}
@@ -251,12 +251,12 @@ export default function Diferidos() {
           </div>
           <label className="form-modal-check">
             <input type="checkbox" checked={form.activo} onChange={e => setForm({ ...form, activo: e.target.checked })} />
-            <span>Cuota activa</span>
+            <span>Se suma a tu flujo</span>
           </label>
           <div className="form-modal-actions">
             <button type="button" className="btn-modal-cancel" onClick={() => setModal(false)}>Cancelar</button>
             <button type="submit" className="btn-modal-save" disabled={loading}>
-              {loading ? 'Guardando...' : editId ? 'Guardar cambios' : 'Agregar cuota'}
+              {loading ? 'Guardando...' : editId ? 'Guardar cambios' : 'Agregar gasto a cuotas'}
             </button>
           </div>
         </form>
@@ -264,8 +264,8 @@ export default function Diferidos() {
 
       <ConfirmDialog
         open={confirmDeleteId !== null}
-        title="Eliminar diferido"
-        message="Este diferido se eliminara de tus cuotas activas y del historial."
+        title="Eliminar gasto a cuotas"
+        message="Este gasto a cuotas se eliminara de tu flujo y del historial."
         confirmText="Eliminar"
         cancelText="Cancelar"
         loading={deletingId !== null}

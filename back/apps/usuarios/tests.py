@@ -63,6 +63,8 @@ class TestUsuarioAPI(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['plan']['slug'], 'free')
         self.assertEqual(response.data['feature_access']['import_max_rows'], 2000)
+        self.assertFalse(response.data['feature_access']['advanced_projection_enabled'])
+        self.assertEqual(response.data['feature_access']['advanced_projection_months'], 60)
 
     @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend', FRONTEND_URL='https://app.aura.test')
     def test_password_forgot_devuelve_ok_y_envia_correo_si_usuario_existe(self):
@@ -172,6 +174,8 @@ class TestSuperAdminAPI(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['plan']['slug'], 'pro')
         self.assertEqual(response.data['feature_access']['import_max_rows'], 5000)
+        self.assertTrue(response.data['feature_access']['advanced_projection_enabled'])
+        self.assertEqual(response.data['feature_access']['advanced_projection_months'], 60)
         self.assertTrue(AdminActionLog.objects.filter(action='user_plan_assigned', target_user=self.user).exists())
 
     def test_superadmin_puede_listar_planes_y_features(self):

@@ -10,9 +10,8 @@ const Registro = lazy(() => import('./pages/auth/Registro'))
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'))
 const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'))
 const Dashboard = lazy(() => import('./pages/dashboard/Dashboard'))
-const Ingresos = lazy(() => import('./pages/ingresos/Ingresos'))
-const GastosCorrientes = lazy(() => import('./pages/gastos/GastosCorrientes'))
-const GastosNoCorrientes = lazy(() => import('./pages/gastos/GastosNoCorrientes'))
+const LoQueGanas = lazy(() => import('./pages/ingresos/LoQueGanas'))
+const LoQueGastas = lazy(() => import('./pages/gastos/LoQueGastas'))
 const Diferidos = lazy(() => import('./pages/diferidos/Diferidos'))
 const Simulador = lazy(() => import('./pages/simulador/Simulador'))
 const Perfil = lazy(() => import('./pages/perfil/Perfil'))
@@ -63,9 +62,11 @@ export default function App() {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/ingresos" element={<Ingresos />} />
-              <Route path="/gastos-corrientes" element={<GastosCorrientes />} />
-              <Route path="/gastos-no-corrientes" element={<GastosNoCorrientes />} />
+              <Route path="/ingresos" element={<LoQueGanas />} />
+              <Route path="/ingresos-puntuales" element={<Navigate to="/ingresos?tab=puntuales" replace />} />
+              <Route path="/gastos" element={<LoQueGastas />} />
+              <Route path="/gastos-corrientes" element={<Navigate to="/gastos?tab=fijos" replace />} />
+              <Route path="/gastos-no-corrientes" element={<Navigate to="/gastos?tab=puntuales" replace />} />
               <Route path="/diferidos" element={<Diferidos />} />
               <Route path="/simulador" element={<Simulador />} />
               <Route path="/presupuesto" element={<Presupuesto />} />

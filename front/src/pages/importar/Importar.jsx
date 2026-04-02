@@ -157,17 +157,17 @@ export default function Importar() {
           <div className="import-result-stats">
             <div>
               <p style={{ fontWeight: 700, fontSize: 28, color: '#10B981' }}>{resultado.ingresos_creados}</p>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>ingresos historicos</p>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>ingresos puntuales</p>
             </div>
             <div>
               <p style={{ fontWeight: 700, fontSize: 28, color: '#F87171' }}>{resultado.gastos_creados}</p>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>gastos registrados</p>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>gastos puntuales</p>
             </div>
           </div>
 
           <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 24 }}>
-            Los ingresos historicos se guardan como <strong>inactivos</strong> para no distorsionar tu proyeccion mensual.
-            Luego puedes activarlos desde el modulo &quot;Lo que ganas&quot; si corresponde.
+            Los movimientos del archivo se guardan como puntuales en su fecha original.
+            Asi no se vuelven recurrentes ni alteran tus meses futuros.
           </p>
 
           <button className="btn-modal-save" style={{ padding: '11px 28px' }} onClick={reiniciar}>
@@ -467,7 +467,7 @@ export default function Importar() {
             </div>
 
             {[
-              'Los ingresos historicos se guardan como inactivos para no afectar la proyeccion mensual actual.',
+              'Los ingresos se importan como ingresos puntuales en la fecha original del archivo.',
               'Los gastos se importan como gastos puntuales del historial.',
               `Tu plan permite hasta ${formatNumber(maxFilasPlan)} filas por importacion.`,
               'La vista previa se pagina para mantener una carga rapida aun con archivos grandes.',

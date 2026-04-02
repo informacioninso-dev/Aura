@@ -5,7 +5,6 @@ import {
   Calculator,
   CreditCard,
   LogOut,
-  ReceiptText,
   ShieldCheck,
   Tags,
   Upload,
@@ -21,9 +20,8 @@ import './layout.css'
 const FINANCE_NAV_ITEMS = [
   { to: '/dashboard', icon: Wallet, label: 'Mi dinero' },
   { to: '/ingresos', icon: ArrowDownCircle, label: 'Lo que ganas' },
-  { to: '/gastos-corrientes', icon: ArrowUpCircle, label: 'Gastos frecuentes' },
-  { to: '/gastos-no-corrientes', icon: ReceiptText, label: 'Gastos puntuales' },
-  { to: '/diferidos', icon: CreditCard, label: 'Cuotas' },
+  { to: '/gastos', icon: ArrowUpCircle, label: 'Lo que gastas' },
+  { to: '/diferidos', icon: CreditCard, label: 'Gastos a cuotas' },
 ]
 
 function NavItem({ to, icon, label, onClick }) {

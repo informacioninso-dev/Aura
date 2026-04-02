@@ -242,27 +242,27 @@ def validar_filas_confirmacion(filas: list[dict], max_filas: int = MAX_FILAS) ->
 
 
 def crear_registros(usuario, filas: list[dict]) -> dict:
-    """Crea Ingreso y GastoNoCorriente a partir de filas parseadas y validadas."""
-    from .models import Ingreso, GastoNoCorriente
+    """Crea ingresos y gastos puntuales a partir de filas parseadas y validadas."""
+    from .models import GastoNoCorriente, IngresoPuntual
     from .utils import recalcular_saldo_mes_para
 
     ingresos = []
     gastos = []
-    fechas_gastos = []
+    fechas_afectadas = []
 
     with transaction.atomic():
         for f in filas:
             if f['tipo'] == 'ingreso':
                 ingresos.append(
-                    Ingreso(
+                    IngresoPuntual(
                         usuario=usuario,
                         descripcion=f['descripcion'],
                         monto=Decimal(f['monto']),
-                        frecuencia='mensual',
-                        fecha_inicio=f['fecha'],
-                        activo=False,
+                        fecha=f['fecha'],
+                        notas='Importado desde archivo',
                     )
                 )
+                fechas_afectadas.append(datetime.date.fromisoformat(f['fecha']))
             else:
                 gastos.append(
                     GastoNoCorriente(
@@ -274,12 +274,13 @@ def crear_registros(usuario, filas: list[dict]) -> dict:
                         notas='Importado desde archivo',
                     )
                 )
-                fechas_gastos.append(datetime.date.fromisoformat(f['fecha']))
+                fechas_afectadas.append(datetime.date.fromisoformat(f['fecha']))
         if ingresos:
-            Ingreso.objects.bulk_create(ingresos, batch_size=500)
+            IngresoPuntual.objects.bulk_create(ingresos, batch_size=500)
         if gastos:
             GastoNoCorriente.objects.bulk_create(gastos, batch_size=500)
-            for fecha in sorted(set(fechas_gastos)):
+        if fechas_afectadas:
+            for fecha in sorted(set(fechas_afectadas)):
                 recalcular_saldo_mes_para(usuario, fecha, fecha)
 
     return {'ingresos_creados': len(ingresos), 'gastos_creados': len(gastos)}

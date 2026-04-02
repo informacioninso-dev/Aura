@@ -754,9 +754,10 @@ export default function SuperAdmin() {
             </thead>
             <tbody>
               <tr><td>Ingresos registrados</td><td>{movements.ingresos || 0}</td></tr>
+              <tr><td>Ingresos puntuales</td><td>{movements.ingresos_puntuales || 0}</td></tr>
               <tr><td>Gastos corrientes</td><td>{movements.gastos_corrientes || 0}</td></tr>
               <tr><td>Gastos no corrientes</td><td>{movements.gastos_no_corrientes || 0}</td></tr>
-              <tr><td>Diferidos</td><td>{movements.diferidos || 0}</td></tr>
+              <tr><td>Gastos a cuotas</td><td>{movements.diferidos || 0}</td></tr>
               <tr><td>Simulaciones</td><td>{movements.simulaciones || 0}</td></tr>
               <tr><td>Notificaciones sin leer</td><td>{movements.notificaciones_no_leidas || 0}</td></tr>
             </tbody>

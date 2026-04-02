@@ -19,7 +19,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from apps.finanzas.models import Diferido, GastoCorriente, GastoNoCorriente, Ingreso, Notificacion
+from apps.finanzas.models import Diferido, GastoCorriente, GastoNoCorriente, Ingreso, IngresoPuntual, Notificacion
 from apps.simulador.models import Simulacion
 from .models import AdminActionLog, EmailServerConfig, Feature, Plan, PlanFeature
 from .plans import assign_plan_to_user, get_default_plan, sync_feature_catalog
@@ -307,6 +307,7 @@ class SuperAdminDashboardView(APIView):
 
         movement_summary = {
             'ingresos': Ingreso.objects.count(),
+            'ingresos_puntuales': IngresoPuntual.objects.count(),
             'gastos_corrientes': GastoCorriente.objects.count(),
             'gastos_no_corrientes': GastoNoCorriente.objects.count(),
             'diferidos': Diferido.objects.count(),

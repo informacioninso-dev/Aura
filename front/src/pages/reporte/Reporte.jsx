@@ -96,11 +96,13 @@ export default function Reporte() {
         [],
         ['Resumen', ''],
         ['Total ingresos', data.resumen.total_ingresos],
+        ['Ingresos fijos', data.resumen.ingresos_fijos],
+        ['Ingresos puntuales', data.resumen.ingresos_puntuales],
         ['Total gastos', data.resumen.total_gastos],
         ['Balance', data.resumen.balance],
         ['Tasa de ahorro', `${data.resumen.tasa_ahorro}%`],
-        ['Gastos corrientes', data.resumen.gastos_corrientes],
-        ['Cuotas', data.resumen.cuotas],
+        ['Gastos fijos', data.resumen.gastos_corrientes],
+        ['Gastos a cuotas', data.resumen.cuotas],
         ['Gastos puntuales', data.resumen.gastos_puntuales],
       ]
 
@@ -158,7 +160,7 @@ export default function Reporte() {
       <div className="reporte-header">
         <div className="page-header-main">
           <h1 className="page-title">Reportes</h1>
-          <p className="page-subtitle">Resumen mensual de tus finanzas</p>
+          <p className="page-subtitle">Asi se movio tu mes</p>
         </div>
 
         <div className="reporte-actions">
@@ -223,14 +225,16 @@ export default function Reporte() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 28 }}>
-            <MiniCard label="Gastos corrientes" value={data.resumen.gastos_corrientes} />
-            <MiniCard label="Cuotas" value={data.resumen.cuotas} />
+            <MiniCard label="Ingresos fijos" value={data.resumen.ingresos_fijos} />
+            <MiniCard label="Ingresos puntuales" value={data.resumen.ingresos_puntuales} />
+            <MiniCard label="Gastos fijos" value={data.resumen.gastos_corrientes} />
+            <MiniCard label="Gastos a cuotas" value={data.resumen.cuotas} />
             <MiniCard label="Gastos puntuales" value={data.resumen.gastos_puntuales} />
           </div>
 
           {data.categorias.length > 0 && (
             <div className="card" style={{ marginBottom: 24 }}>
-              <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 18 }}>Gasto por categoria</h2>
+              <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 18 }}>Gastos por categoria</h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {data.categorias.map((categoria) => {
                   const pct = categoria.pct_limite
@@ -280,12 +284,12 @@ export default function Reporte() {
 
           {data.top_gastos.length > 0 && (
             <div className="card">
-              <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Top gastos puntuales</h2>
+              <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Gastos puntuales mas altos</h2>
               <div className="table-wrap" style={{ border: 'none' }}>
                 <table className="table">
                   <thead>
                     <tr>
-                      <th>Descripcion</th>
+                      <th>Nombre</th>
                       <th>Categoria</th>
                       <th>Fecha</th>
                       <th style={{ textAlign: 'right' }}>Monto</th>
@@ -310,7 +314,7 @@ export default function Reporte() {
 
           {data.categorias.length === 0 && data.top_gastos.length === 0 && (
             <div style={{ textAlign: 'center', padding: '48px 0', color: 'rgba(255,255,255,0.30)', fontSize: 14 }}>
-              Sin movimientos registrados para {MESES[mes - 1]} {anio}.
+              No hubo movimientos en {MESES[mes - 1]} {anio}.
             </div>
           )}
         </>

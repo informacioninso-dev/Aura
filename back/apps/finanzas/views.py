@@ -10,24 +10,36 @@ from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.usuarios.plans import FEATURE_IMPORT_MAX_ROWS, get_user_feature_value
+from apps.usuarios.plans import (
+    FEATURE_ADVANCED_PROJECTION_ENABLED,
+    FEATURE_ADVANCED_PROJECTION_MONTHS,
+    FEATURE_IMPORT_MAX_ROWS,
+    get_user_feature_value,
+)
 from .models import (
     Categoria,
-    Ingreso,
+    Diferido,
     GastoCorriente,
     GastoNoCorriente,
-    Diferido,
+    Ingreso,
+    IngresoPuntual,
     Notificacion,
     SaldoMes,
     CATEGORIAS_DEFAULT,
 )
-from .utils import asegurar_saldo_mes, calcular_balance_mes, FREQ_FACTOR
+from .utils import (
+    calcular_balance_mes,
+    calcular_proyeccion_acumulada,
+    obtener_o_sembrar_saldo_mes,
+    FREQ_FACTOR,
+)
 from .serializers import (
     CategoriaSerializer,
-    IngresoSerializer,
+    DeferidoSerializer,
     GastoCorrienteSerializer,
     GastoNoCorrienteSerializer,
-    DeferidoSerializer,
+    IngresoPuntualSerializer,
+    IngresoSerializer,
     NotificacionSerializer,
     SaldoMesSerializer,
 )
@@ -63,6 +75,11 @@ class CategoriaViewSet(BaseFinanzasViewSet):
 class IngresoViewSet(BaseFinanzasViewSet):
     queryset = Ingreso.objects.all()
     serializer_class = IngresoSerializer
+
+
+class IngresoPuntualViewSet(BaseFinanzasViewSet):
+    queryset = IngresoPuntual.objects.all()
+    serializer_class = IngresoPuntualSerializer
 
 
 class GastoCorrienteViewSet(BaseFinanzasViewSet):
@@ -110,10 +127,10 @@ class SaldoMesViewSet(BaseFinanzasViewSet):
         else:
             anio_ant, mes_ant = anio, mes - 1
 
-        saldo = asegurar_saldo_mes(request.user, anio_ant, mes_ant)
+        saldo, created = obtener_o_sembrar_saldo_mes(request.user, anio_ant, mes_ant)
         data = SaldoMesSerializer(saldo).data
         data['existe'] = True
-        data['sugerido'] = False
+        data['sugerido'] = created
         data['anio_origen'] = anio_ant
         data['mes_origen'] = mes_ant
         return Response(data)
@@ -149,6 +166,77 @@ class SaldoMesViewSet(BaseFinanzasViewSet):
         data = SaldoMesSerializer(saldo).data
         data['existe'] = True
         data['sugerido'] = False
+        return Response(data)
+
+
+class ProyeccionAcumuladaView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request):
+        has_access = bool(
+            get_user_feature_value(
+                request.user,
+                FEATURE_ADVANCED_PROJECTION_ENABLED,
+                default=False,
+            )
+        )
+        if not has_access:
+            return Response(
+                {'detail': 'Tu plan no tiene acceso a la proyeccion acumulada.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        raw_max_months = get_user_feature_value(
+            request.user,
+            FEATURE_ADVANCED_PROJECTION_MONTHS,
+            default=60,
+        )
+        try:
+            max_months = max(1, int(raw_max_months))
+        except (TypeError, ValueError):
+            max_months = 60
+
+        raw_months = request.query_params.get('months')
+        if raw_months in (None, ''):
+            months = min(60, max_months)
+        else:
+            try:
+                months = int(raw_months)
+            except (TypeError, ValueError):
+                return Response(
+                    {'error': 'months debe ser un numero entero positivo.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if months <= 0:
+                return Response(
+                    {'error': 'months debe ser mayor que 0.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if months > max_months:
+                return Response(
+                    {'error': f'Tu plan permite hasta {max_months} meses de proyeccion acumulada.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        hoy = datetime.date.today()
+        if hoy.month == 1:
+            saldo_anio, saldo_mes = hoy.year - 1, 12
+        else:
+            saldo_anio, saldo_mes = hoy.year, hoy.month - 1
+
+        saldo, created = obtener_o_sembrar_saldo_mes(request.user, saldo_anio, saldo_mes)
+        starting_balance = Decimal(str(saldo.monto)) if saldo.activo else Decimal('0.00')
+
+        data = calcular_proyeccion_acumulada(
+            request.user,
+            months=months,
+            history_months=12,
+            starting_balance=starting_balance,
+        )
+        data['max_months_allowed'] = max_months
+        data['starting_balance_applied'] = bool(saldo.activo)
+        data['starting_balance_month'] = f'{saldo_anio}-{saldo_mes:02d}'
+        data['starting_balance_seeded'] = created
         return Response(data)
 
 
@@ -238,6 +326,12 @@ def _build_reporte_data(usuario, anio, mes):
         fecha_inicio__lte=ultimo_dia,
     ).filter(models.Q(fecha_fin__isnull=True) | models.Q(fecha_fin__gte=primer_dia))
     total_ing = sum(Decimal(str(i.monto)) * FREQ_FACTOR.get(i.frecuencia, 1) for i in ingresos_qs)
+    ingresos_puntuales_qs = IngresoPuntual.objects.filter(
+        usuario=usuario,
+        fecha__gte=primer_dia,
+        fecha__lte=ultimo_dia,
+    )
+    total_ip = sum(Decimal(str(i.monto)) for i in ingresos_puntuales_qs)
 
     gc_qs = GastoCorriente.objects.filter(
         usuario=usuario,
@@ -257,9 +351,10 @@ def _build_reporte_data(usuario, anio, mes):
     gnc_qs = GastoNoCorriente.objects.filter(usuario=usuario, fecha__gte=primer_dia, fecha__lte=ultimo_dia)
     total_gnc = sum(Decimal(str(g.monto)) for g in gnc_qs)
 
+    total_ingresos = total_ing + total_ip
     total_gastos = total_gc + total_dif + total_gnc
-    balance = total_ing - total_gastos
-    tasa_ahorro = round((balance / total_ing * 100), 1) if total_ing > 0 else 0
+    balance = total_ingresos - total_gastos
+    tasa_ahorro = round((balance / total_ingresos * 100), 1) if total_ingresos > 0 else 0
 
     cat_totales = {}
     for gasto in gc_qs:
@@ -296,7 +391,9 @@ def _build_reporte_data(usuario, anio, mes):
         'anio': anio,
         'mes': mes,
         'resumen': {
-            'total_ingresos': round(total_ing, 2),
+            'total_ingresos': round(total_ingresos, 2),
+            'ingresos_fijos': round(total_ing, 2),
+            'ingresos_puntuales': round(total_ip, 2),
             'total_gastos': round(total_gastos, 2),
             'balance': round(balance, 2),
             'tasa_ahorro': tasa_ahorro,

@@ -65,6 +65,23 @@ class Ingreso(models.Model):
         return f"{self.descripcion} - ${self.monto} ({self.frecuencia})"
 
 
+class IngresoPuntual(models.Model):
+    usuario    = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='ingresos_puntuales')
+    descripcion = models.CharField(max_length=200)
+    monto      = models.DecimalField(max_digits=12, decimal_places=2)
+    fecha      = models.DateField()
+    notas      = models.TextField(blank=True)
+    creado_en  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-fecha', '-creado_en']
+        verbose_name = 'Ingreso Puntual'
+        verbose_name_plural = 'Ingresos Puntuales'
+
+    def __str__(self):
+        return f"{self.descripcion} - ${self.monto} ({self.fecha})"
+
+
 class GastoCorriente(models.Model):
     usuario      = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='gastos_corrientes')
     descripcion  = models.CharField(max_length=200)

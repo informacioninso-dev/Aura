@@ -4,7 +4,16 @@ from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
 from django.conf import settings
 
-from .models import Categoria, CATEGORIAS_DEFAULT, GastoCorriente, GastoNoCorriente, Notificacion, Ingreso, Diferido
+from .models import (
+    CATEGORIAS_DEFAULT,
+    Categoria,
+    Diferido,
+    GastoCorriente,
+    GastoNoCorriente,
+    Ingreso,
+    IngresoPuntual,
+    Notificacion,
+)
 from .utils import recalcular_saldo_mes_para
 
 FREQ = {
@@ -145,4 +154,10 @@ def on_recurrente_eliminado(sender, instance, **kwargs):
 @receiver(post_save, sender=GastoNoCorriente)
 @receiver(post_delete, sender=GastoNoCorriente)
 def on_gasto_nc_cambiado(sender, instance, **kwargs):
+    recalcular_saldo_mes_para(instance.usuario, instance.fecha, instance.fecha)
+
+
+@receiver(post_save, sender=IngresoPuntual)
+@receiver(post_delete, sender=IngresoPuntual)
+def on_ingreso_puntual_cambiado(sender, instance, **kwargs):
     recalcular_saldo_mes_para(instance.usuario, instance.fecha, instance.fecha)

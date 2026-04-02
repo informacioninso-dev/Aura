@@ -15,7 +15,7 @@ const features = [
   {
     icon: Wallet,
     title: 'Todo en orden',
-    desc: 'Registra ingresos, gastos y cuotas en segundos.',
+    desc: 'Registra ingresos, gastos y compras a cuotas en segundos.',
   },
   {
     icon: Calculator,
@@ -28,7 +28,7 @@ const kpis = [
   { l: 'Ingresos', v: '$3.500.000', c: '#10B981' },
   { l: 'Gastos', v: '$2.100.000', c: '#F87171' },
   { l: 'Balance', v: '+$1.400.000', c: '#10B981' },
-  { l: 'Cuotas', v: '$220.000', c: '#C487F6' },
+  { l: 'A cuotas', v: '$220.000', c: '#C487F6' },
 ]
 
 const simRows = [
@@ -83,7 +83,7 @@ export default function Home() {
               </Link>
             </div>
             <p className="hero-note">
-              Gastos, cuotas y flujo de caja en un solo lugar.
+              Gastos, pagos a cuotas y flujo de caja en un solo lugar.
             </p>
           </div>
 
@@ -170,7 +170,7 @@ export default function Home() {
         <div className="sim-inner">
           <div>
             <div className="sim-badge">Prestamos</div>
-            <h2 className="sim-title">Si una cuota te ahoga, lo ves antes.</h2>
+            <h2 className="sim-title">Si un pago a cuotas te ahoga, lo ves antes.</h2>
             <p className="sim-desc">
               Prueba montos, tasas y plazos antes de comprometerte.
             </p>

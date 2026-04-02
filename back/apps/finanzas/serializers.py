@@ -2,7 +2,16 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from rest_framework import serializers
 
-from .models import Categoria, Diferido, GastoCorriente, GastoNoCorriente, Ingreso, Notificacion, SaldoMes
+from .models import (
+    Categoria,
+    Diferido,
+    GastoCorriente,
+    GastoNoCorriente,
+    Ingreso,
+    IngresoPuntual,
+    Notificacion,
+    SaldoMes,
+)
 
 
 TWOPLACES = Decimal('0.01')
@@ -65,6 +74,19 @@ class IngresoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Ingreso
+        fields = '__all__'
+        read_only_fields = ('usuario', 'creado_en')
+
+
+class IngresoPuntualSerializer(serializers.ModelSerializer):
+    def validate(self, attrs):
+        monto = attrs.get('monto', getattr(self.instance, 'monto', None))
+        if monto is not None and monto <= 0:
+            raise serializers.ValidationError({'monto': 'El monto debe ser mayor que 0.'})
+        return attrs
+
+    class Meta:
+        model = IngresoPuntual
         fields = '__all__'
         read_only_fields = ('usuario', 'creado_en')
 

@@ -29,6 +29,32 @@ function parseLocalDate(value) {
   return new Date(y, m - 1, d)
 }
 
+function startOfMonth(date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1)
+}
+
+function endOfMonth(date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0)
+}
+
+function overlapsMonth(item, monthDate) {
+  if (!item.activo) return false
+  const monthStart = startOfMonth(monthDate)
+  const monthEnd = endOfMonth(monthDate)
+  const ini = parseLocalDate(item.fecha_inicio)
+  const fin = item.fecha_fin ? parseLocalDate(item.fecha_fin) : null
+  return ini <= monthEnd && (!fin || fin >= monthStart)
+}
+
+function occursInMonth(item, monthDate, dateField = 'fecha') {
+  const dateValue = item?.[dateField]
+  if (!dateValue) return false
+  const targetDate = parseLocalDate(dateValue)
+  const monthStart = startOfMonth(monthDate)
+  const monthEnd = endOfMonth(monthDate)
+  return targetDate >= monthStart && targetDate <= monthEnd
+}
+
 function formatDateLocal(date) {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
@@ -54,41 +80,34 @@ function getInitialColchonMinimo() {
   return String(parsed)
 }
 
-function construirFlujoBase(ingresos, gastosCorrientes, diferidos) {
+function construirFlujoBase(ingresos, ingresosPuntuales, gastosCorrientes, gastosNoCorrientes, diferidos) {
   const hoy = new Date()
   return Array.from({ length: 24 }, (_, i) => {
     const fecha = new Date(hoy.getFullYear(), hoy.getMonth() + i, 1)
     const mes = `${MESES[fecha.getMonth()]} ${fecha.getFullYear()}`
 
     const totalIngresos = ingresos
-      .filter((item) => {
-        if (!item.activo) return false
-        const ini = parseLocalDate(item.fecha_inicio)
-        const fin = item.fecha_fin ? parseLocalDate(item.fecha_fin) : null
-        return ini <= fecha && (!fin || fin >= fecha)
-      })
+      .filter((item) => overlapsMonth(item, fecha))
       .reduce((sum, item) => sum + Number(item.monto) * (FACTOR_FRECUENCIA[item.frecuencia] || 1), 0)
+
+    const totalIngresosPuntuales = ingresosPuntuales
+      .filter((item) => occursInMonth(item, fecha))
+      .reduce((sum, item) => sum + Number(item.monto), 0)
 
     const totalGastosCorrientes = gastosCorrientes
-      .filter((item) => {
-        if (!item.activo) return false
-        const ini = parseLocalDate(item.fecha_inicio)
-        const fin = item.fecha_fin ? parseLocalDate(item.fecha_fin) : null
-        return ini <= fecha && (!fin || fin >= fecha)
-      })
+      .filter((item) => overlapsMonth(item, fecha))
       .reduce((sum, item) => sum + Number(item.monto) * (FACTOR_FRECUENCIA[item.frecuencia] || 1), 0)
 
+    const totalGastosPuntuales = gastosNoCorrientes
+      .filter((item) => occursInMonth(item, fecha))
+      .reduce((sum, item) => sum + Number(item.monto), 0)
+
     const totalDiferidos = diferidos
-      .filter((item) => {
-        if (!item.activo) return false
-        const ini = parseLocalDate(item.fecha_inicio)
-        const fin = parseLocalDate(item.fecha_fin)
-        return ini <= fecha && fin >= fecha
-      })
+      .filter((item) => overlapsMonth(item, fecha))
       .reduce((sum, item) => sum + Number(item.cuota_mensual), 0)
 
-    const gastos = Math.round(totalGastosCorrientes + totalDiferidos)
-    const ingresosMes = Math.round(totalIngresos)
+    const gastos = Math.round(totalGastosCorrientes + totalGastosPuntuales + totalDiferidos)
+    const ingresosMes = Math.round(totalIngresos + totalIngresosPuntuales)
     return {
       mes,
       ingresos: ingresosMes,
@@ -137,17 +156,27 @@ export default function Simulador() {
   async function loadInitialData() {
     setLoadingData(true)
     try {
-      const [bancosRes, simulacionesRes, ingresosRes, gastosRes, diferidosRes] = await Promise.all([
+      const [bancosRes, simulacionesRes, ingresosRes, ingresosPuntualesRes, gastosRes, gastosPuntualesRes, diferidosRes] = await Promise.all([
         api.get('/simulador/bancos/'),
         api.get('/simulador/simulaciones/'),
         api.get('/finanzas/ingresos/'),
+        api.get('/finanzas/ingresos-puntuales/'),
         api.get('/finanzas/gastos-corrientes/'),
+        api.get('/finanzas/gastos-no-corrientes/'),
         api.get('/finanzas/diferidos/'),
       ])
 
       setBancos(bancosRes.data)
       setSimulaciones(simulacionesRes.data)
-      setFlujoBase(construirFlujoBase(ingresosRes.data, gastosRes.data, diferidosRes.data))
+      setFlujoBase(
+        construirFlujoBase(
+          ingresosRes.data,
+          ingresosPuntualesRes.data,
+          gastosRes.data,
+          gastosPuntualesRes.data,
+          diferidosRes.data,
+        ),
+      )
       if (!getInitialColchonMinimo() && simulacionesRes.data.length > 0 && Number(simulacionesRes.data[0].colchon_minimo) > 0) {
         setForm((prev) => ({ ...prev, colchon_minimo: String(simulacionesRes.data[0].colchon_minimo) }))
       }
@@ -160,12 +189,22 @@ export default function Simulador() {
 
   async function recargarFlujoBase() {
     try {
-      const [ingresosRes, gastosRes, diferidosRes] = await Promise.all([
+      const [ingresosRes, ingresosPuntualesRes, gastosRes, gastosPuntualesRes, diferidosRes] = await Promise.all([
         api.get('/finanzas/ingresos/'),
+        api.get('/finanzas/ingresos-puntuales/'),
         api.get('/finanzas/gastos-corrientes/'),
+        api.get('/finanzas/gastos-no-corrientes/'),
         api.get('/finanzas/diferidos/'),
       ])
-      setFlujoBase(construirFlujoBase(ingresosRes.data, gastosRes.data, diferidosRes.data))
+      setFlujoBase(
+        construirFlujoBase(
+          ingresosRes.data,
+          ingresosPuntualesRes.data,
+          gastosRes.data,
+          gastosPuntualesRes.data,
+          diferidosRes.data,
+        ),
+      )
     } catch (err) {
       setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo actualizar el flujo base.') })
     }
@@ -189,7 +228,7 @@ export default function Simulador() {
     const plazo = Number(form.plazo_meses)
     const colchonMinimo = Number(form.colchon_minimo)
     if (!monto || monto <= 0 || Number.isNaN(tasa) || tasa < 0 || !plazo || plazo <= 0 || !colchonMinimo || colchonMinimo <= 0) {
-      setFeedback({ type: 'error', message: 'Completa monto, tasa, plazo y colchon minimo con valores validos.' })
+      setFeedback({ type: 'error', message: 'Completa monto, tasa, plazo y minimo libre con valores validos.' })
       return
     }
     if (typeof window !== 'undefined') {
@@ -292,10 +331,10 @@ export default function Simulador() {
 
       await recargarFlujoBase()
       setDiferidoOk(true)
-      setFeedback({ type: 'success', message: 'Cuota agregada a tus diferidos.' })
+      setFeedback({ type: 'success', message: 'Gasto a cuotas agregado a tu plan.' })
       setTimeout(() => setDiferidoOk(false), 3500)
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo agregar la cuota a diferidos.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo agregar el gasto a cuotas.') })
     } finally {
       setAgregando(false)
     }
@@ -348,7 +387,7 @@ export default function Simulador() {
     <div>
       <div className="page-header">
         <h1 className="page-title">Simulador de prestamos</h1>
-        <p className="page-subtitle">Simula antes de firmar para evitar cuotas que rompan tu flujo.</p>
+        <p className="page-subtitle">Mira si una cuota te cabe antes de tomarla.</p>
       </div>
 
       <FeedbackAlert type={feedback.type || 'error'} message={feedback.message} />
@@ -363,12 +402,12 @@ export default function Simulador() {
             <div className="card">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
                 <Calculator size={18} style={{ color: '#C487F6' }} />
-                <h2 style={{ fontWeight: 700, fontSize: 15 }}>Nueva simulacion</h2>
+                <h2 style={{ fontWeight: 700, fontSize: 15 }}>Haz una simulacion</h2>
               </div>
 
               <form onSubmit={simular}>
                 <div className="form-modal-group">
-                  <label className="form-modal-label">Que quieres comprar?</label>
+                  <label className="form-modal-label">Que quieres financiar?</label>
                   <input
                     className="form-modal-input"
                     required
@@ -379,7 +418,7 @@ export default function Simulador() {
                 </div>
 
                 <div className="form-modal-group">
-                  <label className="form-modal-label">Monto del prestamo</label>
+                  <label className="form-modal-label">Monto</label>
                   <input
                     className="form-modal-input"
                     type="number"
@@ -395,7 +434,7 @@ export default function Simulador() {
                 <div className="form-modal-group">
                   <label className="form-modal-label">Banco <span>(opcional)</span></label>
                   <select className="form-modal-select" value={form.banco} onChange={(e) => handleBanco(e.target.value)}>
-                    <option value="">- Sin banco especifico -</option>
+                    <option value="">- Sin banco -</option>
                     {bancos.map((b) => (
                       <option key={b.id} value={b.id}>{b.nombre} ({b.tasa_anual_minima}% - {b.tasa_anual_maxima}% anual)</option>
                     ))}
@@ -433,7 +472,7 @@ export default function Simulador() {
                 </div>
 
                 <div className="form-modal-group">
-                  <label className="form-modal-label">Colchon minimo mensual que quieres dejar libre</label>
+                  <label className="form-modal-label">Minimo libre que quieres dejar al mes</label>
                   <input
                     className="form-modal-input"
                     type="number"
@@ -445,12 +484,12 @@ export default function Simulador() {
                     onChange={(e) => setForm({ ...form, colchon_minimo: e.target.value })}
                   />
                   <p style={{ marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
-                    Este valor es tu meta mensual de seguridad despues de ingresos, gastos y cuota.
+                    Es tu piso de tranquilidad despues de gastos y cuota.
                   </p>
                 </div>
 
                 <div className="form-modal-group">
-                  <label className="form-modal-label">Desde cuando empieza?</label>
+                  <label className="form-modal-label">Empieza en</label>
                   <div className="date-input-wrap">
                     <input
                       className="form-modal-input"
@@ -489,10 +528,10 @@ export default function Simulador() {
                         </p>
                         <p style={{ color: 'rgba(255,255,255,0.50)', fontSize: 13 }}>
                           {resultado.factible
-                            ? `Con este prestamo, tu saldo proyectado queda por encima del colchon minimo (${fmt(resultado.colchonMinimo)}) en todos los meses del credito.`
+                            ? `Esta cuota respeta tu minimo libre (${fmt(resultado.colchonMinimo)}) en todo el plazo.`
                             : resultado.mesesConDeficit.length > 0
-                              ? `${resultado.mesesConDeficit.length} mes(es) con deficit y ${resultado.mesesBajoColchon.length} mes(es) por debajo del colchon minimo.`
-                              : `${resultado.mesesBajoColchon.length} mes(es) por debajo del colchon minimo.`}
+                              ? `${resultado.mesesConDeficit.length} mes(es) quedarian en rojo y ${resultado.mesesBajoColchon.length} por debajo de tu minimo libre.`
+                              : `${resultado.mesesBajoColchon.length} mes(es) quedarian por debajo de tu minimo libre.`}
                         </p>
                       </div>
                     </div>
@@ -500,12 +539,12 @@ export default function Simulador() {
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
                     {[
-                      { label: 'Cuota mensual', value: fmt(resultado.cuota), color: '#FFFFFF' },
-                      { label: 'Total a pagar', value: fmt(resultado.totalPagar), color: '#F87171' },
+                      { label: 'Cuota al mes', value: fmt(resultado.cuota), color: '#FFFFFF' },
+                      { label: 'Total', value: fmt(resultado.totalPagar), color: '#F87171' },
                       { label: 'Intereses', value: fmt(resultado.totalIntereses), color: '#C487F6' },
-                      { label: 'Colchon minimo', value: fmt(resultado.colchonMinimo), color: '#FBBF24' },
+                      { label: 'Minimo libre', value: fmt(resultado.colchonMinimo), color: '#FBBF24' },
                       {
-                        label: 'Saldo minimo proyectado',
+                        label: 'Saldo mas bajo',
                         value: fmt(resultado.balanceMinimo),
                         color: resultado.balanceMinimo >= resultado.colchonMinimo ? '#10B981' : '#F87171',
                       },
@@ -552,7 +591,7 @@ export default function Simulador() {
                           fontWeight: 600,
                         }}
                       >
-                        <CheckCircle size={16} /> Agregado a tus cuotas.
+                        <CheckCircle size={16} /> Ya quedo en gastos a cuotas.
                       </div>
                     ) : (
                       <button
@@ -561,7 +600,7 @@ export default function Simulador() {
                         className="btn-modal-save"
                         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '12px 0' }}
                       >
-                        <CreditCard size={16} /> {agregando ? 'Agregando...' : 'Agregar como cuota a mi plan'}
+                        <CreditCard size={16} /> {agregando ? 'Agregando...' : 'Agregar como gasto a cuotas'}
                       </button>
                     )
                   )}
@@ -578,7 +617,7 @@ export default function Simulador() {
                     color: 'rgba(255,255,255,0.25)',
                   }}
                 >
-                  <p style={{ fontSize: 14 }}>Completa el formulario y presiona Simular</p>
+                  <p style={{ fontSize: 14 }}>Completa arriba y toca Simular</p>
                 </div>
               )}
             </div>
@@ -587,7 +626,7 @@ export default function Simulador() {
           {resultado && (
             <div className="card" style={{ marginBottom: 20 }}>
               <div className="card-header">
-                <h2 className="card-title">Flujo de caja con el prestamo - 24 meses</h2>
+                <h2 className="card-title">Flujo con prestamo · 24 meses</h2>
               </div>
               <ResponsiveContainer width="100%" height={280}>
                 <AreaChart data={resultado.flujoConPrestamo} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
@@ -610,21 +649,21 @@ export default function Simulador() {
                     formatter={(v, n) => [
                       fmt(v),
                       n === 'ingresos'
-                        ? 'Ingresa'
+                        ? 'Ingresos'
                         : n === 'gastosSim'
-                          ? 'Sale + cuota'
+                          ? 'Egresos + cuota'
                           : n === 'balanceSim'
                             ? 'Balance con prestamo'
                             : 'Balance base',
                     ]}
                   />
-                  <Legend formatter={(v) => (v === 'ingresos' ? 'Ingresa' : v === 'gastosSim' ? 'Sale + cuota' : 'Balance')} />
+                  <Legend formatter={(v) => (v === 'ingresos' ? 'Ingresos' : v === 'gastosSim' ? 'Egresos + cuota' : 'Balance')} />
                   <ReferenceLine y={0} stroke="rgba(255,255,255,0.20)" strokeDasharray="4 4" />
                   <ReferenceLine
                     y={resultado.colchonMinimo}
                     stroke="#FBBF24"
                     strokeDasharray="6 4"
-                    label={{ value: 'Colchon minimo', fill: '#FBBF24', position: 'right', fontSize: 11 }}
+                    label={{ value: 'Minimo libre', fill: '#FBBF24', position: 'right', fontSize: 11 }}
                   />
                   <Area type="monotone" dataKey="ingresos" stroke="#10B981" fill="url(#gSimIng)" strokeWidth={2.5} />
                   <Area type="monotone" dataKey="gastosSim" stroke="#F87171" fill="url(#gSimGas)" strokeWidth={2.5} />
@@ -640,15 +679,15 @@ export default function Simulador() {
 
             {simulaciones.length === 0 ? (
               <div className="empty-state" style={{ paddingBottom: 26 }}>
-                <p className="empty-text">Todavia no guardas simulaciones</p>
-                <p className="empty-sub">Simula una compra y guardala para compararla despues.</p>
+                <p className="empty-text">Aun no guardas simulaciones</p>
+                <p className="empty-sub">Simula algo y guardalo para compararlo despues.</p>
               </div>
             ) : (
               <>
                 <ListControls
                   query={query}
                   onQueryChange={(value) => { setQuery(value); setPage(1) }}
-                  placeholder="Buscar por nombre, banco o colchon..."
+                  placeholder="Buscar por nombre, banco o minimo..."
                   page={safePage}
                   pageCount={pageCount}
                   onPrevPage={() => setPage((prev) => Math.max(1, prev - 1))}
