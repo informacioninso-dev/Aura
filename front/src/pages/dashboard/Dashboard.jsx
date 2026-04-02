@@ -437,7 +437,7 @@ export default function Dashboard() {
                       </strong>
                     </div>
                     <div className="dashboard-premium-stat">
-                      <span className="dashboard-premium-stat-label">Meses de historial</span>
+                      <span className="dashboard-premium-stat-label">Historial de puntuales</span>
                       <strong className="dashboard-premium-stat-value">{histMeses} {histMeses === 1 ? 'mes' : 'meses'}</strong>
                     </div>
                   </div>
@@ -450,11 +450,11 @@ export default function Dashboard() {
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 12, padding: '10px 14px', marginBottom: 14 }}>
                     <span style={{ fontSize: 16, lineHeight: 1 }}>⚠️</span>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#FBBF24', marginBottom: 2 }}>Proyeccion con poco historial</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#FBBF24', marginBottom: 2 }}>Parte variable con poco historial</div>
                       <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
                         {histMesesAviso === 0
-                          ? 'Aun no hay meses completos registrados. La proyeccion usa solo tus ingresos y gastos fijos.'
-                          : `Solo ${histMesesAviso} ${histMesesAviso === 1 ? 'mes' : 'meses'} de historial. Con 3 o mas meses la proyeccion variable sera mas confiable.`}
+                          ? 'Tus ingresos y gastos fijos estan proyectados correctamente. Agrega gastos o ingresos puntuales para afinar la parte variable.'
+                          : `Solo ${histMesesAviso} ${histMesesAviso === 1 ? 'mes' : 'meses'} de movimientos puntuales. Los fijos ya estan incluidos — con mas meses de puntuales la estimacion variable mejora.`}
                       </div>
                     </div>
                   </div>
