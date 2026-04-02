@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts'
-import { TrendingUp, TrendingDown, Wallet, Lock, PiggyBank } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, Lock, PiggyBank, RefreshCw } from 'lucide-react'
 
 import api from '../../api/client'
 import { getApiErrorMessage } from '../../api/errors'
@@ -83,6 +83,7 @@ export default function Dashboard() {
   })
 
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [feedback, setFeedback] = useState({ type: '', message: '' })
   const [advancedProjection, setAdvancedProjection] = useState(null)
   const [projectionLoading, setProjectionLoading] = useState(false)
@@ -98,8 +99,9 @@ export default function Dashboard() {
     loadDashboard()
   }, [advancedProjectionEnabled, advancedProjectionMaxMonths])
 
-  async function loadDashboard() {
-    setLoading(true)
+  async function loadDashboard({ silent = false } = {}) {
+    if (silent) setRefreshing(true)
+    else setLoading(true)
     setProjectionError('')
 
     try {
@@ -131,6 +133,7 @@ export default function Dashboard() {
       setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo cargar el dashboard.') })
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
 
     if (advancedProjectionEnabled) {
@@ -158,6 +161,14 @@ export default function Dashboard() {
     } finally {
       setProjectionLoading(false)
     }
+  }
+
+  function handleManualRefresh() {
+    if (advancedProjectionEnabled) {
+      void loadAdvancedProjection(futureMonths, pastMonths)
+      return
+    }
+    void loadDashboard({ silent: true })
   }
 
   const moneda = user?.moneda_preferida || 'USD'
@@ -497,6 +508,18 @@ export default function Dashboard() {
                 <option value={60}>5 años</option>
               </select>
             </label>
+            <button
+              type="button"
+              className="btn-modal-cancel"
+              onClick={handleManualRefresh}
+              disabled={loading || refreshing || projectionLoading}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 14px' }}
+            >
+              <RefreshCw size={15} style={{ opacity: refreshing || projectionLoading ? 0.7 : 1 }} />
+              {advancedProjectionEnabled
+                ? (projectionLoading ? 'Recalculando...' : 'Recalcular proyeccion')
+                : (refreshing ? 'Recargando...' : 'Recargar')}
+            </button>
             <div className="dashboard-chart-toggle-group" role="tablist" aria-label="Curvas de la proyeccion">
               {SERIES_FOCUS_OPTIONS.map((option) => (
                 <button
