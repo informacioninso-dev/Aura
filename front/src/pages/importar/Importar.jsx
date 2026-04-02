@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Upload, FileSpreadsheet, CheckCircle, XCircle, AlertTriangle, Download } from 'lucide-react'
 
 import api from '../../api/client'
@@ -16,7 +16,7 @@ const TEMPLATE_CSV = `fecha,descripcion,monto,tipo,categoria
 const PREVIEW_PAGE_SIZE = 100
 
 export default function Importar() {
-  const { user } = useAuth()
+  const { user, fetchPerfil } = useAuth()
   const inputRef = useRef(null)
 
   const [fase, setFase] = useState('upload')
@@ -30,6 +30,13 @@ export default function Importar() {
 
   const maxFilasPlan = user?.feature_access?.import_max_rows ?? 2000
   const maxFilasDetectadas = preview?.max_filas_permitidas ?? maxFilasPlan
+
+  useEffect(() => {
+    void fetchPerfil()
+    // Esta vista debe reflejar el limite vigente del plan aunque el admin
+    // lo haya cambiado despues del login.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const totalValidas = preview?.filas_ok?.length ?? 0
   const previewPageCount = Math.max(1, Math.ceil(totalValidas / PREVIEW_PAGE_SIZE))

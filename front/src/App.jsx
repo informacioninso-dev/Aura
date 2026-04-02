@@ -17,7 +17,6 @@ const Simulador = lazy(() => import('./pages/simulador/Simulador'))
 const Perfil = lazy(() => import('./pages/perfil/Perfil'))
 const Presupuesto = lazy(() => import('./pages/presupuesto/Presupuesto'))
 const Importar = lazy(() => import('./pages/importar/Importar'))
-const Reporte = lazy(() => import('./pages/reporte/Reporte'))
 const SuperAdmin = lazy(() => import('./pages/superadmin/SuperAdmin'))
 
 function AppBootFallback() {
@@ -71,7 +70,6 @@ export default function App() {
               <Route path="/simulador" element={<Simulador />} />
               <Route path="/presupuesto" element={<Presupuesto />} />
               <Route path="/importar" element={<Importar />} />
-              <Route path="/reporte" element={<Reporte />} />
               <Route path="/perfil" element={<Perfil />} />
               <Route path="/superadmin" element={<SuperAdmin />} />
             </Route>

@@ -24,7 +24,6 @@ const FREQ = {
 
 const SERIES_FOCUS_OPTIONS = [
   { value: 'all', label: 'Todas' },
-  { value: 'balance', label: 'Balance neto' },
   { value: 'income', label: 'Ingresos' },
   { value: 'expense', label: 'Gastos' },
 ]
@@ -67,7 +66,6 @@ function normalizePositiveInt(value, fallback) {
 }
 
 function getSeriesFamily(dataKey = '') {
-  if (dataKey.startsWith('balance_')) return 'balance'
   if (dataKey.startsWith('ing_')) return 'income'
   if (dataKey.startsWith('gasto_')) return 'expense'
   return 'all'
@@ -163,9 +161,10 @@ export default function Dashboard() {
   }
 
   const moneda = user?.moneda_preferida || 'USD'
-  const fmt = (value) => formatMoney(value, { currency: moneda })
+  const fmt = (value) => formatMoney(value, { currency: moneda, currencyDisplay: 'narrowSymbol' })
   const fmtAxis = (value) => formatMoney(value, {
     currency: moneda,
+    currencyDisplay: 'narrowSymbol',
     notation: 'compact',
     maximumFractionDigits: 1,
   })
@@ -215,22 +214,32 @@ export default function Dashboard() {
   const chartSeries = useMemo(() => {
     if (!advancedSeries.length) return []
     const lastRealIdx = advancedSeries.reduce((acc, p, i) => p.is_real ? i : acc, -1)
+
     return advancedSeries.map((point, i) => {
       const isConnectReal = point.is_real || i === lastRealIdx + 1
       const isConnectProj = !point.is_real || i === lastRealIdx
+        const openingCarry = Number(point.opening_balance ?? 0)
+        const gapAcumulado = Number(point.closing_balance ?? point.cumulative_balance ?? 0)
+      let displayIngresos = Number(point.monthly_ingresos ?? 0)
+      let displayGastos = Number(point.monthly_gastos ?? 0)
+      displayIngresos += Math.max(openingCarry, 0)
+      displayGastos += Math.max(-openingCarry, 0)
+
       return {
         label: point.label,
         month: point.month,
         is_real: point.is_real,
-        ing_real:     isConnectReal ? point.cumulative_ingresos : null,
-        ing_proj:     isConnectProj ? point.cumulative_ingresos : null,
-        gasto_real:   isConnectReal ? point.cumulative_gastos   : null,
-        gasto_proj:   isConnectProj ? point.cumulative_gastos   : null,
-        balance_real: isConnectReal ? point.cumulative_balance  : null,
-        balance_proj: isConnectProj ? point.cumulative_balance  : null,
+        openingCarry,
+        gapAcumulado,
+        ing_real: isConnectReal ? displayIngresos : null,
+        ing_proj: isConnectProj ? displayIngresos : null,
+        gasto_real: isConnectReal ? displayGastos : null,
+        gasto_proj: isConnectProj ? displayGastos : null,
       }
     })
   }, [advancedSeries])
+
+  const latestProjectedPoint = chartSeries.filter((point) => !point.is_real).at(-1) || null
 
   function shouldShowSeries(kind) {
     return seriesFocus === 'all' || seriesFocus === kind
@@ -245,7 +254,8 @@ export default function Dashboard() {
       <div className="dashboard-chart-toggle-group dashboard-legend-group">
         {payload.map((entry) => {
           const family = getSeriesFamily(entry.dataKey)
-          const isActive = family !== 'all' && seriesFocus === family
+          if (family === 'all') return null
+          const isActive = seriesFocus !== 'all' && seriesFocus === family
           return (
             <button
               key={entry.dataKey}
@@ -265,10 +275,8 @@ export default function Dashboard() {
               {({
                 ing_real: 'Ingresos (real)',
                 ing_proj: 'Ingresos (proy.)',
-                gasto_real: 'Gastos (real)',
-                gasto_proj: 'Gastos (proy.)',
-                balance_real: 'Balance neto (real)',
-                balance_proj: 'Balance neto (proy.)',
+                  gasto_real: 'Egresos + cuotas (real)',
+                  gasto_proj: 'Egresos + cuotas (proy.)',
               }[entry.dataKey] || entry.value)}
             </button>
           )
@@ -277,8 +285,28 @@ export default function Dashboard() {
     )
   }
 
+  function renderProjectionTooltip({ active, label, payload = [] }) {
+    if (!active || !payload.length) return null
+    const point = payload[0]?.payload
+    if (!point) return null
+      const gapAcumulado = point.gapAcumulado != null
+        ? `Saldo acumulado: ${fmt(point.gapAcumulado)}`
+      : null
+
+    return (
+      <div style={{ background: 'rgba(26,37,64,0.97)', border: '1px solid rgba(196,135,246,0.2)', borderRadius: 12, padding: '10px 12px' }}>
+        <div style={{ color: '#FFFFFF', marginBottom: 6, fontWeight: 700 }}>
+          {`${label} · ${point.is_real ? 'Real' : 'Proyectado'}`}
+        </div>
+        {gapAcumulado && <div style={{ color: '#C487F6', fontWeight: 700 }}>{gapAcumulado}</div>}
+        <div style={{ color: '#10B981', fontWeight: 700 }}>{`Ingresos (${point.is_real ? 'real' : 'proy.'}): ${fmt(point.is_real ? point.ing_real : point.ing_proj)}`}</div>
+          <div style={{ color: '#F87171', fontWeight: 700 }}>{`Egresos + cuotas (${point.is_real ? 'real' : 'proy.'}): ${fmt(point.is_real ? point.gasto_real : point.gasto_proj)}`}</div>
+      </div>
+    )
+  }
+
   const advancedChartEmpty = advancedSeries.length === 0 || advancedSeries.every(
-    (point) => point.cumulative_ingresos === 0 && point.cumulative_gastos === 0,
+    (point) => point.monthly_ingresos === 0 && point.monthly_gastos === 0,
   )
 
   if (loading) {
@@ -427,9 +455,9 @@ export default function Dashboard() {
         <div className="card dashboard-chart-card dashboard-premium-card">
           <div className="card-header dashboard-card-header-compact">
             <div className="dashboard-card-copy">
-              <h2 className="card-title">Proyeccion acumulada</h2>
+              <h2 className="card-title">Proyeccion mensual</h2>
               <p className="dashboard-card-subtitle">
-                Historico real + tendencia proyectada hacia adelante.
+                Historico real + proyeccion mensual de ingresos y gastos.
               </p>
             </div>
             <span className="dashboard-premium-badge">Premium</span>
@@ -496,11 +524,19 @@ export default function Dashboard() {
             <>
               {(() => {
                 const histMeses = advancedProjection?.history_months_used ?? 0
-                const svgap = advancedProjection?.smoothed_variable_gap ?? 0
                 const svi = advancedProjection?.smoothed_variable_ingresos ?? 0
                 const svg = advancedProjection?.smoothed_variable_gastos ?? 0
+                const projectedGap = latestProjectedPoint?.gapAcumulado ?? 0
+                const projectedGapLabel = latestProjectedPoint?.label ?? 'fin del horizonte'
                 return (
                   <div className="dashboard-premium-meta">
+                    <div className="dashboard-premium-stat">
+                        <span className="dashboard-premium-stat-label">Saldo acumulado</span>
+                      <strong className="dashboard-premium-stat-value" style={{ color: projectedGap >= 0 ? '#C487F6' : '#F87171' }}>
+                        {fmt(projectedGap)}
+                      </strong>
+                      <span className="dashboard-chart-note">Resultado neto estimado para {projectedGapLabel}</span>
+                    </div>
                     <div className="dashboard-premium-stat">
                       <span className="dashboard-premium-stat-label">Saldo inicial</span>
                       <strong className="dashboard-premium-stat-value">{fmt(advancedProjection?.starting_balance ?? 0)}</strong>
@@ -515,12 +551,6 @@ export default function Dashboard() {
                       <span className="dashboard-premium-stat-label">Puntuales prom. gastos</span>
                       <strong className="dashboard-premium-stat-value" style={{ color: '#F87171' }}>
                         {fmt(svg)}
-                      </strong>
-                    </div>
-                    <div className="dashboard-premium-stat">
-                      <span className="dashboard-premium-stat-label">Gap variable neto</span>
-                      <strong className="dashboard-premium-stat-value" style={{ color: svgap >= 0 ? '#10B981' : '#F87171' }}>
-                        {svgap >= 0 ? '+' : ''}{fmt(svgap)}
                       </strong>
                     </div>
                     <div className="dashboard-premium-stat">
@@ -550,15 +580,15 @@ export default function Dashboard() {
               })()}
 
               {advancedProjection?.starting_balance_applied && (
-                <div style={{ marginBottom: 14, fontSize: 12, color: 'rgba(255,255,255,0.50)' }}>
-                  El saldo inicial de {fmt(advancedProjection?.starting_balance ?? 0)} se muestra aparte. La curva neta representa ingresos acumulados menos gastos acumulados.
-                </div>
-              )}
+                  <div style={{ marginBottom: 14, fontSize: 12, color: 'rgba(255,255,255,0.50)' }}>
+                   La grafica muestra ingresos y gastos mensuales. El valor morado resume el saldo acumulado a lo largo del horizonte.
+                  </div>
+                )}
 
               {advancedChartEmpty ? (
                 <div className="empty-state">
                   <p className="empty-text">Aun no hay base suficiente</p>
-                  <p className="empty-sub">Cuando registres movimientos, aqui veras tu caja acumulada a futuro.</p>
+                  <p className="empty-sub">Cuando registres movimientos, aqui veras tus ingresos y gastos mensuales proyectados.</p>
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
@@ -580,14 +610,6 @@ export default function Dashboard() {
                         <stop offset="5%" stopColor="#F87171" stopOpacity={0.10} />
                         <stop offset="95%" stopColor="#F87171" stopOpacity={0} />
                       </linearGradient>
-                      <linearGradient id="gBalReal" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#C487F6" stopOpacity={0.30} />
-                        <stop offset="95%" stopColor="#C487F6" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="gBalProj" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#C487F6" stopOpacity={0.12} />
-                        <stop offset="95%" stopColor="#C487F6" stopOpacity={0} />
-                      </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                     <XAxis dataKey="label" tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 11 }} />
@@ -601,15 +623,20 @@ export default function Dashboard() {
                       />
                     )}
                     <ReferenceLine y={0} stroke="rgba(248,113,113,0.35)" strokeDasharray="4 3" />
-                    <Tooltip
+                    <Tooltip content={renderProjectionTooltip}
                       contentStyle={{ background: 'rgba(26,37,64,0.97)', border: '1px solid rgba(196,135,246,0.2)', borderRadius: 12 }}
                       labelStyle={{ color: '#FFFFFF', marginBottom: 6, fontWeight: 700 }}
+                      itemSorter={(item) => ({
+                        ing_real: 0,
+                        ing_proj: 1,
+                        gasto_real: 2,
+                        gasto_proj: 3,
+                      }[item?.dataKey] ?? 99)}
                       formatter={(value, name) => {
                         if (value == null) return null
                         const labels = {
-                          ing_real: 'Ingresos acum. (real)', ing_proj: 'Ingresos acum. (proy.)',
-                          gasto_real: 'Gastos acum. (real)',  gasto_proj: 'Gastos acum. (proy.)',
-                          balance_real: 'Balance neto acum. (real)', balance_proj: 'Balance neto acum. (proy.)',
+                          ing_real: 'Ingresos (real)', ing_proj: 'Ingresos (proy.)',
+                            gasto_real: 'Egresos + cuotas (real)',  gasto_proj: 'Egresos + cuotas (proy.)',
                         }
                         return [fmt(value), labels[name] || name]
                       }}
@@ -619,12 +646,6 @@ export default function Dashboard() {
                       }}
                     />
                     <Legend content={renderProjectionLegend} />
-                    {shouldShowSeries('balance') && (
-                      <>
-                        <Area connectNulls={false} type="monotone" dataKey="balance_real" stroke="#C487F6" strokeWidth={2.5} fill="url(#gBalReal)" dot={false} />
-                        <Area connectNulls={false} type="monotone" dataKey="balance_proj" stroke="#C487F6" strokeWidth={2} fill="url(#gBalProj)" strokeDasharray="5 4" dot={false} />
-                      </>
-                    )}
                     {shouldShowSeries('income') && (
                       <>
                         <Area connectNulls={false} type="monotone" dataKey="ing_real" stroke="#10B981" strokeWidth={2.5} fill="url(#gIngReal)" dot={false} />
@@ -647,7 +668,7 @@ export default function Dashboard() {
         <div className="card dashboard-chart-card dashboard-premium-locked">
           <div className="dashboard-premium-lock-head">
             <div className="dashboard-card-copy">
-              <h2 className="card-title">Proyeccion acumulada</h2>
+              <h2 className="card-title">Proyeccion mensual</h2>
               <p className="dashboard-card-subtitle">
                 Mira como podria crecer o caer tu caja con el paso de los meses.
               </p>

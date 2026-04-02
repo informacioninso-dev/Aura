@@ -1,7 +1,6 @@
 import {
   ArrowDownCircle,
   ArrowUpCircle,
-  BarChart3,
   Calculator,
   CreditCard,
   LogOut,
@@ -84,7 +83,6 @@ export default function Sidebar({ isOpen, onClose }) {
         <NavItem to="/presupuesto" icon={Tags} label="Categorias" onClick={handleNavClick} />
         <NavItem to="/simulador" icon={Calculator} label="Simulador" onClick={handleNavClick} />
         <NavItem to="/importar" icon={Upload} label="Importar historial" onClick={handleNavClick} />
-        <NavItem to="/reporte" icon={BarChart3} label="Reportes" onClick={handleNavClick} />
 
         {user?.is_superuser && (
           <>

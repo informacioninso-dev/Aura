@@ -28,8 +28,10 @@ from .models import (
     CATEGORIAS_DEFAULT,
 )
 from .utils import (
-    calcular_balance_mes,
     calcular_proyeccion_acumulada,
+    asegurar_saldo_mes,
+    asegurar_saldos_historicos,
+    _restar_meses,
     obtener_o_sembrar_saldo_mes,
     FREQ_FACTOR,
 )
@@ -116,6 +118,10 @@ class SaldoMesViewSet(BaseFinanzasViewSet):
     queryset = SaldoMes.objects.all()
     serializer_class = SaldoMesSerializer
 
+    def get_queryset(self):
+        asegurar_saldos_historicos(self.request.user)
+        return super().get_queryset()
+
     @action(detail=False, methods=['get'])
     def actual(self, request):
         """Saldo del mes anterior que aplica al mes actual."""
@@ -128,6 +134,7 @@ class SaldoMesViewSet(BaseFinanzasViewSet):
             anio_ant, mes_ant = anio, mes - 1
 
         saldo, created = obtener_o_sembrar_saldo_mes(request.user, anio_ant, mes_ant)
+        obtener_o_sembrar_saldo_mes(request.user, anio, mes)
         data = SaldoMesSerializer(saldo).data
         data['existe'] = True
         data['sugerido'] = created
@@ -153,15 +160,7 @@ class SaldoMesViewSet(BaseFinanzasViewSet):
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        saldo, _ = SaldoMes.objects.get_or_create(
-            usuario=request.user,
-            anio=anio,
-            mes=mes,
-            defaults={'monto': 0, 'activo': True},
-        )
-
-        saldo.monto = calcular_balance_mes(request.user, anio, mes)
-        saldo.save(update_fields=['monto', 'actualizado_en'])
+        saldo = asegurar_saldo_mes(request.user, anio, mes)
 
         data = SaldoMesSerializer(saldo).data
         data['existe'] = True
@@ -224,14 +223,18 @@ class ProyeccionAcumuladaView(APIView):
         else:
             saldo_anio, saldo_mes = hoy.year, hoy.month - 1
 
-        saldo, created = obtener_o_sembrar_saldo_mes(request.user, saldo_anio, saldo_mes)
-        starting_balance = Decimal(str(saldo.monto)) if saldo.activo else Decimal('0.00')
-
         raw_past = request.query_params.get('past_months', '6')
         try:
             real_past_months = max(1, min(24, int(raw_past)))
         except (TypeError, ValueError):
             real_past_months = 6
+        current_month = datetime.date(hoy.year, hoy.month, 1)
+        history_end = current_month - datetime.timedelta(days=1)
+        history_start = _restar_meses(current_month, max(12, real_past_months))
+        asegurar_saldos_historicos(request.user, history_end)
+        asegurar_saldo_mes(request.user, history_start.year, history_start.month)
+        saldo, created = obtener_o_sembrar_saldo_mes(request.user, saldo_anio, saldo_mes)
+        starting_balance = Decimal(str(saldo.monto)) if saldo.activo else Decimal('0.00')
 
         data = calcular_proyeccion_acumulada(
             request.user,

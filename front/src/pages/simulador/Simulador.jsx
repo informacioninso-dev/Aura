@@ -127,12 +127,19 @@ const EMPTY_FORM = {
   fecha_inicio: formatDateLocal(new Date()),
 }
 
+function resolveSaldoInicial(responseData) {
+  if (!responseData) return 0
+  const monto = Number(responseData.monto)
+  return Number.isFinite(monto) ? monto : 0
+}
+
 export default function Simulador() {
   const { user } = useAuth()
 
   const [bancos, setBancos] = useState([])
   const [simulaciones, setSimulaciones] = useState([])
   const [flujoBase, setFlujoBase] = useState([])
+  const [saldoInicial, setSaldoInicial] = useState(0)
   const [form, setForm] = useState(EMPTY_FORM)
   const [resultado, setResultado] = useState(null)
 
@@ -156,7 +163,7 @@ export default function Simulador() {
   async function loadInitialData() {
     setLoadingData(true)
     try {
-      const [bancosRes, simulacionesRes, ingresosRes, ingresosPuntualesRes, gastosRes, gastosPuntualesRes, diferidosRes] = await Promise.all([
+      const [bancosRes, simulacionesRes, ingresosRes, ingresosPuntualesRes, gastosRes, gastosPuntualesRes, diferidosRes, saldoRes] = await Promise.all([
         api.get('/simulador/bancos/'),
         api.get('/simulador/simulaciones/'),
         api.get('/finanzas/ingresos/'),
@@ -164,10 +171,12 @@ export default function Simulador() {
         api.get('/finanzas/gastos-corrientes/'),
         api.get('/finanzas/gastos-no-corrientes/'),
         api.get('/finanzas/diferidos/'),
+        api.get('/finanzas/saldo-mes/actual/'),
       ])
 
       setBancos(bancosRes.data)
       setSimulaciones(simulacionesRes.data)
+      setSaldoInicial(resolveSaldoInicial(saldoRes.data))
       setFlujoBase(
         construirFlujoBase(
           ingresosRes.data,
@@ -189,13 +198,15 @@ export default function Simulador() {
 
   async function recargarFlujoBase() {
     try {
-      const [ingresosRes, ingresosPuntualesRes, gastosRes, gastosPuntualesRes, diferidosRes] = await Promise.all([
+      const [ingresosRes, ingresosPuntualesRes, gastosRes, gastosPuntualesRes, diferidosRes, saldoRes] = await Promise.all([
         api.get('/finanzas/ingresos/'),
         api.get('/finanzas/ingresos-puntuales/'),
         api.get('/finanzas/gastos-corrientes/'),
         api.get('/finanzas/gastos-no-corrientes/'),
         api.get('/finanzas/diferidos/'),
+        api.get('/finanzas/saldo-mes/actual/'),
       ])
+      setSaldoInicial(resolveSaldoInicial(saldoRes.data))
       setFlujoBase(
         construirFlujoBase(
           ingresosRes.data,
@@ -243,30 +254,47 @@ export default function Simulador() {
     const inicio = parseLocalDate(form.fecha_inicio)
     const finPrestamo = new Date(inicio.getFullYear(), inicio.getMonth() + plazo, 1)
 
-    const flujoConPrestamo = Array.from({ length: 24 }, (_, i) => {
+    const horizonMonths = Math.max(24, plazo)
+    let saldoBaseAcumulado = saldoInicial
+    let saldoSimAcumulado = saldoInicial
+
+    const flujoConPrestamo = Array.from({ length: horizonMonths }, (_, i) => {
       const fecha = new Date(hoy.getFullYear(), hoy.getMonth() + i, 1)
       const mes = `${MESES[fecha.getMonth()]} ${fecha.getFullYear()}`
       const tieneCuota = fecha >= inicio && fecha < finPrestamo
       const base = flujoBase[i] || { ingresos: 0, gastos: 0, balance: 0 }
       const gastosSim = base.gastos + (tieneCuota ? Math.round(cuota) : 0)
+      const balanceSimMensual = base.ingresos - gastosSim
+      const saldoBaseInicio = saldoBaseAcumulado
+      const saldoSimInicio = saldoSimAcumulado
+      const arrastreInicio = saldoSimInicio
+      saldoBaseAcumulado += base.balance
+      saldoSimAcumulado += balanceSimMensual
+      const ingresosVisibles = base.ingresos + Math.max(arrastreInicio, 0)
+      const gastosVisibles = gastosSim + Math.max(-arrastreInicio, 0)
+
       return {
         mes,
         ingresos: base.ingresos,
+        ingresosVisibles,
         gastosSim,
-        balanceSim: base.ingresos - gastosSim,
+        gastosVisibles,
+        balanceSim: balanceSimMensual,
         balanceBase: base.balance,
+        saldoBaseInicio,
+        saldoBaseFin: saldoBaseAcumulado,
+        saldoSimInicio,
+        saldoSimFin: saldoSimAcumulado,
       }
     })
 
-    const mesesDuranteCredito = flujoConPrestamo.filter((fila, i) => {
-      const fecha = new Date(hoy.getFullYear(), hoy.getMonth() + i, 1)
-      return fecha >= inicio && fecha < finPrestamo
-    })
-    const mesesConDeficit = mesesDuranteCredito.filter((fila) => fila.balanceSim < 0)
-    const mesesBajoColchon = mesesDuranteCredito.filter((fila) => fila.balanceSim < colchonMinimo)
-    const balanceMinimo = mesesDuranteCredito.length > 0
-      ? mesesDuranteCredito.reduce((min, fila) => Math.min(min, fila.balanceSim), mesesDuranteCredito[0].balanceSim)
+    const mesesConDeficit = flujoConPrestamo.filter((fila) => fila.saldoSimFin < 0)
+    const mesesBajoColchon = flujoConPrestamo.filter((fila) => fila.saldoSimFin < colchonMinimo)
+    const balanceMinimo = flujoConPrestamo.length > 0
+      ? flujoConPrestamo.reduce((min, fila) => Math.min(min, fila.saldoSimFin), flujoConPrestamo[0].saldoSimFin)
       : 0
+    const primerMesEnRojo = mesesConDeficit[0]?.mes || null
+    const primerMesBajoColchon = mesesBajoColchon[0]?.mes || null
 
     setResultado({
       cuota,
@@ -277,7 +305,11 @@ export default function Simulador() {
       mesesBajoColchon,
       colchonMinimo,
       balanceMinimo,
-      factible: mesesBajoColchon.length === 0,
+      primerMesEnRojo,
+      primerMesBajoColchon,
+      horizonMonths,
+      saldoInicial,
+      factible: mesesConDeficit.length === 0 && mesesBajoColchon.length === 0,
     })
   }
 
@@ -526,25 +558,26 @@ export default function Simulador() {
                         <p style={{ fontWeight: 800, fontSize: 18, color: resultado.factible ? '#10B981' : '#F87171' }}>
                           {resultado.factible ? 'Te alcanza' : 'No te alcanza'}
                         </p>
-                        <p style={{ color: 'rgba(255,255,255,0.50)', fontSize: 13 }}>
-                          {resultado.factible
-                            ? `Esta cuota respeta tu minimo libre (${fmt(resultado.colchonMinimo)}) en todo el plazo.`
+                          <p style={{ color: 'rgba(255,255,255,0.50)', fontSize: 13 }}>
+                            {resultado.factible
+                            ? `Esta cuota mantiene tu saldo acumulado por encima de ${fmt(resultado.colchonMinimo)} durante toda la proyeccion.`
                             : resultado.mesesConDeficit.length > 0
-                              ? `${resultado.mesesConDeficit.length} mes(es) quedarian en rojo y ${resultado.mesesBajoColchon.length} por debajo de tu minimo libre.`
-                              : `${resultado.mesesBajoColchon.length} mes(es) quedarian por debajo de tu minimo libre.`}
-                        </p>
+                              ? `No te alcanza: ${resultado.mesesConDeficit.length} mes(es) quedarian en negativo. El primero seria ${resultado.primerMesEnRojo}.`
+                              : `No te alcanza: ${resultado.mesesBajoColchon.length} mes(es) quedarian por debajo de tu minimo libre acumulado. El primero seria ${resultado.primerMesBajoColchon}.`}
+                          </p>
                       </div>
                     </div>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
                     {[
+                      { label: 'Saldo inicial', value: fmt(resultado.saldoInicial), color: '#C487F6' },
                       { label: 'Cuota al mes', value: fmt(resultado.cuota), color: '#FFFFFF' },
                       { label: 'Total', value: fmt(resultado.totalPagar), color: '#F87171' },
                       { label: 'Intereses', value: fmt(resultado.totalIntereses), color: '#C487F6' },
                       { label: 'Minimo libre', value: fmt(resultado.colchonMinimo), color: '#FBBF24' },
                       {
-                        label: 'Saldo mas bajo',
+                        label: 'Saldo acumulado mas bajo',
                         value: fmt(resultado.balanceMinimo),
                         color: resultado.balanceMinimo >= resultado.colchonMinimo ? '#10B981' : '#F87171',
                       },
@@ -648,16 +681,14 @@ export default function Simulador() {
                     labelStyle={{ color: '#FFFFFF', marginBottom: 4, fontWeight: 700 }}
                     formatter={(v, n) => [
                       fmt(v),
-                      n === 'ingresos'
-                        ? 'Ingresos'
-                        : n === 'gastosSim'
-                          ? 'Egresos + cuota'
-                          : n === 'balanceSim'
-                            ? 'Balance con prestamo'
-                            : 'Balance base',
+                        n === 'ingresosVisibles'
+                          ? 'Ingresos'
+                        : 'Egresos + cuotas',
                     ]}
                   />
-                  <Legend formatter={(v) => (v === 'ingresos' ? 'Ingresos' : v === 'gastosSim' ? 'Egresos + cuota' : 'Balance')} />
+                  <Legend formatter={(v) => (
+                    v === 'ingresosVisibles' ? 'Ingresos' : 'Egresos + cuotas'
+                  )} />
                   <ReferenceLine y={0} stroke="rgba(255,255,255,0.20)" strokeDasharray="4 4" />
                   <ReferenceLine
                     y={resultado.colchonMinimo}
@@ -665,8 +696,8 @@ export default function Simulador() {
                     strokeDasharray="6 4"
                     label={{ value: 'Minimo libre', fill: '#FBBF24', position: 'right', fontSize: 11 }}
                   />
-                  <Area type="monotone" dataKey="ingresos" stroke="#10B981" fill="url(#gSimIng)" strokeWidth={2.5} />
-                  <Area type="monotone" dataKey="gastosSim" stroke="#F87171" fill="url(#gSimGas)" strokeWidth={2.5} />
+                  <Area type="monotone" dataKey="ingresosVisibles" stroke="#10B981" fill="url(#gSimIng)" strokeWidth={2.5} />
+                  <Area type="monotone" dataKey="gastosVisibles" stroke="#F87171" fill="url(#gSimGas)" strokeWidth={2.5} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>

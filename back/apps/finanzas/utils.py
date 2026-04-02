@@ -64,6 +64,31 @@ def _money(value):
     return Decimal(str(value or 0)).quantize(Decimal('0.01'))
 
 
+def _primera_fecha_con_movimientos(usuario):
+    from .models import Diferido, GastoCorriente, GastoNoCorriente, Ingreso, IngresoPuntual
+
+    candidates = [
+        Ingreso.objects.filter(usuario=usuario).aggregate(value=db_models.Min('fecha_inicio'))['value'],
+        IngresoPuntual.objects.filter(usuario=usuario).aggregate(value=db_models.Min('fecha'))['value'],
+        GastoCorriente.objects.filter(usuario=usuario).aggregate(value=db_models.Min('fecha_inicio'))['value'],
+        GastoNoCorriente.objects.filter(usuario=usuario).aggregate(value=db_models.Min('fecha'))['value'],
+        Diferido.objects.filter(usuario=usuario).aggregate(value=db_models.Min('fecha_inicio'))['value'],
+    ]
+    fechas = [fecha for fecha in candidates if fecha]
+    return min(fechas) if fechas else None
+
+
+def asegurar_saldos_historicos(usuario, fecha_hasta=None):
+    primera_fecha = _primera_fecha_con_movimientos(usuario)
+    if not primera_fecha:
+        return False
+
+    hoy = datetime.date.today()
+    limite = _coerce_date(fecha_hasta) or hoy
+    recalcular_saldo_mes_para(usuario, primera_fecha, min(limite, hoy))
+    return True
+
+
 def _winsorized_weighted_average(values):
     if not values:
         return Decimal('0.00')
@@ -144,10 +169,9 @@ def calcular_balance_mes(usuario, anio, mes):
 
 def recalcular_saldo_mes_para(usuario, fecha_desde, fecha_hasta=None):
     """
-    Recalcula y upserta SaldoMes para:
-    - El mes actual y el mes anterior (siempre)
-    - Todos los SaldoMes existentes del usuario que caen dentro del rango afectado
-    No toca el campo `activo` de registros ya existentes.
+    Recalcula y upserta SaldoMes como saldo acumulado al cierre de cada mes.
+    Si cambia un movimiento en un mes, se recalcula ese mes y todos los meses
+    posteriores hasta hoy porque el arrastre cambia.
     """
     from .models import SaldoMes
 
@@ -157,52 +181,39 @@ def recalcular_saldo_mes_para(usuario, fecha_desde, fecha_hasta=None):
     hasta = min(fecha_hasta, hoy) if fecha_hasta else hoy
     desde_mes = _primer_dia_mes(fecha_desde)
     hasta_mes = _primer_dia_mes(hasta)
-
-    meses = set()
-
+    saldo_prev = SaldoMes.objects.filter(
+        usuario=usuario,
+    ).filter(
+        db_models.Q(anio__lt=desde_mes.year)
+        | db_models.Q(anio=desde_mes.year, mes__lt=desde_mes.month)
+    ).order_by('-anio', '-mes').first()
+    saldo_acumulado = _money(saldo_prev.monto if saldo_prev else Decimal('0.00'))
     cursor = desde_mes
+    if not saldo_prev:
+        primera_fecha = _primera_fecha_con_movimientos(usuario)
+        if primera_fecha:
+            cursor = min(desde_mes, _primer_dia_mes(primera_fecha))
+
     while cursor <= hasta_mes:
-        meses.add((cursor.year, cursor.month))
+        neto_mes = _money(calcular_balance_mes(usuario, cursor.year, cursor.month))
+        saldo_acumulado = (saldo_acumulado + neto_mes).quantize(Decimal('0.01'))
+        obj, created = SaldoMes.objects.get_or_create(
+            usuario=usuario,
+            anio=cursor.year,
+            mes=cursor.month,
+            defaults={'monto': saldo_acumulado, 'activo': True},
+        )
+        if not created:
+            SaldoMes.objects.filter(pk=obj.pk).update(monto=saldo_acumulado)
+
         next_anio, next_mes = _sumar_mes(cursor.year, cursor.month)
         cursor = datetime.date(next_anio, next_mes, 1)
 
-    meses.add((hoy.year, hoy.month))
-    if hoy.month == 1:
-        meses.add((hoy.year - 1, 12))
-    else:
-        meses.add((hoy.year, hoy.month - 1))
-
-    for saldo in SaldoMes.objects.filter(usuario=usuario):
-        primer_dia_saldo = datetime.date(saldo.anio, saldo.mes, 1)
-        if desde_mes <= primer_dia_saldo <= hasta_mes:
-            meses.add((saldo.anio, saldo.mes))
-
-    for anio, mes in meses:
-        monto = calcular_balance_mes(usuario, anio, mes)
-        obj, created = SaldoMes.objects.get_or_create(
-            usuario=usuario,
-            anio=anio,
-            mes=mes,
-            defaults={'monto': monto, 'activo': True},
-        )
-        if not created:
-            SaldoMes.objects.filter(pk=obj.pk).update(monto=monto)
-
 
 def asegurar_saldo_mes(usuario, anio, mes):
-    monto = calcular_balance_mes(usuario, anio, mes)
     from .models import SaldoMes
-
-    saldo, created = SaldoMes.objects.get_or_create(
-        usuario=usuario,
-        anio=anio,
-        mes=mes,
-        defaults={'monto': monto, 'activo': True},
-    )
-    if not created:
-        SaldoMes.objects.filter(pk=saldo.pk).update(monto=monto)
-        saldo.refresh_from_db()
-    return saldo
+    recalcular_saldo_mes_para(usuario, datetime.date(anio, mes, 1), datetime.date(anio, mes, 1))
+    return SaldoMes.objects.get(usuario=usuario, anio=anio, mes=mes)
 
 
 def obtener_o_sembrar_saldo_mes(usuario, anio, mes):
@@ -212,19 +223,13 @@ def obtener_o_sembrar_saldo_mes(usuario, anio, mes):
     if saldo:
         return saldo, False
 
-    monto = calcular_balance_mes(usuario, anio, mes)
-    saldo = SaldoMes.objects.create(
-        usuario=usuario,
-        anio=anio,
-        mes=mes,
-        monto=monto,
-        activo=True,
-    )
+    recalcular_saldo_mes_para(usuario, datetime.date(anio, mes, 1), datetime.date(anio, mes, 1))
+    saldo = SaldoMes.objects.get(usuario=usuario, anio=anio, mes=mes)
     return saldo, True
 
 
 def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real_past_months=6, starting_balance=Decimal('0.00')):
-    from .models import Diferido, GastoCorriente, GastoNoCorriente, Ingreso, IngresoPuntual
+    from .models import Diferido, GastoCorriente, GastoNoCorriente, Ingreso, IngresoPuntual, SaldoMes
 
     today = datetime.date.today()
     current_month = datetime.date(today.year, today.month, 1)
@@ -236,6 +241,14 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real
     history_start = _restar_meses(current_month, history_months)
     history_end = current_month - datetime.timedelta(days=1)
     projection_end = _ultimo_dia_mes(*_sumar_meses_fecha(current_month, months - 1).timetuple()[:2])
+    asegurar_saldos_historicos(usuario, history_end)
+    saldos_historicos = {
+        (saldo.anio, saldo.mes): _money(saldo.monto)
+        for saldo in SaldoMes.objects.filter(
+            usuario=usuario,
+            anio__gte=real_start.year - 1,
+        )
+    }
 
     # Fetch recurrentes covering both past (real) and future (projected) window
     ingresos = list(
@@ -347,6 +360,12 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real
 
         ing_mes = ing_fijos + ing_puntuales
         gasto_mes = gasto_fijos + gasto_puntuales + cuotas
+        prev_month = _restar_meses(month_start, 1)
+        opening_balance = saldos_historicos.get((prev_month.year, prev_month.month), Decimal('0.00'))
+        closing_balance = saldos_historicos.get(
+            (month_start.year, month_start.month),
+            (opening_balance + ing_mes - gasto_mes).quantize(Decimal('0.01')),
+        )
 
         cum_ingresos = (cum_ingresos + ing_mes).quantize(Decimal('0.01'))
         cum_gastos = (cum_gastos + gasto_mes).quantize(Decimal('0.01'))
@@ -356,7 +375,11 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real
         series.append({
             'month': f'{month_start.year}-{month_start.month:02d}',
             'label': _mes_label(month_start),
+            'monthly_ingresos': float(ing_mes),
+            'monthly_gastos': float(gasto_mes),
             'projected_gap': float((ing_mes - gasto_mes).quantize(Decimal('0.01'))),
+            'opening_balance': float(opening_balance),
+            'closing_balance': float(closing_balance),
             'cumulative_ingresos': float(cum_ingresos),
             'cumulative_gastos': float(cum_gastos),
             'cumulative_balance': float(cumulative_balance),
@@ -378,6 +401,8 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real
         projected_ingresos = (total_ing_fijos + smoothed_variable_ingresos).quantize(Decimal('0.01'))
         projected_gastos = (total_gastos_fijos + total_cuotas + smoothed_variable_gastos).quantize(Decimal('0.01'))
         projected_gap = (projected_ingresos - projected_gastos).quantize(Decimal('0.01'))
+        opening_balance = seeded_balance if offset == 0 else closing_balance
+        closing_balance = (opening_balance + projected_gap).quantize(Decimal('0.01'))
 
         cum_ingresos = (cum_ingresos + projected_ingresos).quantize(Decimal('0.01'))
         cum_gastos = (cum_gastos + projected_gastos).quantize(Decimal('0.01'))
@@ -387,7 +412,11 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real
         series.append({
             'month': f'{month_start.year}-{month_start.month:02d}',
             'label': _mes_label(month_start),
+            'monthly_ingresos': float(projected_ingresos),
+            'monthly_gastos': float(projected_gastos),
             'projected_gap': float(projected_gap),
+            'opening_balance': float(opening_balance),
+            'closing_balance': float(closing_balance),
             'cumulative_ingresos': float(cum_ingresos),
             'cumulative_gastos': float(cum_gastos),
             'cumulative_balance': float(cumulative_balance),

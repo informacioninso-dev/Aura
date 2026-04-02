@@ -285,6 +285,128 @@ class TestFinanzasAPI(APITestCase):
             ).exists()
         )
 
+    def test_saldo_mes_arrastra_saldo_acumulado_y_expone_nombre(self):
+        current_month = first_day_of_month(datetime.date.today())
+        first_month = add_months(current_month, -2)
+        previous_month = add_months(current_month, -1)
+
+        Ingreso.objects.create(
+            usuario=self.user_a,
+            descripcion='Sueldo',
+            monto=Decimal('1200.00'),
+            frecuencia='mensual',
+            fecha_inicio=first_month,
+            activo=True,
+        )
+        GastoCorriente.objects.create(
+            usuario=self.user_a,
+            descripcion='Gasto fijo',
+            categoria='otro',
+            monto=Decimal('1000.00'),
+            frecuencia='mensual',
+            fecha_inicio=first_month,
+            activo=True,
+        )
+
+        self.client.force_authenticate(user=self.user_a)
+        response = self.client.get('/api/finanzas/saldo-mes/actual/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Decimal(str(response.data['monto'])), Decimal('400.00'))
+        self.assertEqual(response.data['nombre'], f'saldo-{["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"][previous_month.month]}-{previous_month.year}')
+        self.assertTrue(
+            SaldoMes.objects.filter(
+                usuario=self.user_a,
+                anio=current_month.year,
+                mes=current_month.month,
+                monto=Decimal('600.00'),
+            ).exists()
+        )
+
+    def test_recalcular_saldo_mes_actualiza_meses_posteriores(self):
+        current_month = first_day_of_month(datetime.date.today())
+        first_month = add_months(current_month, -2)
+        previous_month = add_months(current_month, -1)
+
+        ingreso = Ingreso.objects.create(
+            usuario=self.user_a,
+            descripcion='Sueldo',
+            monto=Decimal('1200.00'),
+            frecuencia='mensual',
+            fecha_inicio=first_month,
+            activo=True,
+        )
+        GastoCorriente.objects.create(
+            usuario=self.user_a,
+            descripcion='Gasto fijo',
+            categoria='otro',
+            monto=Decimal('1000.00'),
+            frecuencia='mensual',
+            fecha_inicio=first_month,
+            activo=True,
+        )
+
+        self.client.force_authenticate(user=self.user_a)
+        self.client.get('/api/finanzas/saldo-mes/actual/')
+
+        ingreso.monto = Decimal('1300.00')
+        ingreso.save(update_fields=['monto'])
+
+        response = self.client.post(
+            '/api/finanzas/saldo-mes/recalcular/',
+            {'anio': previous_month.year, 'mes': previous_month.month},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Decimal(str(response.data['monto'])), Decimal('600.00'))
+        self.assertTrue(
+            SaldoMes.objects.filter(
+                usuario=self.user_a,
+                anio=current_month.year,
+                mes=current_month.month,
+                monto=Decimal('900.00'),
+            ).exists()
+        )
+
+    def test_saldo_mes_lista_siembra_historico_completo(self):
+        current_month = first_day_of_month(datetime.date.today())
+        first_month = add_months(current_month, -3)
+
+        Ingreso.objects.create(
+            usuario=self.user_a,
+            descripcion='Sueldo viejo',
+            monto=Decimal('1200.00'),
+            frecuencia='mensual',
+            fecha_inicio=first_month,
+            activo=True,
+        )
+        GastoCorriente.objects.create(
+            usuario=self.user_a,
+            descripcion='Gasto viejo',
+            categoria='otro',
+            monto=Decimal('1000.00'),
+            frecuencia='mensual',
+            fecha_inicio=first_month,
+            activo=True,
+        )
+
+        self.client.force_authenticate(user=self.user_a)
+        response = self.client.get('/api/finanzas/saldo-mes/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(len(response.data), 4)
+        self.assertTrue(
+            any(item['nombre'] == f'saldo-{["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"][first_month.month]}-{first_month.year}' for item in response.data)
+        )
+        self.assertTrue(
+            SaldoMes.objects.filter(
+                usuario=self.user_a,
+                anio=first_month.year,
+                mes=first_month.month,
+            ).exists()
+        )
+
     def test_proyeccion_acumulada_requiere_feature_premium(self):
         self.client.force_authenticate(user=self.user_a)
 
@@ -357,14 +479,28 @@ class TestFinanzasAPI(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['months'], 6)
         self.assertEqual(response.data['history_months_used'], 12)
-        self.assertEqual(Decimal(str(response.data['starting_balance'])), Decimal('200.00'))
+        self.assertEqual(
+            Decimal(str(response.data['starting_balance'])),
+            Decimal(str(response.data['series'][5]['closing_balance'])),
+        )
         self.assertEqual(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('80.0'))
         self.assertEqual(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('20.0'))
         self.assertEqual(Decimal(str(response.data['smoothed_variable_gap'])), Decimal('60.0'))
         self.assertEqual(len(response.data['series']), 12)
         self.assertTrue(all(point['is_real'] for point in response.data['series'][:6]))
         self.assertTrue(all(not point['is_real'] for point in response.data['series'][6:]))
+        self.assertEqual(
+            Decimal(str(response.data['series'][6]['opening_balance'])),
+            Decimal(str(response.data['series'][5]['closing_balance'])),
+        )
+        self.assertEqual(Decimal(str(response.data['series'][6]['monthly_ingresos'])), Decimal('1080.0'))
+        self.assertEqual(Decimal(str(response.data['series'][6]['monthly_gastos'])), Decimal('520.0'))
         self.assertEqual(Decimal(str(response.data['series'][6]['projected_gap'])), Decimal('560.0'))
+        self.assertEqual(
+            Decimal(str(response.data['series'][6]['closing_balance'])),
+            Decimal(str(response.data['series'][6]['opening_balance']))
+            + Decimal(str(response.data['series'][6]['projected_gap'])),
+        )
         self.assertEqual(Decimal(str(response.data['series'][6]['cumulative_balance'])), Decimal('2720.0'))
         self.assertEqual(Decimal(str(response.data['series'][7]['cumulative_balance'])), Decimal('3280.0'))
         self.assertEqual(
@@ -372,7 +508,11 @@ class TestFinanzasAPI(APITestCase):
             Decimal(str(response.data['series'][6]['cumulative_ingresos']))
             - Decimal(str(response.data['series'][6]['cumulative_gastos'])),
         )
-        self.assertEqual(Decimal(str(response.data['series'][6]['cumulative_cash_position'])), Decimal('2920.0'))
+        self.assertEqual(
+            Decimal(str(response.data['series'][6]['cumulative_cash_position'])),
+            Decimal(str(response.data['starting_balance']))
+            + Decimal(str(response.data['series'][6]['cumulative_balance'])),
+        )
 
     def test_proyeccion_acumulada_suaviza_outliers_de_puntuales(self):
         current_month = first_day_of_month(datetime.date.today())

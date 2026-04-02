@@ -15,6 +15,21 @@ from .models import (
 
 
 TWOPLACES = Decimal('0.01')
+MESES_SLUG = [
+    '',
+    'enero',
+    'febrero',
+    'marzo',
+    'abril',
+    'mayo',
+    'junio',
+    'julio',
+    'agosto',
+    'septiembre',
+    'octubre',
+    'noviembre',
+    'diciembre',
+]
 
 
 def round_money(value):
@@ -47,9 +62,13 @@ class CategoriaSerializer(serializers.ModelSerializer):
 
 class SaldoMesSerializer(serializers.ModelSerializer):
     recalculos_restantes = serializers.SerializerMethodField()
+    nombre = serializers.SerializerMethodField()
 
     def get_recalculos_restantes(self, obj):
         return obj.recalculos_restantes()
+
+    def get_nombre(self, obj):
+        return f'saldo-{MESES_SLUG[obj.mes]}-{obj.anio}'
 
     class Meta:
         model = SaldoMes
