@@ -20,6 +20,7 @@ from apps.usuarios.plans import (
 )
 from .models import (
     Categoria,
+    CuentaPorCobrar,
     Diferido,
     GastoCorriente,
     GastoNoCorriente,
@@ -43,6 +44,7 @@ from .utils import (
 )
 from .serializers import (
     CategoriaSerializer,
+    CuentaPorCobrarSerializer,
     DeferidoSerializer,
     GastoCorrienteSerializer,
     GastoNoCorrienteSerializer,
@@ -103,6 +105,11 @@ class GastoNoCorrienteViewSet(BaseFinanzasViewSet):
 class DeferidoViewSet(BaseFinanzasViewSet):
     queryset = Diferido.objects.all()
     serializer_class = DeferidoSerializer
+
+
+class CuentaPorCobrarViewSet(BaseFinanzasViewSet):
+    queryset = CuentaPorCobrar.objects.all()
+    serializer_class = CuentaPorCobrarSerializer
 
 
 def _parse_anio_mes(anio_raw, mes_raw):

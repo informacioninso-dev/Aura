@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     CategoriaViewSet,
+    CuentaPorCobrarViewSet,
     IngresoPuntualViewSet,
     IngresoViewSet,
     GastoCorrienteViewSet,
@@ -15,6 +16,7 @@ from .views import (
 
 router = DefaultRouter()
 router.register('categorias',           CategoriaViewSet,       basename='categoria')
+router.register('cuentas-por-cobrar',   CuentaPorCobrarViewSet, basename='cuenta-por-cobrar')
 router.register('ingresos',             IngresoViewSet,         basename='ingreso')
 router.register('ingresos-puntuales',   IngresoPuntualViewSet,  basename='ingreso-puntual')
 router.register('gastos-corrientes',    GastoCorrienteViewSet,  basename='gasto-corriente')

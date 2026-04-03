@@ -8,7 +8,7 @@ from rest_framework.test import APITestCase
 
 from apps.usuarios.models import Plan
 from apps.usuarios.plans import assign_plan_to_user
-from .models import Diferido, GastoCorriente, GastoNoCorriente, Ingreso, IngresoPuntual, SaldoMes
+from .models import CuentaPorCobrar, Diferido, GastoCorriente, GastoNoCorriente, Ingreso, IngresoPuntual, SaldoMes
 
 
 User = get_user_model()
@@ -83,6 +83,54 @@ class TestFinanzasAPI(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['descripcion'], 'Bono A')
+
+    def test_cuentas_por_cobrar_lista_solo_las_del_usuario_y_calcula_saldo(self):
+        CuentaPorCobrar.objects.create(
+            usuario=self.user_a,
+            persona='Juan',
+            concepto='Prestamo del almuerzo',
+            monto_total=Decimal('100.00'),
+            monto_cobrado=Decimal('35.00'),
+            fecha_prestamo='2026-04-01',
+        )
+        CuentaPorCobrar.objects.create(
+            usuario=self.user_b,
+            persona='Maria',
+            concepto='Pasajes',
+            monto_total=Decimal('80.00'),
+            monto_cobrado=Decimal('0.00'),
+            fecha_prestamo='2026-04-02',
+        )
+
+        self.client.force_authenticate(user=self.user_a)
+        response = self.client.get('/api/finanzas/cuentas-por-cobrar/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['persona'], 'Juan')
+        self.assertEqual(Decimal(str(response.data[0]['saldo_pendiente'])), Decimal('65.00'))
+        self.assertEqual(response.data[0]['estado'], 'pagando')
+
+    def test_cuentas_por_cobrar_crea_con_recordatorio_vacio(self):
+        self.client.force_authenticate(user=self.user_a)
+
+        response = self.client.post(
+            '/api/finanzas/cuentas-por-cobrar/',
+            {
+                'persona': 'Carlos',
+                'concepto': 'Prestamo',
+                'monto_total': '45.00',
+                'monto_cobrado': '0.00',
+                'fecha_prestamo': '2026-04-03',
+                'fecha_recordatorio': None,
+                'notas': '',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['persona'], 'Carlos')
+        self.assertEqual(Decimal(str(response.data['saldo_pendiente'])), Decimal('45.00'))
 
     def test_diferido_calcula_cuota_en_backend(self):
         self.client.force_authenticate(user=self.user_a)

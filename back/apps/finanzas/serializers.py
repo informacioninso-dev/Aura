@@ -4,6 +4,7 @@ from rest_framework import serializers
 
 from .models import (
     Categoria,
+    CuentaPorCobrar,
     Diferido,
     GastoCorriente,
     GastoNoCorriente,
@@ -188,3 +189,47 @@ class DeferidoSerializer(serializers.ModelSerializer):
         model = Diferido
         fields = '__all__'
         read_only_fields = ('usuario', 'creado_en', 'cuota_mensual')
+
+
+class CuentaPorCobrarSerializer(serializers.ModelSerializer):
+    saldo_pendiente = serializers.SerializerMethodField()
+    estado = serializers.SerializerMethodField()
+
+    def get_saldo_pendiente(self, obj):
+        return round_money(Decimal(str(obj.saldo_pendiente)))
+
+    def get_estado(self, obj):
+        return obj.estado
+
+    def validate(self, attrs):
+        persona = attrs.get('persona', getattr(self.instance, 'persona', '')).strip()
+        concepto = attrs.get('concepto', getattr(self.instance, 'concepto', '')).strip()
+        monto_total = attrs.get('monto_total', getattr(self.instance, 'monto_total', None))
+        monto_cobrado = attrs.get('monto_cobrado', getattr(self.instance, 'monto_cobrado', Decimal('0.00')))
+        fecha_prestamo = attrs.get('fecha_prestamo', getattr(self.instance, 'fecha_prestamo', None))
+        fecha_recordatorio = attrs.get('fecha_recordatorio', getattr(self.instance, 'fecha_recordatorio', None))
+
+        errors = {}
+        if not persona:
+            errors['persona'] = 'Escribe quien te debe.'
+        if not concepto:
+            errors['concepto'] = 'Describe por que te debe.'
+        if monto_total is not None and monto_total <= 0:
+            errors['monto_total'] = 'El monto total debe ser mayor que 0.'
+        if monto_cobrado is not None and monto_cobrado < 0:
+            errors['monto_cobrado'] = 'Lo cobrado no puede ser negativo.'
+        if monto_total is not None and monto_cobrado is not None and monto_cobrado > monto_total:
+            errors['monto_cobrado'] = 'Lo cobrado no puede ser mayor al total.'
+        if fecha_prestamo and fecha_recordatorio and fecha_recordatorio < fecha_prestamo:
+            errors['fecha_recordatorio'] = 'El recordatorio no puede quedar antes de la fecha inicial.'
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        attrs['persona'] = persona
+        attrs['concepto'] = concepto
+        return attrs
+
+    class Meta:
+        model = CuentaPorCobrar
+        fields = '__all__'
+        read_only_fields = ('usuario', 'creado_en', 'actualizado_en', 'saldo_pendiente', 'estado')

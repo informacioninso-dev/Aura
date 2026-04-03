@@ -60,6 +60,10 @@ class Ingreso(models.Model):
         ordering = ['-creado_en']
         verbose_name = 'Ingreso'
         verbose_name_plural = 'Ingresos'
+        indexes = [
+            models.Index(fields=['usuario', 'activo', 'fecha_inicio'], name='ing_usr_ini_idx'),
+            models.Index(fields=['usuario', 'fecha_fin'], name='ing_usr_fin_idx'),
+        ]
 
     def __str__(self):
         return f"{self.descripcion} - ${self.monto} ({self.frecuencia})"
@@ -77,6 +81,9 @@ class IngresoPuntual(models.Model):
         ordering = ['-fecha', '-creado_en']
         verbose_name = 'Ingreso Puntual'
         verbose_name_plural = 'Ingresos Puntuales'
+        indexes = [
+            models.Index(fields=['usuario', 'fecha'], name='ip_usr_fecha_idx'),
+        ]
 
     def __str__(self):
         return f"{self.descripcion} - ${self.monto} ({self.fecha})"
@@ -97,6 +104,10 @@ class GastoCorriente(models.Model):
         ordering = ['-creado_en']
         verbose_name = 'Gasto Corriente'
         verbose_name_plural = 'Gastos Corrientes'
+        indexes = [
+            models.Index(fields=['usuario', 'activo', 'fecha_inicio'], name='gc_usr_ini_idx'),
+            models.Index(fields=['usuario', 'fecha_fin'], name='gc_usr_fin_idx'),
+        ]
 
     def __str__(self):
         return f"{self.descripcion} - ${self.monto} ({self.frecuencia})"
@@ -115,6 +126,9 @@ class GastoNoCorriente(models.Model):
         ordering = ['-fecha']
         verbose_name = 'Gasto No Corriente'
         verbose_name_plural = 'Gastos No Corrientes'
+        indexes = [
+            models.Index(fields=['usuario', 'fecha'], name='gasto_nc_usuario_fecha_idx'),
+        ]
 
     def __str__(self):
         return f"{self.descripcion} - ${self.monto} ({self.fecha})"
@@ -194,6 +208,47 @@ class Diferido(models.Model):
         ordering = ['-creado_en']
         verbose_name = 'Diferido'
         verbose_name_plural = 'Diferidos'
+        indexes = [
+            models.Index(fields=['usuario', 'activo', 'fecha_inicio', 'fecha_fin'], name='dif_usr_rango_idx'),
+        ]
 
     def __str__(self):
         return f"{self.descripcion} - {self.num_cuotas} cuotas de ${self.cuota_mensual}"
+
+
+class CuentaPorCobrar(models.Model):
+    usuario            = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cuentas_por_cobrar')
+    persona            = models.CharField(max_length=120)
+    concepto           = models.CharField(max_length=200)
+    monto_total        = models.DecimalField(max_digits=12, decimal_places=2)
+    monto_cobrado      = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    fecha_prestamo     = models.DateField()
+    fecha_recordatorio = models.DateField(null=True, blank=True)
+    notas              = models.TextField(blank=True)
+    creado_en          = models.DateTimeField(auto_now_add=True)
+    actualizado_en     = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-fecha_prestamo', '-creado_en']
+        verbose_name = 'Cuenta por cobrar'
+        verbose_name_plural = 'Cuentas por cobrar'
+        indexes = [
+            models.Index(fields=['usuario', 'fecha_prestamo'], name='cxc_usr_fecha_idx'),
+            models.Index(fields=['usuario', 'fecha_recordatorio'], name='cxc_usr_record_idx'),
+        ]
+
+    @property
+    def saldo_pendiente(self):
+        saldo = self.monto_total - self.monto_cobrado
+        return saldo if saldo > 0 else 0
+
+    @property
+    def estado(self):
+        if self.monto_cobrado >= self.monto_total:
+            return 'pagado'
+        if self.monto_cobrado > 0:
+            return 'pagando'
+        return 'pendiente'
+
+    def __str__(self):
+        return f"{self.persona} - ${self.monto_total} ({self.concepto})"
