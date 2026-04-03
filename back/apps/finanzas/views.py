@@ -125,7 +125,8 @@ class SaldoMesViewSet(BaseFinanzasViewSet):
     serializer_class = SaldoMesSerializer
 
     def get_queryset(self):
-        asegurar_saldos_historicos(self.request.user)
+        if getattr(self, 'action', None) == 'list':
+            asegurar_saldos_historicos(self.request.user)
         return super().get_queryset()
 
     @action(detail=False, methods=['get'])
