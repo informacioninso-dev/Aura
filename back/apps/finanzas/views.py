@@ -35,6 +35,7 @@ from .utils import (
     asegurar_saldos_historicos,
     _primera_fecha_con_movimientos,
     _restar_meses,
+    invalidate_finanzas_cache,
     recalcular_saldo_mes_para,
     obtener_o_sembrar_saldo_mes,
     build_projection_cache_key,
