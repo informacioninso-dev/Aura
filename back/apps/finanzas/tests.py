@@ -167,6 +167,68 @@ class TestFinanzasAPI(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('fecha_fin', response.data)
 
+    def test_ingreso_rechaza_fecha_fin_menor_a_inicio(self):
+        self.client.force_authenticate(user=self.user_a)
+        payload = {
+            'descripcion': 'Sueldo',
+            'monto': '1200.00',
+            'frecuencia': 'mensual',
+            'fecha_inicio': '2026-06-01',
+            'fecha_fin': '2026-05-01',
+            'activo': True,
+        }
+
+        response = self.client.post('/api/finanzas/ingresos/', payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('fecha_fin', response.data)
+
+    def test_gasto_corriente_rechaza_fecha_fin_menor_a_inicio(self):
+        self.client.force_authenticate(user=self.user_a)
+        payload = {
+            'descripcion': 'Arriendo',
+            'categoria': 'vivienda',
+            'monto': '500.00',
+            'frecuencia': 'mensual',
+            'fecha_inicio': '2026-06-01',
+            'fecha_fin': '2026-05-01',
+            'activo': True,
+        }
+
+        response = self.client.post('/api/finanzas/gastos-corrientes/', payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('fecha_fin', response.data)
+
+    def test_gasto_corriente_rechaza_anio_absurdo(self):
+        self.client.force_authenticate(user=self.user_a)
+        payload = {
+            'descripcion': 'Gasolina',
+            'categoria': 'transporte',
+            'monto': '120.00',
+            'frecuencia': 'mensual',
+            'fecha_inicio': '0024-12-10',
+            'activo': True,
+        }
+
+        response = self.client.post('/api/finanzas/gastos-corrientes/', payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('fecha_inicio', response.data)
+
+    def test_ingreso_puntual_rechaza_anio_absurdo(self):
+        self.client.force_authenticate(user=self.user_a)
+        payload = {
+            'descripcion': 'Ingreso raro',
+            'monto': '50.00',
+            'fecha': '1800-01-01',
+        }
+
+        response = self.client.post('/api/finanzas/ingresos-puntuales/', payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('fecha', response.data)
+
     def test_reporte_devuelve_resumen_mensual(self):
         Ingreso.objects.create(
             usuario=self.user_a,
@@ -279,6 +341,47 @@ class TestFinanzasAPI(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['max_filas_permitidas'], 5000)
         self.assertEqual(response.data['total'], 2100)
+
+    def test_importar_preview_marca_fecha_absurda_como_error(self):
+        self.client.force_authenticate(user=self.user_a)
+        content = SimpleUploadedFile(
+            'movimientos.csv',
+            '\n'.join([
+                'fecha,descripcion,monto,tipo,categoria',
+                '0024-12-10,Gasolina,120,gasto,transporte',
+            ]).encode('utf-8'),
+            content_type='text/csv',
+        )
+
+        response = self.client.post(
+            '/api/finanzas/importar/preview/',
+            {'archivo': content},
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['filas_ok']), 0)
+        self.assertEqual(len(response.data['filas_error']), 1)
+        self.assertIn('rango permitido', response.data['filas_error'][0]['error'])
+
+    def test_importar_confirmar_rechaza_fecha_absurda(self):
+        self.client.force_authenticate(user=self.user_a)
+        payload = {
+            'filas': [
+                {
+                    'fecha': '1800-01-01',
+                    'descripcion': 'Ingreso raro',
+                    'monto': '50.00',
+                    'tipo': 'ingreso',
+                    'categoria': 'otro',
+                },
+            ]
+        }
+
+        response = self.client.post('/api/finanzas/importar/confirmar/', payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('2000', response.data['error'])
 
     def test_saldo_actual_no_recalcula_si_ya_existe(self):
         current_month = first_day_of_month(datetime.date.today())

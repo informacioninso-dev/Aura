@@ -7,8 +7,10 @@ import { useAuth } from '../../context/useAuth'
 import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import ListControls from '../../components/ui/ListControls'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
+import DateQuickActions from '../../components/ui/DateQuickActions'
 import Modal from '../../components/ui/Modal'
 import { useCategorias } from '../../hooks/useCategorias'
+import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../../utils/dateBounds'
 import { formatNumber } from '../../utils/formatters'
 import '../../components/ui/app.css'
 
@@ -335,8 +337,9 @@ export default function GastosNoCorrientes({ embedded = false }) {
               <div className="form-modal-group">
                 <label className="form-modal-label">Fecha</label>
                 <div className="date-input-wrap">
-                  <input className="form-modal-input" type="date" required value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
+                  <input className="form-modal-input" type="date" required min={DATE_INPUT_MIN} max={DATE_INPUT_MAX} value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
                 </div>
+                <DateQuickActions value={form.fecha} onChange={(value) => setForm({ ...form, fecha: value })} disabled={loading} />
               </div>
               <div className="form-modal-group">
                 <label className="form-modal-label">Notas <span>(opcional)</span></label>

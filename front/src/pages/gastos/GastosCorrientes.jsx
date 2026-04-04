@@ -7,8 +7,10 @@ import { useAuth } from '../../context/useAuth'
 import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import ListControls from '../../components/ui/ListControls'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
+import DateQuickActions from '../../components/ui/DateQuickActions'
 import Modal from '../../components/ui/Modal'
 import { useCategorias } from '../../hooks/useCategorias'
+import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../../utils/dateBounds'
 import { formatNumber } from '../../utils/formatters'
 import '../../components/ui/app.css'
 
@@ -404,6 +406,14 @@ export default function GastosCorrientes({ embedded = false }) {
             </div>
           </div>
 
+          <div className="form-modal-group">
+            <label className="form-modal-label">Desde <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>— afecta el historico y la proyeccion</span></label>
+            <div className="date-input-wrap">
+              <input className="form-modal-input" type="date" required min={DATE_INPUT_MIN} max={DATE_INPUT_MAX} value={form.fecha_inicio} onChange={(e) => setForm((prev) => ({ ...prev, fecha_inicio: e.target.value, fecha_fin: prev.fecha_fin && prev.fecha_fin < e.target.value ? '' : prev.fecha_fin }))} />
+            </div>
+            <DateQuickActions value={form.fecha_inicio} onChange={(value) => setForm((prev) => ({ ...prev, fecha_inicio: value, fecha_fin: prev.fecha_fin && prev.fecha_fin < value ? '' : prev.fecha_fin }))} disabled={loading} />
+          </div>
+
           {!editId && (
             <button type="button" className="btn-modal-cancel" onClick={() => setShowAdvanced((v) => !v)} style={{ width: '100%', marginBottom: 14 }}>
               {showAdvanced ? 'Ocultar opciones' : 'Ver mas opciones'}
@@ -412,26 +422,19 @@ export default function GastosCorrientes({ embedded = false }) {
 
           {(editId || showAdvanced) && (
             <>
-              <div className="form-modal-row">
-                <div className="form-modal-group">
-                  <label className="form-modal-label">Frecuencia</label>
-                  <select className="form-modal-select" value={form.frecuencia} onChange={(e) => setForm({ ...form, frecuencia: e.target.value })}>
-                    {FRECUENCIAS.map((f) => <option key={f} value={f}>{f}</option>)}
-                  </select>
-                </div>
-                <div className="form-modal-group">
-                  <label className="form-modal-label">Desde</label>
-                  <div className="date-input-wrap">
-                    <input className="form-modal-input" type="date" required value={form.fecha_inicio} onChange={(e) => setForm({ ...form, fecha_inicio: e.target.value })} />
-                  </div>
-                </div>
+              <div className="form-modal-group">
+                <label className="form-modal-label">Frecuencia</label>
+                <select className="form-modal-select" value={form.frecuencia} onChange={(e) => setForm({ ...form, frecuencia: e.target.value })}>
+                  {FRECUENCIAS.map((f) => <option key={f} value={f}>{f}</option>)}
+                </select>
               </div>
 
               <div className="form-modal-group">
                 <label className="form-modal-label">Hasta <span>(opcional)</span></label>
                 <div className="date-input-wrap">
-                  <input className="form-modal-input" type="date" value={form.fecha_fin} onChange={(e) => setForm({ ...form, fecha_fin: e.target.value })} />
+                  <input className="form-modal-input" type="date" min={form.fecha_inicio || DATE_INPUT_MIN} max={DATE_INPUT_MAX} value={form.fecha_fin} onChange={(e) => setForm({ ...form, fecha_fin: e.target.value })} />
                 </div>
+                <DateQuickActions value={form.fecha_fin} onChange={(value) => setForm({ ...form, fecha_fin: value })} allowClear disabled={loading} />
               </div>
 
               <label className="form-modal-check">
@@ -439,12 +442,6 @@ export default function GastosCorrientes({ embedded = false }) {
                 <span>Gasto activo</span>
               </label>
             </>
-          )}
-
-          {!editId && !showAdvanced && (
-            <p style={{ marginTop: -4, marginBottom: 18, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
-              Si no cambias nada, queda mensual desde hoy.
-            </p>
           )}
 
           <div className="form-modal-actions">
@@ -499,8 +496,9 @@ export default function GastosCorrientes({ embedded = false }) {
               <div className="form-modal-group">
                 <label className="form-modal-label">Aplica desde</label>
                 <div className="date-input-wrap">
-                  <input className="form-modal-input" type="date" required value={versionForm.nuevaFecha} onChange={(e) => setVersionForm({ ...versionForm, nuevaFecha: e.target.value })} />
+                  <input className="form-modal-input" type="date" required min={DATE_INPUT_MIN} max={DATE_INPUT_MAX} value={versionForm.nuevaFecha} onChange={(e) => setVersionForm({ ...versionForm, nuevaFecha: e.target.value })} />
                 </div>
+                <DateQuickActions value={versionForm.nuevaFecha} onChange={(value) => setVersionForm({ ...versionForm, nuevaFecha: value })} disabled={versionLoading} />
               </div>
             </div>
 

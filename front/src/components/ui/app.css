@@ -435,6 +435,51 @@
   opacity: 1;
   filter: invert(1) brightness(1) sepia(1) hue-rotate(230deg) saturate(3);
 }
+.date-shortcuts {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.date-shortcut {
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.68);
+  border-radius: 999px;
+  padding: 8px 12px;
+  min-height: 34px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s, transform 0.15s;
+  font-family: inherit;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.date-shortcut:hover:not(:disabled) {
+  border-color: rgba(196,135,246,0.28);
+  background: rgba(196,135,246,0.10);
+  color: #FFFFFF;
+  transform: translateY(-1px);
+}
+.date-shortcut.is-active {
+  border-color: rgba(196,135,246,0.38);
+  background: rgba(196,135,246,0.18);
+  color: #FFFFFF;
+}
+.date-shortcut.date-shortcut-clear.is-active {
+  border-color: rgba(248,113,113,0.30);
+  background: rgba(248,113,113,0.14);
+}
+.date-shortcut:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
 
 .form-modal-select {
   width: 100%;

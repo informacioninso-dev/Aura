@@ -5,9 +5,11 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { getApiErrorMessage } from '../../api/errors'
 import api from '../../api/client'
 import ListControls from '../../components/ui/ListControls'
+import DateQuickActions from '../../components/ui/DateQuickActions'
 import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import { useAuth } from '../../context/useAuth'
+import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../../utils/dateBounds'
 import { formatMoney } from '../../utils/formatters'
 import '../../components/ui/app.css'
 
@@ -527,10 +529,13 @@ export default function Simulador() {
                       className="form-modal-input"
                       type="date"
                       required
+                      min={DATE_INPUT_MIN}
+                      max={DATE_INPUT_MAX}
                       value={form.fecha_inicio}
                       onChange={(e) => setForm({ ...form, fecha_inicio: e.target.value })}
                     />
                   </div>
+                  <DateQuickActions value={form.fecha_inicio} onChange={(value) => setForm({ ...form, fecha_inicio: value })} disabled={agregando} />
                 </div>
 
                 <button type="submit" className="btn-modal-save" style={{ width: '100%', padding: '12px 0', marginTop: 4 }}>

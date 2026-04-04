@@ -4,9 +4,11 @@ import { Pencil, Plus, Rat, Trash2 } from 'lucide-react'
 import api from '../../api/client'
 import { getApiErrorMessage } from '../../api/errors'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
+import DateQuickActions from '../../components/ui/DateQuickActions'
 import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import ListControls from '../../components/ui/ListControls'
 import Modal from '../../components/ui/Modal'
+import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../../utils/dateBounds'
 import { formatNumber } from '../../utils/formatters'
 import '../../components/ui/app.css'
 
@@ -348,10 +350,13 @@ export default function LoQueMeDeben() {
                       className="form-modal-input"
                       type="date"
                       required
+                      min={DATE_INPUT_MIN}
+                      max={DATE_INPUT_MAX}
                       value={form.fecha_prestamo}
-                      onChange={(e) => setForm({ ...form, fecha_prestamo: e.target.value })}
+                      onChange={(e) => setForm((prev) => ({ ...prev, fecha_prestamo: e.target.value, fecha_recordatorio: prev.fecha_recordatorio && prev.fecha_recordatorio < e.target.value ? '' : prev.fecha_recordatorio }))}
                     />
                   </div>
+                  <DateQuickActions value={form.fecha_prestamo} onChange={(value) => setForm((prev) => ({ ...prev, fecha_prestamo: value, fecha_recordatorio: prev.fecha_recordatorio && prev.fecha_recordatorio < value ? '' : prev.fecha_recordatorio }))} disabled={loading} />
                 </div>
                 <div className="form-modal-group">
                   <label className="form-modal-label">Recordarmelo <span>(opcional)</span></label>
@@ -359,10 +364,13 @@ export default function LoQueMeDeben() {
                     <input
                       className="form-modal-input"
                       type="date"
+                      min={form.fecha_prestamo || DATE_INPUT_MIN}
+                      max={DATE_INPUT_MAX}
                       value={form.fecha_recordatorio}
                       onChange={(e) => setForm({ ...form, fecha_recordatorio: e.target.value })}
                     />
                   </div>
+                  <DateQuickActions value={form.fecha_recordatorio} onChange={(value) => setForm({ ...form, fecha_recordatorio: value })} allowClear disabled={loading} />
                 </div>
               </div>
 

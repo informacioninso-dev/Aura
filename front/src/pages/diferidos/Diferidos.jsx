@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import api from '../../api/client'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
+import DateQuickActions from '../../components/ui/DateQuickActions'
 import Modal from '../../components/ui/Modal'
 import { useCategorias } from '../../hooks/useCategorias'
+import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../../utils/dateBounds'
 import { formatNumber } from '../../utils/formatters'
 import '../../components/ui/app.css'
 const EMPTY = { descripcion: '', categoria: 'otro', monto_total: '', num_cuotas: '', cuota_mensual: '', fecha_inicio: '', fecha_fin: '', activo: true }
@@ -236,14 +238,15 @@ export default function Diferidos() {
             <div className="form-modal-group">
               <label className="form-modal-label">Empieza en</label>
               <div className="date-input-wrap">
-                <input className="form-modal-input" type="date" required
+                <input className="form-modal-input" type="date" required min={DATE_INPUT_MIN} max={DATE_INPUT_MAX}
                   value={form.fecha_inicio} onChange={e => handleFechaInicio(e.target.value)} />
               </div>
+              <DateQuickActions value={form.fecha_inicio} onChange={handleFechaInicio} disabled={loading} />
             </div>
             <div className="form-modal-group">
               <label className="form-modal-label">Termina en <span>(auto)</span></label>
               <div className="date-input-wrap">
-                <input className="form-modal-input" type="date" required
+                <input className="form-modal-input" type="date" required min={form.fecha_inicio || DATE_INPUT_MIN} max={DATE_INPUT_MAX}
                   value={form.fecha_fin} onChange={e => setForm({ ...form, fecha_fin: e.target.value })}
                   style={form.fecha_fin ? { borderColor: 'rgba(196,135,246,0.40)' } : {}} />
               </div>

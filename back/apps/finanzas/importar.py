@@ -27,6 +27,8 @@ ALIAS_COLUMNAS = {
 
 FORMATOS_FECHA = ['%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y', '%m/%d/%Y', '%Y/%m/%d']
 MAX_FILAS = 2000
+MIN_ALLOWED_YEAR = 2000
+MAX_ALLOWED_YEAR = 2100
 
 
 def _normalizar(s: str) -> str:
@@ -59,6 +61,10 @@ def _parse_fecha(s: str):
         except ValueError:
             continue
     return None
+
+
+def _fecha_en_rango(fecha: datetime.date | None) -> bool:
+    return bool(fecha and MIN_ALLOWED_YEAR <= fecha.year <= MAX_ALLOWED_YEAR)
 
 
 def _parse_monto(s) -> Decimal | None:
@@ -163,6 +169,15 @@ def parsear_archivo(nombre: str, file_bytes: bytes, max_filas: int = MAX_FILAS) 
         if not fecha:
             filas_error.append({'fila': num, 'raw': fila, 'error': f'Fecha invalida: "{get("fecha")}"'})
             continue
+        if not _fecha_en_rango(fecha):
+            filas_error.append(
+                {
+                    'fila': num,
+                    'raw': fila,
+                    'error': f'Fecha fuera de rango permitido ({MIN_ALLOWED_YEAR}-{MAX_ALLOWED_YEAR}): "{get("fecha")}"',
+                }
+            )
+            continue
 
         monto = _parse_monto(get('monto'))
         if monto is None:
@@ -216,6 +231,10 @@ def validar_filas_confirmacion(filas: list[dict], max_filas: int = MAX_FILAS) ->
         fecha = _parse_fecha(str(fila.get('fecha', '')).strip())
         if not fecha:
             raise ValueError(f'Fila {idx}: fecha invalida.')
+        if not _fecha_en_rango(fecha):
+            raise ValueError(
+                f'Fila {idx}: la fecha debe estar entre {MIN_ALLOWED_YEAR} y {MAX_ALLOWED_YEAR}.'
+            )
 
         monto = _parse_monto(fila.get('monto', ''))
         if monto is None or monto <= 0:

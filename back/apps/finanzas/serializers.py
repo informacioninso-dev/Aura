@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
 from rest_framework import serializers
@@ -35,6 +36,20 @@ MESES_SLUG = [
 
 def round_money(value):
     return value.quantize(TWOPLACES, rounding=ROUND_HALF_UP)
+
+
+MIN_ALLOWED_YEAR = 2000
+MAX_ALLOWED_YEAR = 2100
+
+
+def validate_reasonable_date(errors, field_name, value, *, label=None):
+    if value is None or not isinstance(value, date):
+        return
+    if value.year < MIN_ALLOWED_YEAR or value.year > MAX_ALLOWED_YEAR:
+        label = label or field_name.replace('_', ' ')
+        errors[field_name] = (
+            f'La fecha de {label} debe estar entre {MIN_ALLOWED_YEAR} y {MAX_ALLOWED_YEAR}.'
+        )
 
 
 class NotificacionSerializer(serializers.ModelSerializer):
@@ -86,6 +101,8 @@ class IngresoSerializer(serializers.ModelSerializer):
         errors = {}
         if monto is not None and monto <= 0:
             errors['monto'] = 'El monto debe ser mayor que 0.'
+        validate_reasonable_date(errors, 'fecha_inicio', fecha_inicio, label='inicio')
+        validate_reasonable_date(errors, 'fecha_fin', fecha_fin, label='fin')
         if fecha_inicio and fecha_fin and fecha_fin < fecha_inicio:
             errors['fecha_fin'] = 'La fecha fin no puede ser menor que la fecha de inicio.'
         if errors:
@@ -101,8 +118,13 @@ class IngresoSerializer(serializers.ModelSerializer):
 class IngresoPuntualSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         monto = attrs.get('monto', getattr(self.instance, 'monto', None))
+        fecha = attrs.get('fecha', getattr(self.instance, 'fecha', None))
+        errors = {}
         if monto is not None and monto <= 0:
-            raise serializers.ValidationError({'monto': 'El monto debe ser mayor que 0.'})
+            errors['monto'] = 'El monto debe ser mayor que 0.'
+        validate_reasonable_date(errors, 'fecha', fecha)
+        if errors:
+            raise serializers.ValidationError(errors)
         return attrs
 
     class Meta:
@@ -120,6 +142,8 @@ class GastoCorrienteSerializer(serializers.ModelSerializer):
         errors = {}
         if monto is not None and monto <= 0:
             errors['monto'] = 'El monto debe ser mayor que 0.'
+        validate_reasonable_date(errors, 'fecha_inicio', fecha_inicio, label='inicio')
+        validate_reasonable_date(errors, 'fecha_fin', fecha_fin, label='fin')
         if fecha_inicio and fecha_fin and fecha_fin < fecha_inicio:
             errors['fecha_fin'] = 'La fecha fin no puede ser menor que la fecha de inicio.'
         if errors:
@@ -135,8 +159,13 @@ class GastoCorrienteSerializer(serializers.ModelSerializer):
 class GastoNoCorrienteSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         monto = attrs.get('monto', getattr(self.instance, 'monto', None))
+        fecha = attrs.get('fecha', getattr(self.instance, 'fecha', None))
+        errors = {}
         if monto is not None and monto <= 0:
-            raise serializers.ValidationError({'monto': 'El monto debe ser mayor que 0.'})
+            errors['monto'] = 'El monto debe ser mayor que 0.'
+        validate_reasonable_date(errors, 'fecha', fecha)
+        if errors:
+            raise serializers.ValidationError(errors)
         return attrs
 
     class Meta:
@@ -166,6 +195,8 @@ class DeferidoSerializer(serializers.ModelSerializer):
             errors['monto_total'] = 'El monto total debe ser mayor que 0.'
         if num_cuotas is not None and num_cuotas <= 0:
             errors['num_cuotas'] = 'El numero de cuotas debe ser mayor que 0.'
+        validate_reasonable_date(errors, 'fecha_inicio', fecha_inicio, label='inicio')
+        validate_reasonable_date(errors, 'fecha_fin', fecha_fin, label='fin')
         if fecha_inicio and fecha_fin and fecha_fin < fecha_inicio:
             errors['fecha_fin'] = 'La fecha fin no puede ser menor que la fecha de inicio.'
         if errors:
@@ -220,6 +251,8 @@ class CuentaPorCobrarSerializer(serializers.ModelSerializer):
             errors['monto_cobrado'] = 'Lo cobrado no puede ser negativo.'
         if monto_total is not None and monto_cobrado is not None and monto_cobrado > monto_total:
             errors['monto_cobrado'] = 'Lo cobrado no puede ser mayor al total.'
+        validate_reasonable_date(errors, 'fecha_prestamo', fecha_prestamo, label='prestamo')
+        validate_reasonable_date(errors, 'fecha_recordatorio', fecha_recordatorio, label='recordatorio')
         if fecha_prestamo and fecha_recordatorio and fecha_recordatorio < fecha_prestamo:
             errors['fecha_recordatorio'] = 'El recordatorio no puede quedar antes de la fecha inicial.'
         if errors:
