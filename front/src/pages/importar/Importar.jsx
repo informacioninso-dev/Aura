@@ -3,7 +3,7 @@ import { Upload, FileSpreadsheet, CheckCircle, XCircle, AlertTriangle, Download 
 
 import api from '../../api/client'
 import { useAuth } from '../../context/useAuth'
-import { formatNumber } from '../../utils/formatters'
+import { formatAmount, formatNumber } from '../../utils/formatters'
 import '../../components/ui/app.css'
 
 const TEMPLATE_CSV = `fecha,descripcion,monto,tipo,categoria
@@ -315,7 +315,7 @@ export default function Importar() {
                         <td style={{ fontSize: 13 }}>{fila.fecha}</td>
                         <td style={{ fontWeight: 600, fontSize: 13 }}>{fila.descripcion}</td>
                         <td className={`table-amount ${fila.tipo === 'ingreso' ? 'positive' : 'negative'}`}>
-                          {fila.tipo === 'ingreso' ? '+' : '-'}${formatNumber(parseFloat(fila.monto))}
+                          {fila.tipo === 'ingreso' ? '+' : '-'}${formatAmount(parseFloat(fila.monto))}
                         </td>
                         <td>
                           <span

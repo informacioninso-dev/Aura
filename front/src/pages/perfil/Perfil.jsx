@@ -11,6 +11,8 @@ const MONEDAS = ['USD', 'CLP', 'EUR', 'ARS', 'COP', 'MXN', 'PEN']
 
 export default function Perfil() {
   const { user, fetchPerfil, changePassword } = useAuth()
+  const currentPlanLabel = user?.plan?.slug === 'pro' ? 'Pro' : 'Free'
+  const currentPlanBadgeClass = user?.plan?.slug === 'pro' ? 'is-pro' : 'is-free'
 
   const [form, setForm] = useState({
     username: user?.username || '',
@@ -76,7 +78,10 @@ export default function Perfil() {
   return (
     <div style={{ maxWidth: 640 }}>
       <div className="page-header">
-        <h1 className="page-title">Tu perfil</h1>
+        <div className="page-title-row">
+          <h1 className="page-title">Tu perfil</h1>
+          <span className={`subtle-plan-badge ${currentPlanBadgeClass}`}>Plan {currentPlanLabel}</span>
+        </div>
         <p className="page-subtitle">Personaliza tu cuenta y seguridad</p>
       </div>
 
@@ -85,8 +90,11 @@ export default function Perfil() {
           <div className="perfil-avatar-shell">
             <User size={24} style={{ color: '#C487F6' }} />
           </div>
-          <div>
-            <p style={{ fontWeight: 700, color: '#fff', fontSize: 16 }}>{user?.username}</p>
+          <div className="perfil-summary-copy">
+            <div className="perfil-summary-row">
+              <p style={{ fontWeight: 700, color: '#fff', fontSize: 16 }}>{user?.username}</p>
+              <span className={`subtle-plan-badge ${currentPlanBadgeClass}`}>{currentPlanLabel}</span>
+            </div>
             <p style={{ color: 'rgba(255,255,255,0.40)', fontSize: 13 }}>{user?.email}</p>
           </div>
         </div>

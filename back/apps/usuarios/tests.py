@@ -8,6 +8,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from .models import AdminActionLog, EmailServerConfig, Feature, Plan
+from .plans import assign_plan_to_user
 
 
 User = get_user_model()
@@ -65,6 +66,47 @@ class TestUsuarioAPI(APITestCase):
         self.assertEqual(response.data['feature_access']['import_max_rows'], 2000)
         self.assertFalse(response.data['feature_access']['advanced_projection_enabled'])
         self.assertEqual(response.data['feature_access']['advanced_projection_months'], 60)
+        self.assertEqual(response.data['projection_mode'], 'simple')
+
+    def test_perfil_free_ignora_cambio_de_projection_mode(self):
+        user = User.objects.create_user(
+            email='freeprojection@example.com',
+            username='freeprojection',
+            password='clave12345',
+        )
+        self.client.force_authenticate(user=user)
+
+        response = self.client.patch(
+            '/api/usuarios/perfil/',
+            {'projection_mode': 'personalizada'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        user.refresh_from_db()
+        self.assertEqual(user.projection_mode, 'automatica')
+        self.assertEqual(response.data['projection_mode'], 'simple')
+
+    def test_perfil_plan_pro_permite_actualizar_projection_mode(self):
+        user = User.objects.create_user(
+            email='proprojection@example.com',
+            username='proprojection',
+            password='clave12345',
+        )
+        plan_pro = Plan.objects.get(slug='pro')
+        assign_plan_to_user(user=user, plan=plan_pro, assigned_by=None, notes='Projection mode test')
+        self.client.force_authenticate(user=user)
+
+        response = self.client.patch(
+            '/api/usuarios/perfil/',
+            {'projection_mode': 'personalizada'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        user.refresh_from_db()
+        self.assertEqual(user.projection_mode, 'personalizada')
+        self.assertEqual(response.data['projection_mode'], 'personalizada')
 
     @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend', FRONTEND_URL='https://app.aura.test')
     def test_password_forgot_devuelve_ok_y_envia_correo_si_usuario_existe(self):

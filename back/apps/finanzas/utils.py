@@ -4,9 +4,18 @@ from decimal import Decimal
 from django.core.cache import cache
 from django.db import models as db_models
 
+from apps.usuarios.models import (
+    PROJECTION_MODE_AUTOMATICA,
+    PROJECTION_MODE_PERSONALIZADA,
+)
+from apps.usuarios.plans import (
+    get_user_projection_mode,
+)
+
 MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 FINANZAS_CACHE_VERSION_PREFIX = 'finanzas:version'
 FINANZAS_DIRTY_FROM_PREFIX = 'finanzas:dirty-from'
+MIN_VARIABLE_HISTORY_MONTHS = 3
 
 FREQ_FACTOR = {
     'diario': 30,
@@ -223,6 +232,92 @@ def _winsorized_weighted_average(values):
     return (weighted_total / total_weight).quantize(Decimal('0.01'))
 
 
+def _median_decimal(values):
+    ordered = sorted(_money(value) for value in values)
+    if not ordered:
+        return Decimal('0.00')
+
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[middle]
+    return ((ordered[middle - 1] + ordered[middle]) / Decimal('2')).quantize(Decimal('0.01'))
+
+
+def _quantile_decimal(ordered, percentile):
+    if not ordered:
+        return Decimal('0.00')
+    if len(ordered) == 1:
+        return ordered[0]
+
+    position = Decimal(str(len(ordered) - 1)) * Decimal(str(percentile))
+    lower_index = int(position)
+    upper_index = min(lower_index + 1, len(ordered) - 1)
+    fraction = position - Decimal(lower_index)
+    lower_value = ordered[lower_index]
+    upper_value = ordered[upper_index]
+    return (lower_value + (upper_value - lower_value) * fraction).quantize(Decimal('0.01'))
+
+
+def _clamp_series_with_iqr(values):
+    series = [_money(value) for value in values]
+    if len(series) < 4:
+        return series
+
+    ordered = sorted(series)
+    q1 = _quantile_decimal(ordered, Decimal('0.25'))
+    q3 = _quantile_decimal(ordered, Decimal('0.75'))
+    iqr = q3 - q1
+    lower_bound = max(Decimal('0.00'), q1 - (iqr * Decimal('1.5')))
+    upper_bound = q3 + (iqr * Decimal('1.5'))
+
+    clamped = []
+    for value in series:
+        if value < lower_bound:
+            clamped.append(lower_bound)
+        elif value > upper_bound:
+            clamped.append(upper_bound)
+        else:
+            clamped.append(value)
+    return clamped
+
+
+def _ewma_decimal(values, alpha=Decimal('0.35')):
+    series = [_money(value) for value in values]
+    if not series:
+        return Decimal('0.00')
+
+    alpha = Decimal(str(alpha))
+    smoothed = series[0]
+    for value in series[1:]:
+        smoothed = ((alpha * value) + ((Decimal('1.00') - alpha) * smoothed)).quantize(Decimal('0.01'))
+    return smoothed
+
+
+def _estimate_premium_variable_component(monthly_values):
+    series = [_money(value) for value in monthly_values]
+    if not series:
+        return Decimal('0.00')
+
+    active_values = [value for value in series if value != Decimal('0.00')]
+    total_months = len(series)
+    active_months = len(active_values)
+    if total_months == 0 or active_months < MIN_VARIABLE_HISTORY_MONTHS:
+        return Decimal('0.00')
+
+    clamped_active = _clamp_series_with_iqr(active_values)
+    if active_months < 6:
+        typical_amount = _median_decimal(clamped_active)
+    else:
+        median_amount = _median_decimal(clamped_active)
+        ewma_amount = _ewma_decimal(clamped_active)
+        typical_amount = (
+            (ewma_amount * Decimal('0.65')) + (median_amount * Decimal('0.35'))
+        ).quantize(Decimal('0.01'))
+
+    frequency = Decimal(active_months) / Decimal(total_months)
+    return (typical_amount * frequency).quantize(Decimal('0.01'))
+
+
 def calcular_balance_mes(usuario, anio, mes):
     """Calcula ingresos - gastos para un mes/anio dado. Puede ser negativo."""
     import calendar as cal
@@ -266,7 +361,7 @@ def calcular_balance_mes(usuario, anio, mes):
     )
     total_gnc = sum(Decimal(str(g.monto)) for g in gnc)
 
-    return round(total_ing + total_ip - total_gc - total_dif - total_gnc, 2)
+    return _money(total_ing + total_ip - total_gc - total_dif - total_gnc)
 
 
 def _calcular_neto_mensual_en_rango(usuario, desde_mes, hasta_mes):
@@ -450,6 +545,7 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real
 
     today = datetime.date.today()
     current_month = datetime.date(today.year, today.month, 1)
+    projection_mode = get_user_projection_mode(usuario)
     # real_start NO se restringe por date_joined — el usuario puede tener
     # registros fijos cargados con fecha anterior a su registro en la app
     real_start = _restar_meses(current_month, real_past_months)
@@ -504,6 +600,15 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real
             fecha__lte=history_end,
         )
     )
+    use_manual_eligibility = projection_mode == PROJECTION_MODE_PERSONALIZADA
+    ingresos_puntuales_elegibles = [
+        item for item in ingresos_puntuales
+        if (item.incluir_en_proyeccion if use_manual_eligibility else True)
+    ]
+    gastos_puntuales_elegibles = [
+        item for item in gastos_puntuales
+        if (item.incluir_en_proyeccion if use_manual_eligibility else True)
+    ]
 
     ingresos_puntuales_por_mes = {}
     for item in ingresos_puntuales:
@@ -515,21 +620,48 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real
         key = (item.fecha.year, item.fecha.month)
         gastos_puntuales_por_mes[key] = gastos_puntuales_por_mes.get(key, Decimal('0.00')) + _money(item.monto)
 
+    ingresos_puntuales_elegibles_por_mes = {}
+    for item in ingresos_puntuales_elegibles:
+        key = (item.fecha.year, item.fecha.month)
+        ingresos_puntuales_elegibles_por_mes[key] = (
+            ingresos_puntuales_elegibles_por_mes.get(key, Decimal('0.00')) + _money(item.monto)
+        )
+
+    gastos_puntuales_elegibles_por_mes = {}
+    for item in gastos_puntuales_elegibles:
+        key = (item.fecha.year, item.fecha.month)
+        gastos_puntuales_elegibles_por_mes[key] = (
+            gastos_puntuales_elegibles_por_mes.get(key, Decimal('0.00')) + _money(item.monto)
+        )
+
     # Compute smoothed variable incomes/expenses from full history window
     earliest_history_month = max(earliest_user_month, history_start)
     history_cursor = earliest_history_month
     variable_ingresos = []
     variable_gastos = []
+    history_months_used = 0
     while history_cursor < current_month:
         key = (history_cursor.year, history_cursor.month)
-        variable_ingresos.append(ingresos_puntuales_por_mes.get(key, Decimal('0.00')))
-        variable_gastos.append(gastos_puntuales_por_mes.get(key, Decimal('0.00')))
+        ingreso_variable = ingresos_puntuales_elegibles_por_mes.get(key, Decimal('0.00'))
+        gasto_variable = gastos_puntuales_elegibles_por_mes.get(key, Decimal('0.00'))
+        variable_ingresos.append(ingreso_variable)
+        variable_gastos.append(gasto_variable)
+        if ingreso_variable or gasto_variable:
+            history_months_used += 1
         history_cursor = _sumar_meses_fecha(history_cursor, 1)
 
-    smoothed_variable_ingresos = _winsorized_weighted_average(variable_ingresos)
-    smoothed_variable_gastos = _winsorized_weighted_average(variable_gastos)
+    variable_projection_applied = history_months_used >= MIN_VARIABLE_HISTORY_MONTHS
+    if projection_mode in {PROJECTION_MODE_AUTOMATICA, PROJECTION_MODE_PERSONALIZADA}:
+        smoothed_variable_ingresos = _estimate_premium_variable_component(variable_ingresos)
+        smoothed_variable_gastos = _estimate_premium_variable_component(variable_gastos)
+    else:
+        smoothed_variable_ingresos = _winsorized_weighted_average(variable_ingresos)
+        smoothed_variable_gastos = _winsorized_weighted_average(variable_gastos)
+
+    if not variable_projection_applied:
+        smoothed_variable_ingresos = Decimal('0.00')
+        smoothed_variable_gastos = Decimal('0.00')
     smoothed_variable_gap = (smoothed_variable_ingresos - smoothed_variable_gastos).quantize(Decimal('0.01'))
-    history_months_used = max(len(variable_ingresos), len(variable_gastos))
 
     def _ing_fijos_mes(month_start, month_end):
         return sum(
@@ -648,6 +780,9 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real
         'smoothed_variable_ingresos': float(smoothed_variable_ingresos),
         'smoothed_variable_gastos': float(smoothed_variable_gastos),
         'smoothed_variable_gap': float(smoothed_variable_gap),
+        'variable_projection_applied': variable_projection_applied,
+        'min_variable_history_months': MIN_VARIABLE_HISTORY_MONTHS,
+        'projection_mode': projection_mode,
         'current_month': f'{current_month.year}-{current_month.month:02d}',
         'series': series,
     }

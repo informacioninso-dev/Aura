@@ -5,8 +5,21 @@ from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.tokens import default_token_generator
 
-from .models import AdminActionLog, EmailServerConfig, Feature, Plan
-from .plans import get_user_feature_access, get_current_plan, serialize_feature_value
+from .models import (
+    AdminActionLog,
+    EmailServerConfig,
+    Feature,
+    Plan,
+    PROJECTION_MODE_CHOICES,
+)
+from .plans import (
+    FEATURE_ADVANCED_PROJECTION_ENABLED,
+    get_current_plan,
+    get_user_feature_access,
+    get_user_feature_value,
+    get_user_projection_mode,
+    serialize_feature_value,
+)
 from .security import encrypt_secret
 
 User = get_user_model()
@@ -36,6 +49,7 @@ class RegistroSerializer(serializers.ModelSerializer):
 class UsuarioSerializer(serializers.ModelSerializer):
     plan = serializers.SerializerMethodField()
     feature_access = serializers.SerializerMethodField()
+    projection_mode = serializers.ChoiceField(choices=PROJECTION_MODE_CHOICES, required=False)
 
     def get_plan(self, obj):
         plan, _ = get_current_plan(obj)
@@ -51,6 +65,22 @@ class UsuarioSerializer(serializers.ModelSerializer):
     def get_feature_access(self, obj):
         return get_user_feature_access(obj)
 
+    def validate(self, attrs):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if user and 'projection_mode' in attrs:
+            has_advanced_projection = bool(
+                get_user_feature_value(user, FEATURE_ADVANCED_PROJECTION_ENABLED, default=False)
+            )
+            if not has_advanced_projection:
+                attrs.pop('projection_mode', None)
+        return attrs
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['projection_mode'] = get_user_projection_mode(instance)
+        return data
+
     class Meta:
         model = User
         fields = (
@@ -58,6 +88,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
             'email',
             'username',
             'moneda_preferida',
+            'projection_mode',
             'foto_perfil',
             'fecha_registro',
             'is_staff',
@@ -73,6 +104,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
 class SuperAdminUserSerializer(serializers.ModelSerializer):
     plan = serializers.SerializerMethodField()
     feature_access = serializers.SerializerMethodField()
+    projection_mode = serializers.SerializerMethodField()
 
     def get_plan(self, obj):
         plan, assignment = get_current_plan(obj)
@@ -90,6 +122,9 @@ class SuperAdminUserSerializer(serializers.ModelSerializer):
     def get_feature_access(self, obj):
         return get_user_feature_access(obj)
 
+    def get_projection_mode(self, obj):
+        return get_user_projection_mode(obj)
+
     class Meta:
         model = User
         fields = (
@@ -97,6 +132,7 @@ class SuperAdminUserSerializer(serializers.ModelSerializer):
             'email',
             'username',
             'moneda_preferida',
+            'projection_mode',
             'is_active',
             'is_staff',
             'is_superuser',

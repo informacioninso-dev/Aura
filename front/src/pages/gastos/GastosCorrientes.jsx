@@ -11,7 +11,7 @@ import DateQuickActions from '../../components/ui/DateQuickActions'
 import Modal from '../../components/ui/Modal'
 import { useCategorias } from '../../hooks/useCategorias'
 import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../../utils/dateBounds'
-import { formatNumber } from '../../utils/formatters'
+import { formatAmount } from '../../utils/formatters'
 import '../../components/ui/app.css'
 
 const FRECUENCIAS = ['diario', 'semanal', 'quincenal', 'mensual', 'bimestral', 'trimestral', 'semestral', 'anual']
@@ -281,7 +281,7 @@ export default function GastosCorrientes({ embedded = false }) {
             <p className="finance-panel-kpi">
               Total al mes:&nbsp;
               <span style={{ color: '#F87171', fontWeight: 700 }}>
-                ${formatNumber(total, { maximumFractionDigits: 0 })}
+                ${formatAmount(total)}
               </span>
             </p>
           </div>
@@ -294,7 +294,7 @@ export default function GastosCorrientes({ embedded = false }) {
             <p className="page-subtitle">
               Total al mes:&nbsp;
               <span style={{ color: '#F87171', fontWeight: 700 }}>
-                ${formatNumber(total, { maximumFractionDigits: 0 })}
+                ${formatAmount(total)}
               </span>
             </p>
           </div>
@@ -357,7 +357,7 @@ export default function GastosCorrientes({ embedded = false }) {
                       </td>
                       <td style={{ fontWeight: 600 }}>{item.descripcion}</td>
                       <td><span className="badge badge-gray" style={{ textTransform: 'capitalize' }}>{item.categoria}</span></td>
-                      <td className="table-amount negative">${formatNumber(parseFloat(item.monto))}</td>
+                      <td className="table-amount negative">${formatAmount(parseFloat(item.monto))}</td>
                       <td><span className="badge badge-gray" style={{ textTransform: 'capitalize' }}>{item.frecuencia}</span></td>
                       <td>{item.fecha_inicio}</td>
                       <td>{item.fecha_fin || '-'}</td>
@@ -463,7 +463,7 @@ export default function GastosCorrientes({ embedded = false }) {
 
             <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
               <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>Actual: </span>
-              {versioningItem.descripcion} — ${formatNumber(parseFloat(versioningItem.monto))} {versioningItem.frecuencia}
+              {versioningItem.descripcion} — ${formatAmount(parseFloat(versioningItem.monto))} {versioningItem.frecuencia}
             </div>
 
             <div className="form-modal-group">

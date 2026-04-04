@@ -25,6 +25,12 @@ const FACTOR_FRECUENCIA = {
   anual: 0.083,
 }
 const COLCHON_STORAGE_KEY = 'simulador_colchon_minimo'
+const SIMULADOR_PAST_MONTHS = 6
+const PROJECTION_MODE_LABELS = {
+  automatica: 'Automatica',
+  simple: 'Simple',
+  personalizada: 'Personalizada',
+}
 
 function parseLocalDate(value) {
   const [y, m, d] = value.split('-').map(Number)
@@ -73,6 +79,12 @@ function calcularCuota(monto, tasaAnual, plazoMeses) {
   return (p * (r * Math.pow(1 + r, n))) / (Math.pow(1 + r, n) - 1)
 }
 
+function roundMoneyNumber(value) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return 0
+  return Number(numeric.toFixed(2))
+}
+
 function getInitialColchonMinimo() {
   if (typeof window === 'undefined') return ''
   const savedValue = window.localStorage.getItem(COLCHON_STORAGE_KEY)
@@ -82,7 +94,7 @@ function getInitialColchonMinimo() {
   return String(parsed)
 }
 
-function construirFlujoBase(ingresos, ingresosPuntuales, gastosCorrientes, gastosNoCorrientes, diferidos) {
+function construirFlujoBaseSimple(ingresos, ingresosPuntuales, gastosCorrientes, gastosNoCorrientes, diferidos) {
   const hoy = new Date()
   return Array.from({ length: 24 }, (_, i) => {
     const fecha = new Date(hoy.getFullYear(), hoy.getMonth() + i, 1)
@@ -108,15 +120,35 @@ function construirFlujoBase(ingresos, ingresosPuntuales, gastosCorrientes, gasto
       .filter((item) => overlapsMonth(item, fecha))
       .reduce((sum, item) => sum + Number(item.cuota_mensual), 0)
 
-    const gastos = Math.round(totalGastosCorrientes + totalGastosPuntuales + totalDiferidos)
-    const ingresosMes = Math.round(totalIngresos + totalIngresosPuntuales)
+    const gastos = roundMoneyNumber(totalGastosCorrientes + totalGastosPuntuales + totalDiferidos)
+    const ingresosMes = roundMoneyNumber(totalIngresos + totalIngresosPuntuales)
     return {
       mes,
       ingresos: ingresosMes,
       gastos,
-      balance: ingresosMes - gastos,
+      balance: roundMoneyNumber(ingresosMes - gastos),
     }
   })
+}
+
+function construirFlujoBaseDesdeProyeccion(series = [], desiredMonths = series.length) {
+  const normalized = series.map((point) => ({
+    mes: point.label,
+    ingresos: roundMoneyNumber(point.monthly_ingresos || 0),
+    gastos: roundMoneyNumber(point.monthly_gastos || 0),
+    balance: roundMoneyNumber(point.projected_gap || 0),
+  }))
+
+  if (normalized.length === 0 || desiredMonths <= normalized.length) {
+    return normalized
+  }
+
+  const lastPoint = normalized[normalized.length - 1]
+  const extended = [...normalized]
+  while (extended.length < desiredMonths) {
+    extended.push({ ...lastPoint })
+  }
+  return extended
 }
 
 const EMPTY_FORM = {
@@ -132,20 +164,29 @@ const EMPTY_FORM = {
 function resolveSaldoInicial(responseData) {
   if (!responseData) return 0
   const monto = Number(responseData.monto)
-  return Number.isFinite(monto) ? monto : 0
+  return Number.isFinite(monto) ? roundMoneyNumber(monto) : 0
 }
 
 export default function Simulador() {
   const { user } = useAuth()
+  const advancedProjectionEnabled = Boolean(user?.feature_access?.advanced_projection_enabled)
+  const advancedProjectionMaxMonths = Number(user?.feature_access?.advanced_projection_months || 60)
 
   const [bancos, setBancos] = useState([])
   const [simulaciones, setSimulaciones] = useState([])
   const [flujoBase, setFlujoBase] = useState([])
   const [saldoInicial, setSaldoInicial] = useState(0)
+  const [simulationProjectionMeta, setSimulationProjectionMeta] = useState({
+    mode: advancedProjectionEnabled ? (user?.projection_mode || 'automatica') : 'simple',
+    variableProjectionApplied: !advancedProjectionEnabled,
+    historyMonthsUsed: 0,
+    minVariableHistoryMonths: 3,
+  })
   const [form, setForm] = useState(EMPTY_FORM)
   const [resultado, setResultado] = useState(null)
 
   const [loadingData, setLoadingData] = useState(true)
+  const [simulating, setSimulating] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [agregando, setAgregando] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
@@ -162,32 +203,66 @@ export default function Simulador() {
     loadInitialData()
   }, [])
 
+  async function cargarFlujoBase({ monthsNeeded = 24 } = {}) {
+    if (advancedProjectionEnabled) {
+      const months = Math.min(Math.max(24, monthsNeeded), advancedProjectionMaxMonths)
+      const { data } = await api.get(`/finanzas/proyeccion-acumulada/?months=${months}&past_months=${SIMULADOR_PAST_MONTHS}`)
+      const projectedSeries = (data.series || []).filter((point) => !point.is_real).slice(0, months)
+      const nextSaldoInicial = resolveSaldoInicial({
+        monto: projectedSeries[0]?.opening_balance ?? data.starting_balance ?? 0,
+      })
+      const nextFlujoBase = construirFlujoBaseDesdeProyeccion(projectedSeries, monthsNeeded)
+      const nextMeta = {
+        mode: data.projection_mode || user?.projection_mode || 'automatica',
+        variableProjectionApplied: data.variable_projection_applied !== false,
+        historyMonthsUsed: Number(data.history_months_used || 0),
+        minVariableHistoryMonths: Number(data.min_variable_history_months || 3),
+      }
+      setSaldoInicial(nextSaldoInicial)
+      setFlujoBase(nextFlujoBase)
+      setSimulationProjectionMeta(nextMeta)
+      return { flujoBase: nextFlujoBase, saldoInicial: nextSaldoInicial, meta: nextMeta }
+    }
+
+    const [ingresosRes, ingresosPuntualesRes, gastosRes, gastosPuntualesRes, diferidosRes, saldoRes] = await Promise.all([
+      api.get('/finanzas/ingresos/'),
+      api.get('/finanzas/ingresos-puntuales/'),
+      api.get('/finanzas/gastos-corrientes/'),
+      api.get('/finanzas/gastos-no-corrientes/'),
+      api.get('/finanzas/diferidos/'),
+      api.get('/finanzas/saldo-mes/actual/'),
+    ])
+    const nextSaldoInicial = resolveSaldoInicial(saldoRes.data)
+    const nextFlujoBase = construirFlujoBaseSimple(
+      ingresosRes.data,
+      ingresosPuntualesRes.data,
+      gastosRes.data,
+      gastosPuntualesRes.data,
+      diferidosRes.data,
+    )
+    const nextMeta = {
+      mode: 'simple',
+      variableProjectionApplied: true,
+      historyMonthsUsed: 0,
+      minVariableHistoryMonths: 3,
+    }
+    setSaldoInicial(nextSaldoInicial)
+    setFlujoBase(nextFlujoBase)
+    setSimulationProjectionMeta(nextMeta)
+    return { flujoBase: nextFlujoBase, saldoInicial: nextSaldoInicial, meta: nextMeta }
+  }
+
   async function loadInitialData() {
     setLoadingData(true)
     try {
-      const [bancosRes, simulacionesRes, ingresosRes, ingresosPuntualesRes, gastosRes, gastosPuntualesRes, diferidosRes, saldoRes] = await Promise.all([
+      const [bancosRes, simulacionesRes] = await Promise.all([
         api.get('/simulador/bancos/'),
         api.get('/simulador/simulaciones/'),
-        api.get('/finanzas/ingresos/'),
-        api.get('/finanzas/ingresos-puntuales/'),
-        api.get('/finanzas/gastos-corrientes/'),
-        api.get('/finanzas/gastos-no-corrientes/'),
-        api.get('/finanzas/diferidos/'),
-        api.get('/finanzas/saldo-mes/actual/'),
       ])
 
       setBancos(bancosRes.data)
       setSimulaciones(simulacionesRes.data)
-      setSaldoInicial(resolveSaldoInicial(saldoRes.data))
-      setFlujoBase(
-        construirFlujoBase(
-          ingresosRes.data,
-          ingresosPuntualesRes.data,
-          gastosRes.data,
-          gastosPuntualesRes.data,
-          diferidosRes.data,
-        ),
-      )
+      await cargarFlujoBase({ monthsNeeded: 24 })
       if (!getInitialColchonMinimo() && simulacionesRes.data.length > 0 && Number(simulacionesRes.data[0].colchon_minimo) > 0) {
         setForm((prev) => ({ ...prev, colchon_minimo: String(simulacionesRes.data[0].colchon_minimo) }))
       }
@@ -200,24 +275,7 @@ export default function Simulador() {
 
   async function recargarFlujoBase() {
     try {
-      const [ingresosRes, ingresosPuntualesRes, gastosRes, gastosPuntualesRes, diferidosRes, saldoRes] = await Promise.all([
-        api.get('/finanzas/ingresos/'),
-        api.get('/finanzas/ingresos-puntuales/'),
-        api.get('/finanzas/gastos-corrientes/'),
-        api.get('/finanzas/gastos-no-corrientes/'),
-        api.get('/finanzas/diferidos/'),
-        api.get('/finanzas/saldo-mes/actual/'),
-      ])
-      setSaldoInicial(resolveSaldoInicial(saldoRes.data))
-      setFlujoBase(
-        construirFlujoBase(
-          ingresosRes.data,
-          ingresosPuntualesRes.data,
-          gastosRes.data,
-          gastosPuntualesRes.data,
-          diferidosRes.data,
-        ),
-      )
+      await cargarFlujoBase({ monthsNeeded: Math.max(24, Number(form.plazo_meses || 24)) })
     } catch (err) {
       setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo actualizar el flujo base.') })
     }
@@ -232,87 +290,105 @@ export default function Simulador() {
     }))
   }
 
-  function simular(e) {
+  async function simular(e) {
     e.preventDefault()
+    if (simulating) return
     setFeedback({ type: '', message: '' })
+    setSimulating(true)
 
-    const monto = Number(form.monto)
-    const tasa = Number(form.tasa_anual)
-    const plazo = Number(form.plazo_meses)
-    const colchonMinimo = Number(form.colchon_minimo)
-    if (!monto || monto <= 0 || Number.isNaN(tasa) || tasa < 0 || !plazo || plazo <= 0 || !colchonMinimo || colchonMinimo <= 0) {
-      setFeedback({ type: 'error', message: 'Completa monto, tasa, plazo y minimo libre con valores validos.' })
-      return
-    }
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(COLCHON_STORAGE_KEY, String(colchonMinimo))
-    }
-
-    const cuota = calcularCuota(monto, tasa, plazo)
-    const totalPagar = cuota * plazo
-    const totalIntereses = totalPagar - monto
-
-    const hoy = new Date()
-    const inicio = parseLocalDate(form.fecha_inicio)
-    const finPrestamo = new Date(inicio.getFullYear(), inicio.getMonth() + plazo, 1)
-
-    const horizonMonths = Math.max(24, plazo)
-    let saldoBaseAcumulado = saldoInicial
-    let saldoSimAcumulado = saldoInicial
-
-    const flujoConPrestamo = Array.from({ length: horizonMonths }, (_, i) => {
-      const fecha = new Date(hoy.getFullYear(), hoy.getMonth() + i, 1)
-      const mes = `${MESES[fecha.getMonth()]} ${fecha.getFullYear()}`
-      const tieneCuota = fecha >= inicio && fecha < finPrestamo
-      const base = flujoBase[i] || { ingresos: 0, gastos: 0, balance: 0 }
-      const gastosSim = base.gastos + (tieneCuota ? Math.round(cuota) : 0)
-      const balanceSimMensual = base.ingresos - gastosSim
-      const saldoBaseInicio = saldoBaseAcumulado
-      const saldoSimInicio = saldoSimAcumulado
-      const arrastreInicio = saldoSimInicio
-      saldoBaseAcumulado += base.balance
-      saldoSimAcumulado += balanceSimMensual
-      const ingresosVisibles = base.ingresos + Math.max(arrastreInicio, 0)
-      const gastosVisibles = gastosSim + Math.max(-arrastreInicio, 0)
-
-      return {
-        mes,
-        ingresos: base.ingresos,
-        ingresosVisibles,
-        gastosSim,
-        gastosVisibles,
-        balanceSim: balanceSimMensual,
-        balanceBase: base.balance,
-        saldoBaseInicio,
-        saldoBaseFin: saldoBaseAcumulado,
-        saldoSimInicio,
-        saldoSimFin: saldoSimAcumulado,
+    try {
+      const monto = Number(form.monto)
+      const tasa = Number(form.tasa_anual)
+      const plazo = Number(form.plazo_meses)
+      const colchonMinimo = Number(form.colchon_minimo)
+      if (!monto || monto <= 0 || Number.isNaN(tasa) || tasa < 0 || !plazo || plazo <= 0 || !colchonMinimo || colchonMinimo <= 0) {
+        setFeedback({ type: 'error', message: 'Completa monto, tasa, plazo y minimo libre con valores validos.' })
+        return
       }
-    })
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(COLCHON_STORAGE_KEY, String(colchonMinimo))
+      }
 
-    const mesesConDeficit = flujoConPrestamo.filter((fila) => fila.saldoSimFin < 0)
-    const mesesBajoColchon = flujoConPrestamo.filter((fila) => fila.saldoSimFin < colchonMinimo)
-    const balanceMinimo = flujoConPrestamo.length > 0
-      ? flujoConPrestamo.reduce((min, fila) => Math.min(min, fila.saldoSimFin), flujoConPrestamo[0].saldoSimFin)
-      : 0
-    const primerMesEnRojo = mesesConDeficit[0]?.mes || null
-    const primerMesBajoColchon = mesesBajoColchon[0]?.mes || null
+      const cuota = roundMoneyNumber(calcularCuota(monto, tasa, plazo))
+      const totalPagar = roundMoneyNumber(cuota * plazo)
+      const totalIntereses = roundMoneyNumber(totalPagar - monto)
 
-    setResultado({
-      cuota,
-      totalPagar,
-      totalIntereses,
-      flujoConPrestamo,
-      mesesConDeficit,
-      mesesBajoColchon,
-      colchonMinimo,
-      balanceMinimo,
-      primerMesEnRojo,
-      primerMesBajoColchon,
-      horizonMonths,
-      saldoInicial,
-      factible: mesesConDeficit.length === 0 && mesesBajoColchon.length === 0,
-    })
+      const hoy = new Date()
+      const inicio = parseLocalDate(form.fecha_inicio)
+      const finPrestamo = new Date(inicio.getFullYear(), inicio.getMonth() + plazo, 1)
+
+      const horizonMonths = Math.max(24, plazo)
+      let currentFlujoBase = flujoBase
+      let currentSaldoInicial = saldoInicial
+
+      try {
+        const baseData = await cargarFlujoBase({ monthsNeeded: horizonMonths })
+        currentFlujoBase = baseData.flujoBase
+        currentSaldoInicial = baseData.saldoInicial
+      } catch (err) {
+        setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo calcular la base de la simulacion.') })
+        return
+      }
+
+      let saldoBaseAcumulado = currentSaldoInicial
+      let saldoSimAcumulado = currentSaldoInicial
+
+      const flujoConPrestamo = Array.from({ length: horizonMonths }, (_, i) => {
+        const fecha = new Date(hoy.getFullYear(), hoy.getMonth() + i, 1)
+        const mes = `${MESES[fecha.getMonth()]} ${fecha.getFullYear()}`
+        const tieneCuota = fecha >= inicio && fecha < finPrestamo
+        const base = currentFlujoBase[i] || { ingresos: 0, gastos: 0, balance: 0 }
+        const gastosSim = roundMoneyNumber(base.gastos + (tieneCuota ? cuota : 0))
+        const balanceSimMensual = roundMoneyNumber(base.ingresos - gastosSim)
+        const saldoBaseInicio = saldoBaseAcumulado
+        const saldoSimInicio = saldoSimAcumulado
+        const arrastreInicio = saldoSimInicio
+        saldoBaseAcumulado = roundMoneyNumber(saldoBaseAcumulado + base.balance)
+        saldoSimAcumulado = roundMoneyNumber(saldoSimAcumulado + balanceSimMensual)
+        const ingresosVisibles = roundMoneyNumber(base.ingresos + Math.max(arrastreInicio, 0))
+        const gastosVisibles = roundMoneyNumber(gastosSim + Math.max(-arrastreInicio, 0))
+
+        return {
+          mes,
+          ingresos: base.ingresos,
+          ingresosVisibles,
+          gastosSim,
+          gastosVisibles,
+          balanceSim: balanceSimMensual,
+          balanceBase: base.balance,
+          saldoBaseInicio,
+          saldoBaseFin: saldoBaseAcumulado,
+          saldoSimInicio,
+          saldoSimFin: saldoSimAcumulado,
+        }
+      })
+
+      const mesesConDeficit = flujoConPrestamo.filter((fila) => fila.saldoSimFin < 0)
+      const mesesBajoColchon = flujoConPrestamo.filter((fila) => fila.saldoSimFin < colchonMinimo)
+      const balanceMinimo = flujoConPrestamo.length > 0
+        ? flujoConPrestamo.reduce((min, fila) => Math.min(min, fila.saldoSimFin), flujoConPrestamo[0].saldoSimFin)
+        : 0
+      const primerMesEnRojo = mesesConDeficit[0]?.mes || null
+      const primerMesBajoColchon = mesesBajoColchon[0]?.mes || null
+
+      setResultado({
+        cuota,
+        totalPagar,
+        totalIntereses,
+        flujoConPrestamo,
+        mesesConDeficit,
+        mesesBajoColchon,
+        colchonMinimo,
+        balanceMinimo,
+        primerMesEnRojo,
+        primerMesBajoColchon,
+        horizonMonths,
+        saldoInicial: currentSaldoInicial,
+        factible: mesesConDeficit.length === 0 && mesesBajoColchon.length === 0,
+      })
+    } finally {
+      setSimulating(false)
+    }
   }
 
   async function guardarSimulacion() {
@@ -398,6 +474,10 @@ export default function Simulador() {
 
   const moneda = user?.moneda_preferida || 'USD'
   const fmt = (value) => formatMoney(value, { currency: moneda })
+  const simulationModeLabel = PROJECTION_MODE_LABELS[simulationProjectionMeta.mode] || 'Simple'
+  const simulationModeNote = advancedProjectionEnabled
+    ? `Usa tu modo actual de proyeccion: ${simulationModeLabel}.`
+    : 'Usa una lectura simple de tu flujo actual.'
 
   const filteredSimulaciones = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -422,6 +502,12 @@ export default function Simulador() {
       <div className="page-header">
         <h1 className="page-title">Simulador de prestamos</h1>
         <p className="page-subtitle">Mira si una cuota te cabe antes de tomarla.</p>
+        <p className="dashboard-chart-note" style={{ marginTop: 6 }}>
+          {simulationModeNote}
+          {advancedProjectionEnabled && !simulationProjectionMeta.variableProjectionApplied
+            ? ` Aun no hay suficientes extras para meter variable futura, asi que usa tu base fija.`
+            : ''}
+        </p>
       </div>
 
       <FeedbackAlert type={feedback.type || 'error'} message={feedback.message} />
@@ -535,11 +621,11 @@ export default function Simulador() {
                       onChange={(e) => setForm({ ...form, fecha_inicio: e.target.value })}
                     />
                   </div>
-                  <DateQuickActions value={form.fecha_inicio} onChange={(value) => setForm({ ...form, fecha_inicio: value })} disabled={agregando} />
+                  <DateQuickActions value={form.fecha_inicio} onChange={(value) => setForm({ ...form, fecha_inicio: value })} disabled={agregando || simulating} />
                 </div>
 
-                <button type="submit" className="btn-modal-save" style={{ width: '100%', padding: '12px 0', marginTop: 4 }}>
-                  Simular
+                <button type="submit" className="btn-modal-save" disabled={simulating} style={{ width: '100%', padding: '12px 0', marginTop: 4 }}>
+                  {simulating ? 'Simulando...' : 'Simular'}
                 </button>
               </form>
             </div>

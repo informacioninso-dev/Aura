@@ -11,7 +11,7 @@ import DateQuickActions from '../../components/ui/DateQuickActions'
 import Modal from '../../components/ui/Modal'
 import { useCategorias } from '../../hooks/useCategorias'
 import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../../utils/dateBounds'
-import { formatNumber } from '../../utils/formatters'
+import { formatAmount } from '../../utils/formatters'
 import '../../components/ui/app.css'
 
 const CATEGORIA_STORAGE_KEY = 'gastos_puntuales_last_categoria'
@@ -32,6 +32,7 @@ function buildEmptyForm() {
     monto: '',
     fecha: getTodayDate(),
     notas: '',
+    incluir_en_proyeccion: true,
   }
 }
 
@@ -53,6 +54,7 @@ export default function GastosNoCorrientes({ embedded = false }) {
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const { categorias } = useCategorias()
+  const canCustomizeProjection = Boolean(user?.feature_access?.advanced_projection_enabled)
 
   useEffect(() => { fetchItems() }, [])
 
@@ -73,7 +75,14 @@ export default function GastosNoCorrientes({ embedded = false }) {
   }
 
   function openEdit(item) {
-    setForm({ descripcion: item.descripcion, categoria: item.categoria, monto: item.monto, fecha: item.fecha, notas: item.notas || '' })
+    setForm({
+      descripcion: item.descripcion,
+      categoria: item.categoria,
+      monto: item.monto,
+      fecha: item.fecha,
+      notas: item.notas || '',
+      incluir_en_proyeccion: item.incluir_en_proyeccion !== false,
+    })
     setEditId(item.id)
     setShowAdvanced(true)
     setModal(true)
@@ -139,6 +148,7 @@ export default function GastosNoCorrientes({ embedded = false }) {
   const safePage = Math.min(page, pageCount)
   const start = (safePage - 1) * pageSize
   const paginatedItems = filteredItems.slice(start, start + pageSize)
+  const projectionStatusLabel = (item) => (item.incluir_en_proyeccion === false ? 'Fuera de proyeccion' : 'En proyeccion')
 
   const bulkDeleteMax = user?.feature_access?.bulk_delete_max ?? 10
   const allPageSelected = paginatedItems.length > 0 && paginatedItems.every((i) => selectedIds.has(i.id))
@@ -202,7 +212,7 @@ export default function GastosNoCorrientes({ embedded = false }) {
             <p className="finance-panel-kpi">
               Total cargado:&nbsp;
               <span style={{ color: '#F87171', fontWeight: 700 }}>
-                ${formatNumber(total, { maximumFractionDigits: 0 })}
+                ${formatAmount(total)}
               </span>
             </p>
           </div>
@@ -215,7 +225,7 @@ export default function GastosNoCorrientes({ embedded = false }) {
             <p className="page-subtitle">
               Total cargado:&nbsp;
               <span style={{ color: '#F87171', fontWeight: 700 }}>
-                ${formatNumber(total, { maximumFractionDigits: 0 })}
+                ${formatAmount(total)}
               </span>
             </p>
           </div>
@@ -275,9 +285,18 @@ export default function GastosNoCorrientes({ embedded = false }) {
                       <td style={{ width: 36, paddingRight: 0 }}>
                         <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} style={{ cursor: 'pointer', accentColor: '#C487F6' }} />
                       </td>
-                      <td style={{ fontWeight: 600 }}>{item.descripcion}</td>
+                      <td>
+                        <div className="table-title-stack">
+                          <span style={{ fontWeight: 600 }}>{item.descripcion}</span>
+                          {canCustomizeProjection && (
+                            <span className={`table-row-badge ${item.incluir_en_proyeccion === false ? 'is-muted' : 'is-active'}`}>
+                              {projectionStatusLabel(item)}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td><span className="badge badge-gray" style={{ textTransform: 'capitalize' }}>{item.categoria}</span></td>
-                      <td className="table-amount negative">${formatNumber(parseFloat(item.monto))}</td>
+                      <td className="table-amount negative">${formatAmount(parseFloat(item.monto))}</td>
                       <td>{item.fecha}</td>
                       <td style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>{item.notas || '-'}</td>
                       <td className="table-actions-cell">
@@ -328,8 +347,14 @@ export default function GastosNoCorrientes({ embedded = false }) {
               onClick={() => setShowAdvanced((v) => !v)}
               style={{ width: '100%', marginBottom: 14 }}
             >
-              {showAdvanced ? 'Ocultar opciones' : 'Ver mas opciones'}
+              {showAdvanced ? 'Ocultar opciones' : canCustomizeProjection ? 'Ver fecha, notas y proyeccion' : 'Ver mas opciones'}
             </button>
+          )}
+
+          {!editId && !showAdvanced && canCustomizeProjection && (
+            <p style={{ marginTop: -4, marginBottom: 14, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
+              Aqui tambien puedes decidir si este extra entra o no en tu proyeccion personalizada.
+            </p>
           )}
 
           {(editId || showAdvanced) && (
@@ -345,6 +370,24 @@ export default function GastosNoCorrientes({ embedded = false }) {
                 <label className="form-modal-label">Notas <span>(opcional)</span></label>
                 <textarea className="form-modal-input" rows={2} placeholder="Detalles adicionales..." value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} style={{ resize: 'none', height: 'auto' }} />
               </div>
+              {canCustomizeProjection && (
+                <div className="form-modal-group" style={{ marginTop: -2 }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={form.incluir_en_proyeccion}
+                      onChange={(e) => setForm({ ...form, incluir_en_proyeccion: e.target.checked })}
+                      style={{ marginTop: 3, accentColor: '#C487F6' }}
+                    />
+                    <div>
+                      <div className="form-modal-label" style={{ marginBottom: 4 }}>Considerar en mi proyeccion futura</div>
+                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.45 }}>
+                        Se usa cuando eliges el modo Personalizada. Dejalo activo si este extra podria repetirse; apagalo para viajes u otros casos especiales.
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              )}
             </>
           )}
 

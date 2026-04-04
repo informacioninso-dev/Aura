@@ -9,11 +9,25 @@ FEATURE_VALUE_TYPE_CHOICES = [
     ('text', 'Texto'),
 ]
 
+PROJECTION_MODE_AUTOMATICA = 'automatica'
+PROJECTION_MODE_SIMPLE = 'simple'
+PROJECTION_MODE_PERSONALIZADA = 'personalizada'
+PROJECTION_MODE_CHOICES = [
+    (PROJECTION_MODE_AUTOMATICA, 'Automatica'),
+    (PROJECTION_MODE_SIMPLE, 'Simple'),
+    (PROJECTION_MODE_PERSONALIZADA, 'Personalizada'),
+]
+
 
 class Usuario(AbstractUser):
     # Campos adicionales para control financiero.
     email = models.EmailField('Correo electronico', unique=True)
     moneda_preferida = models.CharField(max_length=3, default='USD')
+    projection_mode = models.CharField(
+        max_length=16,
+        choices=PROJECTION_MODE_CHOICES,
+        default=PROJECTION_MODE_AUTOMATICA,
+    )
     foto_perfil = models.ImageField(upload_to='perfiles/', null=True, blank=True)
     fecha_registro = models.DateTimeField(auto_now_add=True)
 

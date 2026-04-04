@@ -6,7 +6,7 @@ import DateQuickActions from '../../components/ui/DateQuickActions'
 import Modal from '../../components/ui/Modal'
 import { useCategorias } from '../../hooks/useCategorias'
 import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../../utils/dateBounds'
-import { formatNumber } from '../../utils/formatters'
+import { formatAmount } from '../../utils/formatters'
 import '../../components/ui/app.css'
 const EMPTY = { descripcion: '', categoria: 'otro', monto_total: '', num_cuotas: '', cuota_mensual: '', fecha_inicio: '', fecha_fin: '', activo: true }
 
@@ -135,7 +135,7 @@ export default function Diferidos() {
           <p className="page-subtitle">
             Total al mes:&nbsp;
             <span style={{ color: '#C487F6', fontWeight: 700 }}>
-              ${formatNumber(totalMensual, { maximumFractionDigits: 0 })}
+              ${formatAmount(totalMensual)}
             </span>
           </p>
         </div>
@@ -170,11 +170,11 @@ export default function Diferidos() {
                 <div className="diferido-card-summary">
                   <div>
                     <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>Total</p>
-                    <p style={{ fontWeight: 600, color: '#fff' }}>${formatNumber(parseFloat(item.monto_total))}</p>
+                    <p style={{ fontWeight: 600, color: '#fff' }}>${formatAmount(parseFloat(item.monto_total))}</p>
                   </div>
                   <div>
                     <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>Cuota al mes</p>
-                    <p style={{ fontWeight: 700, color: '#C487F6' }}>${formatNumber(parseFloat(item.cuota_mensual))}</p>
+                    <p style={{ fontWeight: 700, color: '#C487F6' }}>${formatAmount(parseFloat(item.cuota_mensual))}</p>
                   </div>
                   <div>
                     <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>Cuotas</p>

@@ -3,6 +3,8 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from rest_framework import serializers
 
+from apps.usuarios.plans import FEATURE_ADVANCED_PROJECTION_ENABLED, get_user_feature_value
+
 from .models import (
     Categoria,
     CuentaPorCobrar,
@@ -50,6 +52,25 @@ def validate_reasonable_date(errors, field_name, value, *, label=None):
         errors[field_name] = (
             f'La fecha de {label} debe estar entre {MIN_ALLOWED_YEAR} y {MAX_ALLOWED_YEAR}.'
         )
+
+
+def user_can_customize_projection(request):
+    user = getattr(request, 'user', None)
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    return bool(get_user_feature_value(user, FEATURE_ADVANCED_PROJECTION_ENABLED, default=False))
+
+
+class ProjectionEligibilitySerializerMixin:
+    projection_field_name = 'incluir_en_proyeccion'
+
+    def enforce_projection_eligibility(self, attrs):
+        request = self.context.get('request')
+        if not user_can_customize_projection(request):
+            attrs[self.projection_field_name] = True
+        elif self.instance is None and self.projection_field_name not in attrs:
+            attrs[self.projection_field_name] = True
+        return attrs
 
 
 class NotificacionSerializer(serializers.ModelSerializer):
@@ -115,7 +136,7 @@ class IngresoSerializer(serializers.ModelSerializer):
         read_only_fields = ('usuario', 'creado_en')
 
 
-class IngresoPuntualSerializer(serializers.ModelSerializer):
+class IngresoPuntualSerializer(ProjectionEligibilitySerializerMixin, serializers.ModelSerializer):
     def validate(self, attrs):
         monto = attrs.get('monto', getattr(self.instance, 'monto', None))
         fecha = attrs.get('fecha', getattr(self.instance, 'fecha', None))
@@ -125,6 +146,7 @@ class IngresoPuntualSerializer(serializers.ModelSerializer):
         validate_reasonable_date(errors, 'fecha', fecha)
         if errors:
             raise serializers.ValidationError(errors)
+        self.enforce_projection_eligibility(attrs)
         return attrs
 
     class Meta:
@@ -156,7 +178,7 @@ class GastoCorrienteSerializer(serializers.ModelSerializer):
         read_only_fields = ('usuario', 'creado_en')
 
 
-class GastoNoCorrienteSerializer(serializers.ModelSerializer):
+class GastoNoCorrienteSerializer(ProjectionEligibilitySerializerMixin, serializers.ModelSerializer):
     def validate(self, attrs):
         monto = attrs.get('monto', getattr(self.instance, 'monto', None))
         fecha = attrs.get('fecha', getattr(self.instance, 'fecha', None))
@@ -166,6 +188,7 @@ class GastoNoCorrienteSerializer(serializers.ModelSerializer):
         validate_reasonable_date(errors, 'fecha', fecha)
         if errors:
             raise serializers.ValidationError(errors)
+        self.enforce_projection_eligibility(attrs)
         return attrs
 
     class Meta:

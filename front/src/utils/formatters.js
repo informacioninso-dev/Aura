@@ -15,6 +15,14 @@ export function formatNumber(value, options = {}, locale) {
   return new Intl.NumberFormat(resolveLocale(locale), options).format(toFiniteNumber(value))
 }
 
+export function formatAmount(value, options = {}, locale) {
+  return formatNumber(value, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    ...options,
+  }, locale)
+}
+
 export function formatMoney(value, options = {}) {
   const { currency = 'USD', locale, currencyDisplay = 'symbol', ...restOptions } = options
   const resolvedLocale = resolveLocale(locale)
@@ -29,11 +37,18 @@ export function formatMoney(value, options = {}) {
     .formatToParts(1)
     .find((part) => part.type === 'currency')?.value || currency
 
-  const numberPortion = new Intl.NumberFormat(resolvedLocale, {
+  const hasMinDigits = Object.prototype.hasOwnProperty.call(restOptions, 'minimumFractionDigits')
+  const hasMaxDigits = Object.prototype.hasOwnProperty.call(restOptions, 'maximumFractionDigits')
+  const numberFormatOptions = {
     style: 'decimal',
-    maximumFractionDigits: 0,
     ...restOptions,
-  }).format(absoluteValue)
+  }
+  if (!hasMinDigits && !hasMaxDigits) {
+    numberFormatOptions.minimumFractionDigits = 2
+    numberFormatOptions.maximumFractionDigits = 2
+  }
+
+  const numberPortion = new Intl.NumberFormat(resolvedLocale, numberFormatOptions).format(absoluteValue)
 
   return `${numericValue < 0 ? '-' : ''}${currencySymbol}${numberPortion}`
 }

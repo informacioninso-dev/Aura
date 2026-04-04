@@ -12,6 +12,8 @@ from .views import (
     SaldoMesViewSet,
     ImportarView,
     ProyeccionAcumuladaView,
+    ReportePDFView,
+    ReporteView,
 )
 
 router = DefaultRouter()
@@ -29,4 +31,6 @@ urlpatterns = [
     path('', include(router.urls)),
     path('importar/<str:accion>/', ImportarView.as_view(), name='importar'),
     path('proyeccion-acumulada/', ProyeccionAcumuladaView.as_view(), name='proyeccion-acumulada'),
+    path('reporte/', ReporteView.as_view(), name='reporte'),
+    path('reporte/pdf/', ReportePDFView.as_view(), name='reporte-pdf'),
 ]

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts'
 import { TrendingUp, TrendingDown, Wallet, Lock, PiggyBank, RefreshCw } from 'lucide-react'
@@ -27,6 +27,17 @@ const SERIES_FOCUS_OPTIONS = [
   { value: 'income', label: 'Ingresos' },
   { value: 'expense', label: 'Gastos' },
 ]
+const PROJECTION_MODE_OPTIONS = [
+  { value: 'automatica', label: 'Automatica' },
+  { value: 'simple', label: 'Simple' },
+  { value: 'personalizada', label: 'Personalizada' },
+]
+
+function getProjectionModeHelp(mode) {
+  if (mode === 'simple') return 'Simple: usa una lectura directa de tus extras.'
+  if (mode === 'personalizada') return 'Personalizada: usa solo los extras que marques.'
+  return 'Automatica: amortigua picos y aprende de tus extras.'
+}
 
 function parseLocalDate(value) {
   const [y, m, d] = value.split('-').map(Number)
@@ -72,7 +83,7 @@ function getSeriesFamily(dataKey = '') {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth()
+  const { user, fetchPerfil } = useAuth()
 
   const [data, setData] = useState({
     ingresos: [],
@@ -88,12 +99,25 @@ export default function Dashboard() {
   const [advancedProjection, setAdvancedProjection] = useState(null)
   const [projectionLoading, setProjectionLoading] = useState(false)
   const [projectionError, setProjectionError] = useState('')
+  const [projectionMode, setProjectionMode] = useState('simple')
+  const [projectionModeSaving, setProjectionModeSaving] = useState(false)
   const [pastMonths, setPastMonths] = useState(6)
   const [futureMonths, setFutureMonths] = useState(12)
   const [seriesFocus, setSeriesFocus] = useState('all')
+  const projectionDebounceRef = useRef(null)
 
   const advancedProjectionEnabled = Boolean(user?.feature_access?.advanced_projection_enabled)
   const advancedProjectionMaxMonths = normalizePositiveInt(user?.feature_access?.advanced_projection_months, 60)
+  const currentPlanLabel = user?.plan?.slug === 'pro' ? 'Pro' : 'Free'
+  const currentPlanBadgeClass = user?.plan?.slug === 'pro' ? 'is-pro' : 'is-free'
+
+  useEffect(() => {
+    if (!advancedProjectionEnabled) {
+      setProjectionMode('simple')
+      return
+    }
+    setProjectionMode(user?.projection_mode || 'automatica')
+  }, [advancedProjectionEnabled, user?.projection_mode])
 
   useEffect(() => {
     loadDashboard()
@@ -174,6 +198,25 @@ export default function Dashboard() {
     void loadDashboard({ silent: true })
   }
 
+  async function handleProjectionModeChange(nextMode) {
+    if (!advancedProjectionEnabled || projectionModeSaving || nextMode === projectionMode) return
+    const previousMode = projectionMode
+    setProjectionMode(nextMode)
+    setProjectionModeSaving(true)
+    setProjectionError('')
+
+    try {
+      await api.patch('/usuarios/perfil/', { projection_mode: nextMode })
+      await fetchPerfil()
+      await loadAdvancedProjection(futureMonths, pastMonths)
+    } catch (err) {
+      setProjectionMode(previousMode)
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo actualizar el modo de proyeccion.') })
+    } finally {
+      setProjectionModeSaving(false)
+    }
+  }
+
   const moneda = user?.moneda_preferida || 'USD'
   const fmt = (value) => formatMoney(value, { currency: moneda, currencyDisplay: 'narrowSymbol' })
   const fmtAxis = (value) => formatMoney(value, {
@@ -232,23 +275,27 @@ export default function Dashboard() {
     return advancedSeries.map((point, i) => {
       const isConnectReal = point.is_real || i === lastRealIdx + 1
       const isConnectProj = !point.is_real || i === lastRealIdx
-      const openingCarry = Number(point.opening_balance ?? 0)
-      const gapAcumulado = Number(point.closing_balance ?? point.cumulative_balance ?? 0)
-      let displayIngresos = Number(point.monthly_ingresos ?? 0)
-      let displayGastos = Number(point.monthly_gastos ?? 0)
-      displayIngresos += Math.max(openingCarry, 0)
-      displayGastos += Math.max(-openingCarry, 0)
+      // Ingresos disponibles = saldo anterior (opening) + ingresos del mes
+      // El excedente o déficit del mes anterior se arrastra al siguiente (bola de nieve)
+      const opening = Number(point.opening_balance ?? 0)
+      const ingMes = Number(point.monthly_ingresos ?? 0)
+      const gastoMes = Number(point.monthly_gastos ?? 0)
+      const ingDisponible = opening + ingMes
+      // Saldo al cierre del mes (closing_balance)
+      const gapAcumulado = Number(point.closing_balance ?? 0)
 
       return {
         label: point.label,
         month: point.month,
         is_real: point.is_real,
-        openingCarry,
+        opening,
+        ingMes,
+        gastoMes,
         gapAcumulado,
-        ing_real: isConnectReal ? displayIngresos : null,
-        ing_proj: isConnectProj ? displayIngresos : null,
-        gasto_real: isConnectReal ? displayGastos : null,
-        gasto_proj: isConnectProj ? displayGastos : null,
+        ing_real: isConnectReal ? ingDisponible : null,
+        ing_proj: isConnectProj ? ingDisponible : null,
+        gasto_real: isConnectReal ? gastoMes : null,
+        gasto_proj: isConnectProj ? gastoMes : null,
       }
     })
   }, [advancedSeries])
@@ -287,10 +334,10 @@ export default function Dashboard() {
                 }}
               />
               {({
-                ing_real: 'Ingresos (real)',
-                ing_proj: 'Ingresos (proy.)',
-                  gasto_real: 'Egresos + cuotas (real)',
-                  gasto_proj: 'Egresos + cuotas (proy.)',
+                ing_real: 'Disponible (real)',
+                ing_proj: 'Disponible (proy.)',
+                gasto_real: 'Gastos del mes (real)',
+                gasto_proj: 'Gastos del mes (proy.)',
               }[entry.dataKey] || entry.value)}
             </button>
           )
@@ -303,18 +350,26 @@ export default function Dashboard() {
     if (!active || !payload.length) return null
     const point = payload[0]?.payload
     if (!point) return null
-      const gapAcumulado = point.gapAcumulado != null
-        ? `Saldo acumulado: ${fmt(point.gapAcumulado)}`
-      : null
+    const ingDisponible = point.is_real ? point.ing_real : point.ing_proj
+    const gastoDisplay = point.is_real ? point.gasto_real : point.gasto_proj
 
     return (
       <div style={{ background: 'rgba(26,37,64,0.97)', border: '1px solid rgba(196,135,246,0.2)', borderRadius: 12, padding: '10px 12px' }}>
         <div style={{ color: '#FFFFFF', marginBottom: 6, fontWeight: 700 }}>
           {`${label} · ${point.is_real ? 'Real' : 'Proyectado'}`}
         </div>
-        {gapAcumulado && <div style={{ color: '#C487F6', fontWeight: 700 }}>{gapAcumulado}</div>}
-        <div style={{ color: '#10B981', fontWeight: 700 }}>{`Ingresos (${point.is_real ? 'real' : 'proy.'}): ${fmt(point.is_real ? point.ing_real : point.ing_proj)}`}</div>
-          <div style={{ color: '#F87171', fontWeight: 700 }}>{`Egresos + cuotas (${point.is_real ? 'real' : 'proy.'}): ${fmt(point.is_real ? point.gasto_real : point.gasto_proj)}`}</div>
+        {point.gapAcumulado != null && (
+          <div style={{ color: '#C487F6', fontWeight: 700, marginBottom: 4 }}>
+            {`${point.is_real ? 'Saldo al cierre' : 'Saldo proyectado'}: ${fmt(point.gapAcumulado)}`}
+          </div>
+        )}
+        <div style={{ color: '#10B981' }}>{`Disponible este mes: ${fmt(ingDisponible)}`}</div>
+        <div style={{ color: '#F87171' }}>{`Gastos del mes: ${fmt(gastoDisplay)}`}</div>
+        {point.opening != null && (
+          <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, marginTop: 4 }}>
+            {`Saldo anterior: ${fmt(point.opening)} + ingresos: ${fmt(point.ingMes)}`}
+          </div>
+        )}
       </div>
     )
   }
@@ -345,8 +400,11 @@ export default function Dashboard() {
 
       {/* ── Header ── */}
       <div className="dashboard-header-row">
-        <div>
-          <h1 className="page-title">{saludo}{nombre}</h1>
+        <div className="page-title-stack">
+          <div className="page-title-row">
+            <h1 className="page-title">{saludo}{nombre}</h1>
+            <span className={`subtle-plan-badge ${currentPlanBadgeClass}`}>Plan {currentPlanLabel}</span>
+          </div>
           <p className="page-subtitle">Tu mes, claro y sin vueltas.</p>
         </div>
         <span className="dashboard-mes-badge">
@@ -471,13 +529,26 @@ export default function Dashboard() {
             <div className="dashboard-card-copy">
               <h2 className="card-title">Proyeccion mensual</h2>
               <p className="dashboard-card-subtitle">
-                Historico real + proyeccion mensual de ingresos y gastos.
+                {getProjectionModeHelp(projectionMode)}
               </p>
             </div>
             <span className="dashboard-premium-badge">Premium</span>
           </div>
 
           <div className="dashboard-chart-toolbar" style={{ marginBottom: 12 }}>
+            <label className="dashboard-chart-control">
+              <span>Modo</span>
+              <select
+                className="dashboard-chart-select"
+                value={projectionMode}
+                onChange={(e) => void handleProjectionModeChange(e.target.value)}
+                disabled={projectionModeSaving || projectionLoading}
+              >
+                {PROJECTION_MODE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
             <label className="dashboard-chart-control">
               <span>Historico</span>
               <select
@@ -486,7 +557,8 @@ export default function Dashboard() {
                 onChange={(e) => {
                   const val = Number(e.target.value)
                   setPastMonths(val)
-                  loadAdvancedProjection(futureMonths, val)
+                  clearTimeout(projectionDebounceRef.current)
+                  projectionDebounceRef.current = setTimeout(() => loadAdvancedProjection(futureMonths, val), 300)
                 }}
               >
                 <option value={3}>3 meses</option>
@@ -503,7 +575,8 @@ export default function Dashboard() {
                 onChange={(e) => {
                   const val = Number(e.target.value)
                   setFutureMonths(val)
-                  loadAdvancedProjection(val, pastMonths)
+                  clearTimeout(projectionDebounceRef.current)
+                  projectionDebounceRef.current = setTimeout(() => loadAdvancedProjection(val, pastMonths), 300)
                 }}
               >
                 <option value={12}>1 año</option>
@@ -555,34 +628,44 @@ export default function Dashboard() {
                 const svg = advancedProjection?.smoothed_variable_gastos ?? 0
                 const projectedGap = latestProjectedPoint?.gapAcumulado ?? 0
                 const projectedGapLabel = latestProjectedPoint?.label ?? 'fin del horizonte'
+                const variableProjectionApplied = advancedProjection?.variable_projection_applied ?? true
+                const minVariableHistoryMonths = advancedProjection?.min_variable_history_months ?? 3
                 return (
                   <div className="dashboard-premium-meta">
                     <div className="dashboard-premium-stat">
-                        <span className="dashboard-premium-stat-label">Saldo acumulado</span>
+                      <span className="dashboard-premium-stat-label">Si sigues asi, terminarias con</span>
                       <strong className="dashboard-premium-stat-value" style={{ color: projectedGap >= 0 ? '#C487F6' : '#F87171' }}>
                         {fmt(projectedGap)}
                       </strong>
-                      <span className="dashboard-chart-note">Resultado neto estimado para {projectedGapLabel}</span>
+                      <span className="dashboard-chart-note">Saldo estimado al cierre de {projectedGapLabel}</span>
                     </div>
                     <div className="dashboard-premium-stat">
-                      <span className="dashboard-premium-stat-label">Saldo inicial</span>
+                      <span className="dashboard-premium-stat-label">Hoy partes con</span>
                       <strong className="dashboard-premium-stat-value">{fmt(advancedProjection?.starting_balance ?? 0)}</strong>
+                      <span className="dashboard-chart-note">Saldo con el que arranca esta proyeccion</span>
                     </div>
                     <div className="dashboard-premium-stat">
-                      <span className="dashboard-premium-stat-label">Puntuales prom. ingresos</span>
+                      <span className="dashboard-premium-stat-label">Ingresos extra promedio</span>
                       <strong className="dashboard-premium-stat-value" style={{ color: '#10B981' }}>
                         {fmt(svi)}
                       </strong>
                     </div>
                     <div className="dashboard-premium-stat">
-                      <span className="dashboard-premium-stat-label">Puntuales prom. gastos</span>
+                      <span className="dashboard-premium-stat-label">Gastos extra promedio</span>
                       <strong className="dashboard-premium-stat-value" style={{ color: '#F87171' }}>
                         {fmt(svg)}
                       </strong>
                     </div>
                     <div className="dashboard-premium-stat">
-                      <span className="dashboard-premium-stat-label">Historial de puntuales</span>
-                      <strong className="dashboard-premium-stat-value">{histMeses} {histMeses === 1 ? 'mes' : 'meses'}</strong>
+                      <span className="dashboard-premium-stat-label">Calculado usando</span>
+                      <strong className="dashboard-premium-stat-value">
+                        {histMeses} {histMeses === 1 ? 'mes con movimientos extra' : 'meses con movimientos extra'}
+                      </strong>
+                      <span className="dashboard-chart-note">
+                        {variableProjectionApplied
+                          ? 'Solo cuenta extras que entran en tu proyeccion'
+                          : `La parte variable necesita al menos ${minVariableHistoryMonths} meses`}
+                      </span>
                     </div>
                   </div>
                 )
@@ -590,15 +673,17 @@ export default function Dashboard() {
 
               {(() => {
                 const histMesesAviso = advancedProjection?.history_months_used ?? 0
-                if (histMesesAviso === 0) return (
+                const variableProjectionApplied = advancedProjection?.variable_projection_applied ?? true
+                const minVariableHistoryMonths = advancedProjection?.min_variable_history_months ?? 3
+                if (!variableProjectionApplied) return (
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 12, padding: '10px 14px', marginBottom: 14 }}>
                     <span style={{ fontSize: 16, lineHeight: 1 }}>⚠️</span>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#FBBF24', marginBottom: 2 }}>Parte variable con poco historial</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#FBBF24', marginBottom: 2 }}>La base fija ya esta proyectada</div>
                       <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
                         {histMesesAviso === 0
-                          ? 'Tus ingresos y gastos fijos estan proyectados correctamente. Agrega gastos o ingresos puntuales para afinar la parte variable.'
-                          : `Solo ${histMesesAviso} ${histMesesAviso === 1 ? 'mes' : 'meses'} de movimientos puntuales. Los fijos ya estan incluidos — con mas meses de puntuales la estimacion variable mejora.`}
+                          ? `Tus ingresos, gastos fijos y cuotas ya estan incluidos. La parte variable aun no entra porque necesitas ${minVariableHistoryMonths} meses con extras elegibles.`
+                          : `Tus ingresos, gastos fijos y cuotas ya estan incluidos. La parte variable aun no entra porque solo hay ${histMesesAviso} ${histMesesAviso === 1 ? 'mes' : 'meses'} con extras elegibles; necesitas ${minVariableHistoryMonths}.`}
                       </div>
                     </div>
                   </div>
@@ -606,11 +691,6 @@ export default function Dashboard() {
                 return null
               })()}
 
-              {advancedProjection?.starting_balance_applied && (
-                  <div style={{ marginBottom: 14, fontSize: 12, color: 'rgba(255,255,255,0.50)' }}>
-                   La grafica incorpora el saldo inicial como arrastre visible: saldo positivo suma a ingresos y saldo negativo carga a egresos.
-                  </div>
-                )}
 
               {advancedChartEmpty ? (
                 <div className="empty-state">
@@ -662,8 +742,8 @@ export default function Dashboard() {
                       formatter={(value, name) => {
                         if (value == null) return null
                         const labels = {
-                          ing_real: 'Ingresos (real)', ing_proj: 'Ingresos (proy.)',
-                            gasto_real: 'Egresos + cuotas (real)',  gasto_proj: 'Egresos + cuotas (proy.)',
+                          ing_real: 'Disponible (real)', ing_proj: 'Disponible (proy.)',
+                          gasto_real: 'Gastos del mes (real)', gasto_proj: 'Gastos del mes (proy.)',
                         }
                         return [fmt(value), labels[name] || name]
                       }}

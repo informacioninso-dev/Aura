@@ -10,7 +10,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import DateQuickActions from '../../components/ui/DateQuickActions'
 import Modal from '../../components/ui/Modal'
 import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../../utils/dateBounds'
-import { formatNumber } from '../../utils/formatters'
+import { formatAmount } from '../../utils/formatters'
 import '../../components/ui/app.css'
 
 const FRECUENCIAS = ['diario', 'semanal', 'quincenal', 'mensual', 'bimestral', 'trimestral', 'semestral', 'anual']
@@ -269,7 +269,7 @@ export default function Ingresos({ embedded = false }) {
             <p className="finance-panel-kpi">
               Total al mes:&nbsp;
               <span style={{ color: '#10B981', fontWeight: 700 }}>
-                ${formatNumber(total, { maximumFractionDigits: 0 })}
+                ${formatAmount(total)}
               </span>
             </p>
           </div>
@@ -284,7 +284,7 @@ export default function Ingresos({ embedded = false }) {
             <p className="page-subtitle">
               Total al mes:&nbsp;
               <span style={{ color: '#10B981', fontWeight: 700 }}>
-                ${formatNumber(total, { maximumFractionDigits: 0 })}
+                ${formatAmount(total)}
               </span>
             </p>
           </div>
@@ -350,7 +350,7 @@ export default function Ingresos({ embedded = false }) {
                         <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} style={{ cursor: 'pointer', accentColor: '#C487F6' }} />
                       </td>
                       <td style={{ fontWeight: 600 }}>{item.descripcion}</td>
-                      <td className="table-amount positive">${formatNumber(parseFloat(item.monto))}</td>
+                      <td className="table-amount positive">${formatAmount(parseFloat(item.monto))}</td>
                       <td><span className="badge badge-gray" style={{ textTransform: 'capitalize' }}>{item.frecuencia}</span></td>
                       <td>{item.fecha_inicio}</td>
                       <td>{item.fecha_fin || '-'}</td>
@@ -465,7 +465,7 @@ export default function Ingresos({ embedded = false }) {
 
             <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
               <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>Actual: </span>
-              {versioningItem.descripcion} — ${formatNumber(parseFloat(versioningItem.monto))} {versioningItem.frecuencia}
+              {versioningItem.descripcion} — ${formatAmount(parseFloat(versioningItem.monto))} {versioningItem.frecuencia}
             </div>
 
             <div className="form-modal-group">

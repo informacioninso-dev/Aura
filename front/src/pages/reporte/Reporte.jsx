@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import api from '../../api/client'
 import { getApiErrorMessage } from '../../api/errors'
 import FeedbackAlert from '../../components/ui/FeedbackAlert'
-import { formatNumber } from '../../utils/formatters'
+import { formatAmount, formatNumber } from '../../utils/formatters'
 import '../../components/ui/app.css'
 
 const MESES = [
@@ -253,10 +253,10 @@ export default function Reporte() {
                           {categoria.icono} {categoria.categoria}
                         </span>
                         <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.60)' }}>
-                          ${formatNumber(Number(categoria.total))}
+                          ${formatAmount(Number(categoria.total))}
                           {categoria.limite != null && (
                             <span style={{ fontSize: 11, marginLeft: 6, color: 'rgba(255,255,255,0.35)' }}>
-                              / ${formatNumber(Number(categoria.limite))}
+                              / ${formatAmount(Number(categoria.limite))}
                             </span>
                           )}
                         </span>
@@ -302,7 +302,7 @@ export default function Reporte() {
                         <td style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>{gasto.categoria}</td>
                         <td style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>{gasto.fecha}</td>
                         <td style={{ textAlign: 'right', fontWeight: 600, color: '#F87171' }}>
-                          ${formatNumber(Number(gasto.monto))}
+                          ${formatAmount(Number(gasto.monto))}
                         </td>
                       </tr>
                     ))}
@@ -324,9 +324,10 @@ export default function Reporte() {
 }
 
 function SummaryCard({ label, value, color, prefix = '', suffix = '', signed = false }) {
+  const formatter = prefix === '$' ? formatAmount : formatNumber
   const display = signed
-    ? `${value >= 0 ? '+' : ''}${prefix}${formatNumber(Number(value))}${suffix}`
-    : `${prefix}${formatNumber(Number(value))}${suffix}`
+    ? `${value >= 0 ? '+' : ''}${prefix}${formatter(Number(value))}${suffix}`
+    : `${prefix}${formatter(Number(value))}${suffix}`
 
   return (
     <div className="card" style={{ textAlign: 'center' }}>

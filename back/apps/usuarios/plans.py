@@ -1,6 +1,14 @@
 from django.utils import timezone
 
-from .models import Feature, Plan, PlanFeature, UserPlanAssignment
+from .models import (
+    Feature,
+    Plan,
+    PlanFeature,
+    UserPlanAssignment,
+    PROJECTION_MODE_AUTOMATICA,
+    PROJECTION_MODE_PERSONALIZADA,
+    PROJECTION_MODE_SIMPLE,
+)
 
 
 FEATURE_IMPORT_MAX_ROWS = 'import_max_rows'
@@ -53,6 +61,12 @@ FEATURE_DEFAULTS = {
     FEATURE_PROJECTION_MONTHS: 6,
     FEATURE_ADVANCED_PROJECTION_ENABLED: False,
     FEATURE_ADVANCED_PROJECTION_MONTHS: 60,
+}
+
+VALID_PROJECTION_MODES = {
+    PROJECTION_MODE_AUTOMATICA,
+    PROJECTION_MODE_SIMPLE,
+    PROJECTION_MODE_PERSONALIZADA,
 }
 
 
@@ -147,6 +161,22 @@ def get_user_feature_access(user):
 def get_user_feature_value(user, feature_code, default=None):
     fallback = FEATURE_DEFAULTS.get(feature_code, default)
     return get_user_feature_access(user).get(feature_code, fallback)
+
+
+def get_user_projection_mode(user):
+    if not getattr(user, 'is_authenticated', False):
+        return PROJECTION_MODE_SIMPLE
+
+    has_advanced_projection = bool(
+        get_user_feature_value(user, FEATURE_ADVANCED_PROJECTION_ENABLED, default=False)
+    )
+    if not has_advanced_projection:
+        return PROJECTION_MODE_SIMPLE
+
+    mode = getattr(user, 'projection_mode', PROJECTION_MODE_AUTOMATICA) or PROJECTION_MODE_AUTOMATICA
+    if mode not in VALID_PROJECTION_MODES:
+        return PROJECTION_MODE_AUTOMATICA
+    return mode
 
 
 def assign_plan_to_user(*, user, plan, assigned_by=None, notes=''):

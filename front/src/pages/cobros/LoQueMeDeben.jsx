@@ -9,7 +9,7 @@ import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import ListControls from '../../components/ui/ListControls'
 import Modal from '../../components/ui/Modal'
 import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../../utils/dateBounds'
-import { formatNumber } from '../../utils/formatters'
+import { formatAmount } from '../../utils/formatters'
 import '../../components/ui/app.css'
 
 function getTodayDate() {
@@ -179,12 +179,12 @@ export default function LoQueMeDeben() {
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-label">Te deben hoy</div>
-          <div className="stat-value lila">${formatNumber(totalPendiente)}</div>
+          <div className="stat-value lila">${formatAmount(totalPendiente)}</div>
           <div className="stat-sub">Lo que todavia no te han pagado.</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Ya te devolvieron</div>
-          <div className="stat-value green">${formatNumber(totalCobrado)}</div>
+          <div className="stat-value green">${formatAmount(totalCobrado)}</div>
           <div className="stat-sub">Abonos y pagos que ya recibiste.</div>
         </div>
         <div className="stat-card">
@@ -252,9 +252,9 @@ export default function LoQueMeDeben() {
                           {item.fecha_recordatorio ? `Recordar: ${item.fecha_recordatorio}` : 'Sin recordatorio'}
                         </div>
                       </td>
-                      <td className="table-amount">${formatNumber(Number(item.monto_total || 0))}</td>
-                      <td className="table-amount positive">${formatNumber(Number(item.monto_cobrado || 0))}</td>
-                      <td className="table-amount negative">${formatNumber(Number(item.saldo_pendiente || 0))}</td>
+                      <td className="table-amount">${formatAmount(Number(item.monto_total || 0))}</td>
+                      <td className="table-amount positive">${formatAmount(Number(item.monto_cobrado || 0))}</td>
+                      <td className="table-amount negative">${formatAmount(Number(item.saldo_pendiente || 0))}</td>
                       <td><span className={getBadgeClass(item.estado)}>{getBadgeLabel(item.estado)}</span></td>
                       <td className="table-actions-cell">
                         <button className="btn-icon edit" onClick={() => openEdit(item)}><Pencil size={15} /></button>

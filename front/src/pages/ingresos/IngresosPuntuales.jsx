@@ -8,8 +8,9 @@ import ListControls from '../../components/ui/ListControls'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import DateQuickActions from '../../components/ui/DateQuickActions'
 import Modal from '../../components/ui/Modal'
+import { useAuth } from '../../context/useAuth'
 import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../../utils/dateBounds'
-import { formatNumber } from '../../utils/formatters'
+import { formatAmount } from '../../utils/formatters'
 import '../../components/ui/app.css'
 
 function getTodayDate() {
@@ -26,10 +27,12 @@ function buildEmptyForm() {
     monto: '',
     fecha: getTodayDate(),
     notas: '',
+    incluir_en_proyeccion: true,
   }
 }
 
 export default function IngresosPuntuales({ embedded = false }) {
+  const { user } = useAuth()
   const [items, setItems] = useState([])
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState(buildEmptyForm())
@@ -45,6 +48,7 @@ export default function IngresosPuntuales({ embedded = false }) {
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const canCustomizeProjection = Boolean(user?.feature_access?.advanced_projection_enabled)
 
   useEffect(() => { fetchItems() }, [])
 
@@ -70,6 +74,7 @@ export default function IngresosPuntuales({ embedded = false }) {
       monto: item.monto,
       fecha: item.fecha,
       notas: item.notas || '',
+      incluir_en_proyeccion: item.incluir_en_proyeccion !== false,
     })
     setEditId(item.id)
     setShowAdvanced(true)
@@ -173,6 +178,7 @@ export default function IngresosPuntuales({ embedded = false }) {
   const start = (safePage - 1) * pageSize
   const paginated = filtered.slice(start, start + pageSize)
   const pageAllSelected = paginated.length > 0 && paginated.every((item) => selectedIds.has(item.id))
+  const projectionStatusLabel = (item) => (item.incluir_en_proyeccion === false ? 'Fuera de proyeccion' : 'En proyeccion')
 
   return (
     <div>
@@ -183,7 +189,7 @@ export default function IngresosPuntuales({ embedded = false }) {
             <p className="finance-panel-kpi">
               Total cargado:&nbsp;
               <span style={{ color: '#10B981', fontWeight: 700 }}>
-                ${formatNumber(total, { maximumFractionDigits: 0 })}
+                ${formatAmount(total)}
               </span>
             </p>
           </div>
@@ -196,7 +202,7 @@ export default function IngresosPuntuales({ embedded = false }) {
             <p className="page-subtitle">
               Total cargado:&nbsp;
               <span style={{ color: '#10B981', fontWeight: 700 }}>
-                ${formatNumber(total, { maximumFractionDigits: 0 })}
+                ${formatAmount(total)}
               </span>
             </p>
           </div>
@@ -258,10 +264,19 @@ export default function IngresosPuntuales({ embedded = false }) {
                       <td>
                         <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} />
                       </td>
-                      <td style={{ fontWeight: 600 }}>{item.descripcion}</td>
+                      <td>
+                        <div className="table-title-stack">
+                          <span style={{ fontWeight: 600 }}>{item.descripcion}</span>
+                          {canCustomizeProjection && (
+                            <span className={`table-row-badge ${item.incluir_en_proyeccion === false ? 'is-muted' : 'is-active'}`}>
+                              {projectionStatusLabel(item)}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td>{item.fecha}</td>
                       <td style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>{item.notas || '-'}</td>
-                      <td className="table-amount positive">${formatNumber(parseFloat(item.monto))}</td>
+                      <td className="table-amount positive">${formatAmount(parseFloat(item.monto))}</td>
                       <td className="table-actions-cell">
                         <button className="btn-icon" onClick={() => openEdit(item)}><Pencil size={15} /></button>
                         <button className="btn-icon danger" disabled={deletingId === item.id} onClick={() => askDelete(item.id)}>
@@ -300,8 +315,14 @@ export default function IngresosPuntuales({ embedded = false }) {
               onClick={() => setShowAdvanced((v) => !v)}
               style={{ width: '100%', marginBottom: 14 }}
             >
-              {showAdvanced ? 'Ocultar opciones' : 'Ver mas opciones'}
+              {showAdvanced ? 'Ocultar opciones' : canCustomizeProjection ? 'Ver fecha, notas y proyeccion' : 'Ver mas opciones'}
             </button>
+          )}
+
+          {!editId && !showAdvanced && canCustomizeProjection && (
+            <p style={{ marginTop: -4, marginBottom: 14, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
+              Aqui tambien puedes decidir si este extra entra o no en tu proyeccion personalizada.
+            </p>
           )}
 
           {(editId || showAdvanced) && (
@@ -317,6 +338,24 @@ export default function IngresosPuntuales({ embedded = false }) {
                 <label className="form-modal-label">Notas <span>(opcional)</span></label>
                 <textarea className="form-modal-input" rows={2} placeholder="Detalles adicionales..." value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} style={{ resize: 'none', height: 'auto' }} />
               </div>
+              {canCustomizeProjection && (
+                <div className="form-modal-group" style={{ marginTop: -2 }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={form.incluir_en_proyeccion}
+                      onChange={(e) => setForm({ ...form, incluir_en_proyeccion: e.target.checked })}
+                      style={{ marginTop: 3, accentColor: '#C487F6' }}
+                    />
+                    <div>
+                      <div className="form-modal-label" style={{ marginBottom: 4 }}>Considerar en mi proyeccion futura</div>
+                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.45 }}>
+                        Se usa cuando eliges el modo Personalizada. Dejalo activo si este extra podria repetirse; apagalo para bonos u otros casos especiales.
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              )}
             </>
           )}
 

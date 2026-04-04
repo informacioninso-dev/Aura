@@ -75,6 +75,7 @@ class IngresoPuntual(models.Model):
     monto      = models.DecimalField(max_digits=12, decimal_places=2)
     fecha      = models.DateField()
     notas      = models.TextField(blank=True)
+    incluir_en_proyeccion = models.BooleanField(default=True)
     creado_en  = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -120,6 +121,7 @@ class GastoNoCorriente(models.Model):
     monto      = models.DecimalField(max_digits=12, decimal_places=2)
     fecha      = models.DateField()
     notas      = models.TextField(blank=True)
+    incluir_en_proyeccion = models.BooleanField(default=True)
     creado_en  = models.DateTimeField(auto_now_add=True)
 
     class Meta:
