@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
+from django.conf import settings
 from django.test import override_settings
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
@@ -15,6 +16,13 @@ User = get_user_model()
 
 
 class TestUsuarioAPI(APITestCase):
+    def login_user(self, user, password='clave12345'):
+        return self.client.post(
+            '/api/usuarios/login/',
+            {'email': user.email, 'password': password},
+            format='json',
+        )
+
     def test_registro_crea_usuario_y_hashea_password(self):
         payload = {
             'email': 'nuevo@example.com',
@@ -160,6 +168,97 @@ class TestUsuarioAPI(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('current_password', response.data)
+
+    def test_login_entrega_access_y_cookie_refresh_http_only(self):
+        user = User.objects.create_user(
+            email='logincookie@example.com',
+            username='logincookie',
+            password='clave12345',
+        )
+
+        response = self.login_user(user)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', response.data)
+        self.assertNotIn('refresh', response.data)
+        cookie = response.cookies[settings.AUTH_REFRESH_COOKIE_NAME]
+        self.assertTrue(cookie.value)
+        self.assertTrue(cookie['httponly'])
+        self.assertEqual(cookie['path'], settings.AUTH_REFRESH_COOKIE_PATH)
+
+    def test_refresh_cookie_renueva_access_y_rota_refresh(self):
+        user = User.objects.create_user(
+            email='refreshcookie@example.com',
+            username='refreshcookie',
+            password='clave12345',
+        )
+
+        login_response = self.login_user(user)
+        previous_refresh = login_response.cookies[settings.AUTH_REFRESH_COOKIE_NAME].value
+
+        response = self.client.post('/api/usuarios/token/refresh/', {}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', response.data)
+        self.assertIn(settings.AUTH_REFRESH_COOKIE_NAME, response.cookies)
+        self.assertNotEqual(response.cookies[settings.AUTH_REFRESH_COOKIE_NAME].value, previous_refresh)
+
+    def test_logout_limpia_cookie_refresh(self):
+        user = User.objects.create_user(
+            email='logoutcookie@example.com',
+            username='logoutcookie',
+            password='clave12345',
+        )
+        self.login_user(user)
+
+        response = self.client.post('/api/usuarios/logout/', {}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn(settings.AUTH_REFRESH_COOKIE_NAME, response.cookies)
+        self.assertEqual(response.cookies[settings.AUTH_REFRESH_COOKIE_NAME].value, '')
+
+    def test_password_change_invalida_token_actual(self):
+        user = User.objects.create_user(
+            email='invalidatechange@example.com',
+            username='invalidatechange',
+            password='clave12345',
+        )
+        login_response = self.login_user(user)
+        access_token = login_response.data['access']
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
+
+        response = self.client.post(
+            '/api/usuarios/password/change/',
+            {'current_password': 'clave12345', 'new_password': 'RotacionSegura987$'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        user.refresh_from_db()
+        self.assertEqual(user.auth_token_version, 1)
+        stale_response = self.client.get('/api/usuarios/perfil/')
+        self.assertEqual(stale_response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_password_reset_invalida_refresh_cookie_previo(self):
+        user = User.objects.create_user(
+            email='invalidatereset@example.com',
+            username='invalidatereset',
+            password='clave12345',
+        )
+        self.login_user(user)
+        user.refresh_from_db()
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+
+        reset_response = self.client.post(
+            '/api/usuarios/password/reset/',
+            {'uid': uid, 'token': token, 'new_password': 'RotacionSegura987$'},
+            format='json',
+        )
+
+        self.assertEqual(reset_response.status_code, status.HTTP_200_OK)
+        refresh_response = self.client.post('/api/usuarios/token/refresh/', {}, format='json')
+        self.assertEqual(refresh_response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
 class TestSuperAdminAPI(APITestCase):

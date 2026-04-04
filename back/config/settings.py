@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'apps.usuarios',
     'apps.finanzas',
@@ -70,6 +71,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'apps.usuarios.middleware.SecurityHeadersMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -216,6 +218,13 @@ SECURE_HSTS_PRELOAD = env_bool('DJANGO_SECURE_HSTS_PRELOAD', not DEBUG)
 SECURE_CONTENT_TYPE_NOSNIFF = env_bool('DJANGO_SECURE_CONTENT_TYPE_NOSNIFF', True)
 SECURE_REFERRER_POLICY = os.getenv('DJANGO_SECURE_REFERRER_POLICY', 'same-origin')
 X_FRAME_OPTIONS = os.getenv('DJANGO_X_FRAME_OPTIONS', 'DENY')
+AUTH_REFRESH_COOKIE_NAME = os.getenv('DJANGO_AUTH_REFRESH_COOKIE_NAME', 'aura_refresh')
+AUTH_REFRESH_COOKIE_PATH = os.getenv('DJANGO_AUTH_REFRESH_COOKIE_PATH', '/api/usuarios/')
+AUTH_REFRESH_COOKIE_SECURE = env_bool('DJANGO_AUTH_REFRESH_COOKIE_SECURE', not DEBUG)
+AUTH_REFRESH_COOKIE_SAMESITE = os.getenv(
+    'DJANGO_AUTH_REFRESH_COOKIE_SAMESITE',
+    'Lax' if DEBUG else 'Strict',
+)
 
 # CORS
 CORS_ALLOWED_ORIGINS = env_list(
@@ -230,7 +239,7 @@ CORS_ALLOWED_ORIGINS = env_list(
 # DRF
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'apps.usuarios.jwt_auth.AuraJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -243,12 +252,30 @@ REST_FRAMEWORK = {
         'auth_register': os.getenv('DJANGO_RATE_AUTH_REGISTER', '20/min'),
         'auth_password_recovery': os.getenv('DJANGO_RATE_AUTH_PASSWORD_RECOVERY', '8/min'),
         'auth_password_change': os.getenv('DJANGO_RATE_AUTH_PASSWORD_CHANGE', '20/min'),
+        'auth_token_refresh': os.getenv('DJANGO_RATE_AUTH_TOKEN_REFRESH', '20/min'),
         'superadmin_ops': os.getenv('DJANGO_RATE_SUPERADMIN_OPS', '120/min'),
     },
 }
 
 # JWT
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=8),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=int(os.getenv('DJANGO_JWT_ACCESS_MINUTES', '20'))),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=int(os.getenv('DJANGO_JWT_REFRESH_DAYS', '10'))),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
 }
+
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; "
+    "base-uri 'self'; "
+    "object-src 'none'; "
+    "frame-ancestors 'none'; "
+    "script-src 'self' http://localhost:5173 http://127.0.0.1:5173 http://localhost:5174 http://127.0.0.1:5174; "
+    "style-src 'self' 'unsafe-inline' http://localhost:5173 http://127.0.0.1:5173 http://localhost:5174 http://127.0.0.1:5174; "
+    "img-src 'self' data: blob: https:; "
+    "font-src 'self' data:; "
+    "connect-src 'self' http://localhost:5173 http://127.0.0.1:5173 http://localhost:5174 http://127.0.0.1:5174 ws://localhost:5173 ws://127.0.0.1:5173 ws://localhost:5174 ws://127.0.0.1:5174 https://aura.binnso.com; "
+    "form-action 'self'"
+)
+PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=()'

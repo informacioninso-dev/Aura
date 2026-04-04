@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { CheckCircle, User } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 import { getApiErrorMessage } from '../../api/errors'
 import { useAuth } from '../../context/useAuth'
@@ -10,7 +11,8 @@ import '../../components/ui/app.css'
 const MONEDAS = ['USD', 'CLP', 'EUR', 'ARS', 'COP', 'MXN', 'PEN']
 
 export default function Perfil() {
-  const { user, fetchPerfil, changePassword } = useAuth()
+  const { user, fetchPerfil, changePassword, logout } = useAuth()
+  const navigate = useNavigate()
   const currentPlanLabel = user?.plan?.slug === 'pro' ? 'Pro' : 'Free'
   const currentPlanBadgeClass = user?.plan?.slug === 'pro' ? 'is-pro' : 'is-free'
 
@@ -68,6 +70,12 @@ export default function Perfil() {
       })
       setPassOk(response?.detail || 'Contrasena actualizada correctamente.')
       setPassForm({ current_password: '', new_password: '', confirm_password: '' })
+      if (response?.force_relogin) {
+        window.setTimeout(async () => {
+          await logout()
+          navigate('/login')
+        }, 1200)
+      }
     } catch (err) {
       setPassError(getApiErrorMessage(err, 'No se pudo actualizar la clave.'))
     } finally {

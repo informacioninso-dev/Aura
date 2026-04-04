@@ -23,6 +23,7 @@ class Usuario(AbstractUser):
     # Campos adicionales para control financiero.
     email = models.EmailField('Correo electronico', unique=True)
     moneda_preferida = models.CharField(max_length=3, default='USD')
+    auth_token_version = models.PositiveIntegerField(default=0)
     projection_mode = models.CharField(
         max_length=16,
         choices=PROJECTION_MODE_CHOICES,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { clearAuthTokens, getAccessToken, setAuthTokens } from '../api/authStorage'
-import api from '../api/client'
+import { clearAuthTokens, setAccessToken } from '../api/authStorage'
+import api, { refreshAccessToken } from '../api/client'
 import AuthContext from './auth-context'
 
 export function AuthProvider({ children }) {
@@ -8,10 +8,19 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const token = getAccessToken()
-    if (token) fetchPerfil()
-    else setLoading(false)
+    bootstrapAuth()
   }, [])
+
+  async function bootstrapAuth() {
+    try {
+      await refreshAccessToken()
+      await fetchPerfil()
+    } catch {
+      clearAuthTokens()
+      setUser(null)
+      setLoading(false)
+    }
+  }
 
   async function fetchPerfil() {
     try {
@@ -27,7 +36,7 @@ export function AuthProvider({ children }) {
 
   async function login(email, password) {
     const { data } = await api.post('/usuarios/login/', { email, password })
-    setAuthTokens(data)
+    setAccessToken(data.access)
     await fetchPerfil()
   }
 
@@ -51,9 +60,19 @@ export function AuthProvider({ children }) {
     return data
   }
 
-  function logout() {
-    clearAuthTokens()
-    setUser(null)
+  async function logout() {
+    try {
+      await api.post(
+        '/usuarios/logout/',
+        null,
+        { headers: { 'X-Aura-Auth-Flow': 'logout' } },
+      )
+    } catch {
+      // Even if the backend session is already stale, clear the local auth state.
+    } finally {
+      clearAuthTokens()
+      setUser(null)
+    }
   }
 
   return (

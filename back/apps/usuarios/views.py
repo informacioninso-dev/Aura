@@ -15,12 +15,23 @@ from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from rest_framework import generics, permissions, status, throttling
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.finanzas.models import Diferido, GastoCorriente, GastoNoCorriente, Ingreso, IngresoPuntual, Notificacion
 from apps.simulador.models import Simulacion
+from .jwt_auth import (
+    AuraTokenObtainPairSerializer,
+    clear_refresh_cookie,
+    enforce_token_version,
+    get_token_user,
+    invalidate_user_tokens,
+    set_refresh_cookie,
+)
 from .models import AdminActionLog, EmailServerConfig, Feature, Plan, PlanFeature
 from .plans import assign_plan_to_user, get_default_plan, sync_feature_catalog
 from .security import decrypt_secret
@@ -196,10 +207,69 @@ class IsSuperAdmin(permissions.BasePermission):
         return bool(user and user.is_authenticated and user.is_superuser)
 
 
-class LoginTokenObtainPairView(TokenObtainPairView):
+class LoginTokenObtainPairView(APIView):
     permission_classes = (permissions.AllowAny,)
     throttle_classes = (throttling.ScopedRateThrottle,)
     throttle_scope = 'auth_login'
+
+    def post(self, request):
+        serializer = AuraTokenObtainPairSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        refresh_token = serializer.validated_data['refresh']
+        access_token = serializer.validated_data['access']
+        response = Response({'access': access_token}, status=status.HTTP_200_OK)
+        set_refresh_cookie(response, refresh_token)
+        return response
+
+
+class RefreshCookieTokenView(APIView):
+    permission_classes = (permissions.AllowAny,)
+    throttle_classes = (throttling.ScopedRateThrottle,)
+    throttle_scope = 'auth_token_refresh'
+
+    def post(self, request):
+        refresh_token = request.COOKIES.get(settings.AUTH_REFRESH_COOKIE_NAME)
+        if not refresh_token:
+            return Response({'detail': 'No hay sesion para renovar.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        try:
+            raw_refresh = RefreshToken(refresh_token)
+            user = get_token_user(raw_refresh)
+            enforce_token_version(user, raw_refresh)
+            serializer = TokenRefreshSerializer(data={'refresh': refresh_token})
+            serializer.is_valid(raise_exception=True)
+        except (AuthenticationFailed, InvalidToken, TokenError):
+            response = Response(
+                {'detail': 'No se pudo renovar la sesion. Vuelve a iniciar sesion.'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+            clear_refresh_cookie(response)
+            return response
+
+        response = Response({'access': serializer.validated_data['access']}, status=status.HTTP_200_OK)
+        new_refresh_token = serializer.validated_data.get('refresh')
+        if new_refresh_token:
+            set_refresh_cookie(response, new_refresh_token)
+        else:
+            set_refresh_cookie(response, refresh_token)
+        return response
+
+
+class LogoutView(APIView):
+    permission_classes = (permissions.AllowAny,)
+
+    def post(self, request):
+        refresh_token = request.COOKIES.get(settings.AUTH_REFRESH_COOKIE_NAME)
+        if refresh_token:
+            try:
+                RefreshToken(refresh_token).blacklist()
+            except TokenError:
+                pass
+
+        response = Response({'detail': 'Sesion cerrada correctamente.'}, status=status.HTTP_200_OK)
+        clear_refresh_cookie(response)
+        return response
 
 
 class RegistroView(generics.CreateAPIView):
@@ -269,7 +339,14 @@ class PasswordResetConfirmView(APIView):
 
         user.set_password(new_password)
         user.save(update_fields=['password'])
-        return Response({'detail': 'Contrasena restablecida correctamente.'}, status=status.HTTP_200_OK)
+        invalidate_user_tokens(user)
+        return Response(
+            {
+                'detail': 'Contrasena restablecida correctamente. Inicia sesion nuevamente.',
+                'force_relogin': True,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class PasswordChangeView(APIView):
@@ -283,7 +360,14 @@ class PasswordChangeView(APIView):
         user = request.user
         user.set_password(serializer.validated_data['new_password'])
         user.save(update_fields=['password'])
-        return Response({'detail': 'Contrasena actualizada correctamente.'}, status=status.HTTP_200_OK)
+        invalidate_user_tokens(user)
+        return Response(
+            {
+                'detail': 'Contrasena actualizada correctamente. Inicia sesion nuevamente.',
+                'force_relogin': True,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class SuperAdminDashboardView(APIView):
@@ -653,16 +737,19 @@ class SuperAdminResetPasswordView(APIView):
         serializer.is_valid(raise_exception=True)
 
         explicit_password = serializer.validated_data.get('new_password')
+        force_logout = serializer.validated_data.get('force_logout', True)
         temporary_password = explicit_password or _generate_temporary_password()
         target.set_password(temporary_password)
         target.save(update_fields=['password'])
+        if force_logout:
+            invalidate_user_tokens(target)
 
         _admin_log(
             actor=request.user,
             action='user_password_reset',
             request=request,
             target_user=target,
-            details={'manual_password': bool(explicit_password)},
+            details={'manual_password': bool(explicit_password), 'force_logout': force_logout},
         )
 
         return Response({

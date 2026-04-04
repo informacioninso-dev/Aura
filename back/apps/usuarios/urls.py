@@ -1,12 +1,11 @@
 from django.urls import path
-from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     LoginTokenObtainPairView,
-    RegistroView,
-    PerfilView,
     PasswordForgotView,
-    PasswordResetConfirmView,
     PasswordChangeView,
+    PasswordResetConfirmView,
+    PerfilView,
+    RefreshCookieTokenView,
     SuperAdminAuditView,
     SuperAdminDashboardView,
     SuperAdminEmailConfigView,
@@ -19,12 +18,15 @@ from .views import (
     SuperAdminUsersView,
     SuperAdminUserPlanView,
     SuperAdminUserStatusView,
+    LogoutView,
+    RegistroView,
 )
 
 urlpatterns = [
     path('registro/', RegistroView.as_view(), name='registro'),
     path('login/', LoginTokenObtainPairView.as_view(), name='login'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('token/refresh/', RefreshCookieTokenView.as_view(), name='token_refresh'),
+    path('logout/', LogoutView.as_view(), name='logout'),
     path('perfil/', PerfilView.as_view(), name='perfil'),
     path('password/forgot/', PasswordForgotView.as_view(), name='password_forgot'),
     path('password/reset/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
