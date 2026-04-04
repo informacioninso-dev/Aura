@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { useAuth } from '../../context/useAuth'
 import { getApiErrorMessage } from '../../api/errors'
@@ -8,7 +8,7 @@ import './auth.css'
 
 export default function ResetPassword() {
   const navigate = useNavigate()
-  const { resetPassword } = useAuth()
+  const { resetPassword, user, loading: authLoading } = useAuth()
   const [params] = useSearchParams()
   const uid = params.get('uid') || ''
   const token = params.get('token') || ''
@@ -64,14 +64,20 @@ export default function ResetPassword() {
     )
   }
 
+  if (!authLoading && user) {
+    return <Navigate to="/dashboard" replace />
+  }
+
+  const brandTarget = user ? '/dashboard' : '/'
+
   return (
     <div className="auth-page">
       <div className="auth-box">
-        <div className="auth-logo">
+        <Link to={brandTarget} className="auth-logo auth-logo-link" aria-label={user ? 'Ir a mi dashboard' : 'Volver al inicio'}>
           <BrandMark className="auth-logo-icon" />
           <div className="auth-logo-name">AURA</div>
           <div className="auth-logo-tag">Define una nueva contraseña segura.</div>
-        </div>
+        </Link>
 
         <div className="auth-card">
           <h2 className="auth-title">Restablecer contraseña</h2>

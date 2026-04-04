@@ -2,6 +2,7 @@ import { ArrowRight, BarChart3, Calculator, Check, Wallet } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import BrandMark from '../../components/brand/BrandMark'
+import { useAuth } from '../../context/useAuth'
 import './Home.css'
 
 const bars = [72, 80, 68, 88, 84, 70, 90, 82, 95, 78, 88, 100]
@@ -40,6 +41,23 @@ const simRows = [
 ]
 
 export default function Home() {
+  const { user } = useAuth()
+  const isLoggedIn = Boolean(user)
+  const topPrimaryTarget = isLoggedIn ? '/dashboard' : '/login'
+  const topPrimaryLabel = isLoggedIn ? 'Mi dinero' : 'Ingresar'
+  const topSecondaryTarget = isLoggedIn ? '/perfil' : '/registro'
+  const topSecondaryLabel = isLoggedIn ? 'Mi perfil' : 'Crear cuenta'
+  const heroPrimaryTarget = isLoggedIn ? '/dashboard' : '/registro'
+  const heroPrimaryLabel = isLoggedIn ? 'Ir a mi dashboard' : 'Crear cuenta'
+  const heroSecondaryTarget = isLoggedIn ? '/simulador' : '/login'
+  const heroSecondaryLabel = isLoggedIn ? 'Abrir simulador' : 'Ya tengo cuenta'
+  const simulatorCtaTarget = isLoggedIn ? '/simulador' : '/registro'
+  const simulatorCtaLabel = isLoggedIn ? 'Abrir simulador' : 'Simular gratis'
+  const footerPrimaryTarget = isLoggedIn ? '/dashboard' : '/registro'
+  const footerPrimaryLabel = isLoggedIn ? 'Volver a mi dashboard' : 'Crear cuenta'
+  const footerSecondaryTarget = isLoggedIn ? '/perfil' : '/login'
+  const footerSecondaryLabel = isLoggedIn ? 'Ir a mi perfil' : 'Inicia sesion'
+
   return (
     <div className="home">
       <nav className="nav">
@@ -52,8 +70,8 @@ export default function Home() {
             </div>
           </Link>
           <div className="nav-links">
-            <Link to="/login" className="btn-ghost">Ingresar</Link>
-            <Link to="/registro" className="btn-dark">Crear cuenta</Link>
+            <Link to={topPrimaryTarget} className="btn-ghost">{topPrimaryLabel}</Link>
+            <Link to={topSecondaryTarget} className="btn-dark">{topSecondaryLabel}</Link>
           </div>
         </div>
       </nav>
@@ -75,11 +93,11 @@ export default function Home() {
               Sin planillas. Sin vueltas.
             </p>
             <div className="hero-actions">
-              <Link to="/registro" className="btn-primary">
-                Crear cuenta <ArrowRight size={16} />
+              <Link to={heroPrimaryTarget} className="btn-primary">
+                {heroPrimaryLabel} <ArrowRight size={16} />
               </Link>
-              <Link to="/login" className="btn-secondary-link">
-                Ya tengo cuenta
+              <Link to={heroSecondaryTarget} className="btn-secondary-link">
+                {heroSecondaryLabel}
               </Link>
             </div>
             <p className="hero-note">
@@ -174,8 +192,8 @@ export default function Home() {
             <p className="sim-desc">
               Prueba montos, tasas y plazos antes de comprometerte.
             </p>
-            <Link to="/registro" className="btn-lila">
-              Simular gratis <ArrowRight size={16} />
+            <Link to={simulatorCtaTarget} className="btn-lila">
+              {simulatorCtaLabel} <ArrowRight size={16} />
             </Link>
           </div>
 
@@ -209,19 +227,19 @@ export default function Home() {
             Crea tu cuenta y entiende tu panorama sin enredarte.
           </p>
           <Link
-            to="/registro"
+            to={footerPrimaryTarget}
             className="btn-primary"
             style={{ fontSize: 16, padding: '15px 32px' }}
           >
-            Crear cuenta <ArrowRight size={16} />
+            {footerPrimaryLabel} <ArrowRight size={16} />
           </Link>
           <p className="cta-sub">
-            Ya tienes cuenta?{' '}
+            {isLoggedIn ? 'Acceso rapido:' : 'Ya tienes cuenta?'}{' '}
             <Link
-              to="/login"
+              to={footerSecondaryTarget}
               style={{ color: '#C487F6', textDecoration: 'none', fontWeight: 600 }}
             >
-              Inicia sesion
+              {footerSecondaryLabel}
             </Link>
           </p>
         </div>
@@ -234,8 +252,8 @@ export default function Home() {
             <span className="footer-brand">AURA - Tu plata mas clara.</span>
           </Link>
           <div className="footer-links">
-            <Link to="/login" className="footer-link">Ingresar</Link>
-            <Link to="/registro" className="footer-link">Registrarse</Link>
+            <Link to={topPrimaryTarget} className="footer-link">{topPrimaryLabel}</Link>
+            <Link to={topSecondaryTarget} className="footer-link">{topSecondaryLabel}</Link>
           </div>
           <span className="footer-copy">© {new Date().getFullYear()} Aura</span>
         </div>

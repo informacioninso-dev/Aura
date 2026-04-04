@@ -51,6 +51,23 @@
   text-align: center;
   margin-bottom: 32px;
 }
+.auth-logo-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+.auth-logo-link:hover .auth-logo-name {
+  color: #E9D5FF;
+}
+.auth-logo-link:hover .auth-logo-tag {
+  color: #E9D5FF;
+}
+.auth-logo-link:focus-visible {
+  outline: 2px solid rgba(196,135,246,0.75);
+  outline-offset: 8px;
+  border-radius: 18px;
+}
 .auth-logo-icon {
   width: 56px;
   height: 56px;

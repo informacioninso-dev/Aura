@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 
 import { getApiErrorMessage } from '../../api/errors'
 import BrandMark from '../../components/brand/BrandMark'
@@ -9,7 +9,7 @@ import './auth.css'
 const MONEDAS = ['CLP', 'USD', 'EUR', 'ARS', 'COP', 'MXN', 'PEN']
 
 export default function Registro() {
-  const { registro } = useAuth()
+  const { registro, user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState({ email: '', username: '', password: '', confirm_password: '', moneda_preferida: 'CLP' })
   const [error, setError] = useState('')
@@ -45,14 +45,20 @@ export default function Registro() {
     }
   }
 
+  if (!authLoading && user) {
+    return <Navigate to="/dashboard" replace />
+  }
+
+  const brandTarget = user ? '/dashboard' : '/'
+
   return (
     <div className="auth-page">
       <div className="auth-box">
-        <div className="auth-logo">
+        <Link to={brandTarget} className="auth-logo auth-logo-link" aria-label={user ? 'Ir a mi dashboard' : 'Volver al inicio'}>
           <BrandMark className="auth-logo-icon" />
           <div className="auth-logo-name">AURA</div>
           <div className="auth-logo-tag">Clara proyeccion, futuro solido.</div>
-        </div>
+        </Link>
 
         <div className="auth-card">
           <h2 className="auth-title">Crea tu cuenta gratis</h2>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 
 import { useAuth } from '../../context/useAuth'
 import { getApiErrorMessage } from '../../api/errors'
@@ -7,7 +7,7 @@ import BrandMark from '../../components/brand/BrandMark'
 import './auth.css'
 
 export default function ForgotPassword() {
-  const { forgotPassword } = useAuth()
+  const { forgotPassword, user, loading: authLoading } = useAuth()
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -29,14 +29,20 @@ export default function ForgotPassword() {
     }
   }
 
+  if (!authLoading && user) {
+    return <Navigate to="/dashboard" replace />
+  }
+
+  const brandTarget = user ? '/dashboard' : '/'
+
   return (
     <div className="auth-page">
       <div className="auth-box">
-        <div className="auth-logo">
+        <Link to={brandTarget} className="auth-logo auth-logo-link" aria-label={user ? 'Ir a mi dashboard' : 'Volver al inicio'}>
           <BrandMark className="auth-logo-icon" />
           <div className="auth-logo-name">AURA</div>
           <div className="auth-logo-tag">Recupera el acceso de forma segura.</div>
-        </div>
+        </Link>
 
         <div className="auth-card">
           <h2 className="auth-title">Recuperar contraseña</h2>

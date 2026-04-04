@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 
 import { getApiErrorMessage } from '../../api/errors'
 import BrandMark from '../../components/brand/BrandMark'
@@ -7,7 +7,7 @@ import { useAuth } from '../../context/useAuth'
 import './auth.css'
 
 export default function Login() {
-  const { login } = useAuth()
+  const { login, user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState({ email: '', password: '' })
   const [showPass, setShowPass] = useState(false)
@@ -29,14 +29,20 @@ export default function Login() {
     }
   }
 
+  if (!authLoading && user) {
+    return <Navigate to="/dashboard" replace />
+  }
+
+  const brandTarget = user ? '/dashboard' : '/'
+
   return (
     <div className="auth-page">
       <div className="auth-box">
-        <div className="auth-logo">
+        <Link to={brandTarget} className="auth-logo auth-logo-link" aria-label={user ? 'Ir a mi dashboard' : 'Volver al inicio'}>
           <BrandMark className="auth-logo-icon" />
           <div className="auth-logo-name">AURA</div>
           <div className="auth-logo-tag">Clara proyeccion, futuro solido.</div>
-        </div>
+        </Link>
 
         <div className="auth-card">
           <h2 className="auth-title">Bienvenido de vuelta</h2>
