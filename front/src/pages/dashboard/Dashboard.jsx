@@ -142,20 +142,14 @@ export default function Dashboard() {
     setProjectionError('')
 
     try {
-      const [ing, ip, gc, gnc, dif] = await Promise.all([
-        api.get('/finanzas/ingresos/'),
-        api.get('/finanzas/ingresos-puntuales/'),
-        api.get('/finanzas/gastos-corrientes/'),
-        api.get('/finanzas/gastos-no-corrientes/'),
-        api.get('/finanzas/diferidos/'),
-      ])
+      const { data: resumen } = await api.get('/finanzas/dashboard/')
 
       setData({
-        ingresos: ing.data,
-        ingresosPuntuales: ip.data,
-        gastosCorrientes: gc.data,
-        gastosNoCorrientes: gnc.data,
-        diferidos: dif.data,
+        ingresos: resumen.ingresos || [],
+        ingresosPuntuales: resumen.ingresos_puntuales || [],
+        gastosCorrientes: resumen.gastos_corrientes || [],
+        gastosNoCorrientes: resumen.gastos_no_corrientes || [],
+        diferidos: resumen.diferidos || [],
       })
       setFeedback({ type: '', message: '' })
     } catch (err) {
@@ -201,7 +195,7 @@ export default function Dashboard() {
     } catch (err) {
       if (requestId !== projectionRequestIdRef.current) return
       setAdvancedProjection(null)
-      setProjectionError(getApiErrorMessage(err, 'No se pudo cargar la proyeccion premium.'))
+      setProjectionError(getApiErrorMessage(err, 'No se pudo cargar la proyeccion Pro.'))
     } finally {
       if (requestId !== projectionRequestIdRef.current) return
       setProjectionLoading(false)
@@ -266,13 +260,6 @@ export default function Dashboard() {
   const totalGastos = totalGC + totalGNC + totalDif
   const balance = totalIng - totalGastos
 
-
-  const onboardingSteps = [
-    { label: 'Agrega un ingreso fijo o puntual', done: data.ingresos.length > 0 || data.ingresosPuntuales.length > 0 },
-    { label: 'Suma tus gastos fijos', done: data.gastosCorrientes.length > 0 },
-    { label: 'Carga un gasto puntual o a cuotas', done: data.gastosNoCorrientes.length > 0 || data.diferidos.length > 0 },
-    { label: 'Prueba el simulador', done: false },
-  ]
 
   const hasAnyMovement = data.ingresos.length > 0
     || data.ingresosPuntuales.length > 0
@@ -435,19 +422,19 @@ export default function Dashboard() {
       {/* ── Onboarding ── */}
       {!hasAnyMovement && (
         <div className="dashboard-onboarding-card">
-          <h2 className="dashboard-onboarding-title">Tu cuenta, lista en minutos.</h2>
-          <p className="dashboard-onboarding-sub">Haz esto una vez y el resto fluye solo.</p>
-          <div className="dashboard-onboarding-steps">
-            {onboardingSteps.map((step) => (
-              <div key={step.label} className={`dashboard-onboarding-step ${step.done ? 'done' : ''}`}>
-                <span className="dashboard-onboarding-dot">{step.done ? '✓' : '○'}</span>
-                <span>{step.label}</span>
-              </div>
-            ))}
+          <h2 className="dashboard-onboarding-title">Empieza en 10 segundos.</h2>
+          <p className="dashboard-onboarding-sub">
+            Carga un ingreso, un gasto o importa tu historial. Con eso Aura ya te empieza a servir.
+          </p>
+          <div className="dashboard-onboarding-points">
+            <span className="dashboard-onboarding-point">Tu saldo del mes empieza a tomar forma</span>
+            <span className="dashboard-onboarding-point">La proyeccion ya puede darte una primera lectura</span>
+            <span className="dashboard-onboarding-point">Lo demas lo completas despues, sin apuro</span>
           </div>
           <div className="dashboard-onboarding-actions">
-            <Link to="/ingresos" className="btn-modal-save" style={{ textDecoration: 'none' }}>Cargar ingresos</Link>
-            <Link to="/importar" className="btn-modal-cancel" style={{ textDecoration: 'none' }}>Importar archivo</Link>
+            <Link to="/ingresos" className="btn-modal-save" style={{ textDecoration: 'none' }}>Cargar ingreso</Link>
+            <Link to="/gastos-corrientes" className="btn-modal-cancel" style={{ textDecoration: 'none' }}>Cargar gasto</Link>
+            <Link to="/importar" className="btn-modal-cancel" style={{ textDecoration: 'none' }}>Importar historial</Link>
           </div>
         </div>
       )}
@@ -550,7 +537,7 @@ export default function Dashboard() {
                 {getProjectionModeHelp(projectionMode)}
               </p>
             </div>
-            <span className="dashboard-premium-badge">Premium</span>
+            <span className="dashboard-premium-badge">Pro</span>
           </div>
 
           <div className="dashboard-chart-toolbar" style={{ marginBottom: 12 }}>
@@ -810,7 +797,7 @@ export default function Dashboard() {
             </div>
             <span className="dashboard-premium-lock-badge">
               <Lock size={14} />
-              Premium
+              Pro
             </span>
           </div>
 

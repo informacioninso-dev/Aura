@@ -39,6 +39,7 @@ export default function IngresosPuntuales({ embedded = false }) {
   const [editId, setEditId] = useState(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [converting, setConverting] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [feedback, setFeedback] = useState({ type: '', message: '' })
@@ -48,7 +49,9 @@ export default function IngresosPuntuales({ embedded = false }) {
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [confirmConvert, setConfirmConvert] = useState(false)
   const canCustomizeProjection = Boolean(user?.feature_access?.advanced_projection_enabled)
+  const bulkDeleteMax = user?.feature_access?.bulk_delete_max ?? 10
 
   useEffect(() => { fetchItems() }, [])
 
@@ -131,9 +134,17 @@ export default function IngresosPuntuales({ embedded = false }) {
 
   function toggleSelect(id) {
     setSelectedIds((prev) => {
+      if (prev.has(id)) {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      }
+      if (prev.size >= bulkDeleteMax) {
+        setFeedback({ type: 'error', message: `Tu plan permite seleccionar hasta ${bulkDeleteMax} registros a la vez.` })
+        return prev
+      }
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      next.add(id)
       return next
     })
   }
@@ -143,12 +154,21 @@ export default function IngresosPuntuales({ embedded = false }) {
     const allSelected = currentIds.every((id) => selectedIds.has(id))
     setSelectedIds((prev) => {
       const next = new Set(prev)
+      let count = next.size
       currentIds.forEach((id) => {
-        if (allSelected) next.delete(id)
-        else next.add(id)
+        if (allSelected) {
+          next.delete(id)
+          return
+        }
+        if (next.has(id) || count >= bulkDeleteMax) return
+        next.add(id)
+        count += 1
       })
       return next
     })
+    if (!allSelected && currentIds.filter((id) => !selectedIds.has(id)).length + selectedIds.size > bulkDeleteMax) {
+      setFeedback({ type: 'error', message: `Tu plan permite seleccionar hasta ${bulkDeleteMax} registros a la vez.` })
+    }
   }
 
   async function handleBulkDelete() {
@@ -164,6 +184,27 @@ export default function IngresosPuntuales({ embedded = false }) {
     setBulkDeleting(false)
     if (errors === 0) setFeedback({ type: 'success', message: `${ids.length} ingreso${ids.length !== 1 ? 's' : ''} eliminado${ids.length !== 1 ? 's' : ''}.` })
     else setFeedback({ type: 'error', message: `Se eliminaron ${ids.length - errors} de ${ids.length}. Algunos fallaron.` })
+  }
+
+  async function handleConvertToFijo() {
+    if (!editId || converting) return
+    setConverting(true)
+    setConfirmConvert(false)
+    setFeedback({ type: '', message: '' })
+    try {
+      await api.post(`/finanzas/ingresos-puntuales/${editId}/convertir_a_fijo/`, {
+        descripcion: form.descripcion,
+        monto: form.monto,
+        fecha_inicio: form.fecha,
+      })
+      setModal(false)
+      await fetchItems()
+      setFeedback({ type: 'success', message: 'Listo. Ahora lo veras en Ingresos fijos.' })
+    } catch (err) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo convertir el ingreso a fijo.') })
+    } finally {
+      setConverting(false)
+    }
   }
 
   const normalizedQuery = query.trim().toLowerCase()
@@ -236,11 +277,16 @@ export default function IngresosPuntuales({ embedded = false }) {
             />
 
             {selectedIds.size > 0 && (
-              <div className="bulk-actions-bar">
-                <span>{selectedIds.size} seleccionado(s)</span>
-                <button className="btn-modal-danger" type="button" onClick={() => setConfirmBulkDelete(true)}>
-                  Eliminar seleccionados
-                </button>
+              <div className="table-bulk-bar">
+                <span className="table-bulk-info">{selectedIds.size} seleccionado{selectedIds.size !== 1 ? 's' : ''}</span>
+                <div className="table-bulk-actions">
+                  <button className="btn-modal-danger table-bulk-danger" type="button" onClick={() => setConfirmBulkDelete(true)}>
+                    {bulkDeleting ? 'Eliminando...' : 'Eliminar seleccionados'}
+                  </button>
+                  <button className="btn-modal-cancel table-bulk-cancel" type="button" onClick={() => setSelectedIds(new Set())}>
+                    Cancelar
+                  </button>
+                </div>
               </div>
             )}
 
@@ -365,6 +411,25 @@ export default function IngresosPuntuales({ embedded = false }) {
             </p>
           )}
 
+          {editId && (
+            <div className="form-modal-convert-block">
+              <div className="form-modal-convert-copy">
+                <span className="form-modal-convert-title">Cambiar tipo de movimiento</span>
+                <span className="form-modal-convert-text">
+                  Si este extra en realidad se repite, puedes pasarlo a fijo sin volverlo a cargar desde cero.
+                </span>
+              </div>
+              <button
+                type="button"
+                className="btn-modal-convert"
+                onClick={() => setConfirmConvert(true)}
+                disabled={loading || converting}
+              >
+                {converting ? 'Convirtiendo...' : 'Pasar a fijo'}
+              </button>
+            </div>
+          )}
+
           <div className="form-modal-actions">
             <button type="button" className="btn-modal-cancel" onClick={() => setModal(false)}>Cancelar</button>
             <button type="submit" className="btn-modal-save" disabled={loading}>
@@ -373,6 +438,17 @@ export default function IngresosPuntuales({ embedded = false }) {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={confirmConvert}
+        title="Pasar a ingreso fijo"
+        message={`Se creara como ingreso fijo mensual desde ${form.fecha || 'la fecha actual'} y este ingreso puntual se eliminara. Luego podras ajustar la frecuencia si hace falta.`}
+        confirmText="Convertir"
+        cancelText="Cancelar"
+        loading={converting}
+        onConfirm={handleConvertToFijo}
+        onClose={() => setConfirmConvert(false)}
+      />
 
       <ConfirmDialog
         open={confirmDeleteId !== null}

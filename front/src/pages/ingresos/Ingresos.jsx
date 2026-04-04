@@ -58,6 +58,7 @@ export default function Ingresos({ embedded = false }) {
   const [editId, setEditId] = useState(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [converting, setConverting] = useState(false)
 
   // — eliminar —
   const [deletingId, setDeletingId] = useState(null)
@@ -72,6 +73,7 @@ export default function Ingresos({ embedded = false }) {
   const [versioningItem, setVersioningItem] = useState(null)
   const [versionForm, setVersionForm] = useState({ descripcion: '', monto: '', frecuencia: 'mensual', nuevaFecha: '' })
   const [versionLoading, setVersionLoading] = useState(false)
+  const [confirmConvert, setConfirmConvert] = useState(false)
 
   const [feedback, setFeedback] = useState({ type: '', message: '' })
 
@@ -184,6 +186,27 @@ export default function Ingresos({ embedded = false }) {
       setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo crear la nueva version.') })
     } finally {
       setVersionLoading(false)
+    }
+  }
+
+  async function handleConvertToPuntual() {
+    if (!editId || converting) return
+    setConverting(true)
+    setConfirmConvert(false)
+    setFeedback({ type: '', message: '' })
+    try {
+      await api.post(`/finanzas/ingresos/${editId}/convertir_a_puntual/`, {
+        descripcion: form.descripcion,
+        monto: form.monto,
+        fecha: form.fecha_inicio,
+      })
+      setModal(false)
+      await fetchItems()
+      setFeedback({ type: 'success', message: 'Listo. Ahora lo veras en Ingresos puntuales.' })
+    } catch (err) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo convertir el ingreso a puntual.') })
+    } finally {
+      setConverting(false)
     }
   }
 
@@ -320,14 +343,16 @@ export default function Ingresos({ embedded = false }) {
             />
 
             {selectedIds.size > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', background: 'rgba(196,135,246,0.08)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', flex: 1 }}>{selectedIds.size} seleccionado{selectedIds.size !== 1 ? 's' : ''}</span>
-                <button className="btn-modal-danger" style={{ padding: '6px 14px', fontSize: 13 }} disabled={bulkDeleting} onClick={() => setConfirmBulkDelete(true)}>
+              <div className="table-bulk-bar">
+                <span className="table-bulk-info">{selectedIds.size} seleccionado{selectedIds.size !== 1 ? 's' : ''}</span>
+                <div className="table-bulk-actions">
+                  <button className="btn-modal-danger table-bulk-danger" disabled={bulkDeleting} onClick={() => setConfirmBulkDelete(true)}>
                   {bulkDeleting ? 'Eliminando...' : 'Eliminar seleccionados'}
-                </button>
-                <button className="btn-modal-cancel" style={{ padding: '6px 14px', fontSize: 13 }} onClick={() => setSelectedIds(new Set())}>
-                  Cancelar
-                </button>
+                  </button>
+                  <button className="btn-modal-cancel table-bulk-cancel" onClick={() => setSelectedIds(new Set())}>
+                    Cancelar
+                  </button>
+                </div>
               </div>
             )}
 
@@ -446,6 +471,25 @@ export default function Ingresos({ embedded = false }) {
             </>
           )}
 
+          {editId && (
+            <div className="form-modal-convert-block">
+              <div className="form-modal-convert-copy">
+                <span className="form-modal-convert-title">Cambiar tipo de movimiento</span>
+                <span className="form-modal-convert-text">
+                  Si esto no era fijo, puedes pasarlo a puntual sin borrarlo ni volverlo a crear.
+                </span>
+              </div>
+              <button
+                type="button"
+                className="btn-modal-convert"
+                onClick={() => setConfirmConvert(true)}
+                disabled={loading || converting}
+              >
+                {converting ? 'Convirtiendo...' : 'Pasar a puntual'}
+              </button>
+            </div>
+          )}
+
           <div className="form-modal-actions">
             <button type="button" className="btn-modal-cancel" onClick={() => setModal(false)}>Cancelar</button>
             <button type="submit" className="btn-modal-save" disabled={loading}>
@@ -524,6 +568,17 @@ export default function Ingresos({ embedded = false }) {
           </form>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={confirmConvert}
+        title="Pasar a ingreso puntual"
+        message={`Se creara un ingreso puntual con la fecha ${form.fecha_inicio || 'actual'} y este ingreso fijo se eliminara. Luego podras ajustarlo si hace falta.`}
+        confirmText="Convertir"
+        cancelText="Cancelar"
+        loading={converting}
+        onConfirm={handleConvertToPuntual}
+        onClose={() => setConfirmConvert(false)}
+      />
 
       <ConfirmDialog
         open={confirmDeleteId !== null}

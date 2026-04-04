@@ -4,7 +4,7 @@ from io import BytesIO
 
 from django.conf import settings
 from django.core.cache import cache
-from django.db import models
+from django.db import models, transaction
 from django.http import HttpResponse
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
@@ -83,24 +83,158 @@ class CategoriaViewSet(BaseFinanzasViewSet):
         return qs
 
 
+class DashboardResumenView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request):
+        user = request.user
+        return Response({
+            'ingresos': IngresoSerializer(
+                Ingreso.objects.filter(usuario=user),
+                many=True,
+                context={'request': request},
+            ).data,
+            'ingresos_puntuales': IngresoPuntualSerializer(
+                IngresoPuntual.objects.filter(usuario=user),
+                many=True,
+                context={'request': request},
+            ).data,
+            'gastos_corrientes': GastoCorrienteSerializer(
+                GastoCorriente.objects.filter(usuario=user),
+                many=True,
+                context={'request': request},
+            ).data,
+            'gastos_no_corrientes': GastoNoCorrienteSerializer(
+                GastoNoCorriente.objects.filter(usuario=user),
+                many=True,
+                context={'request': request},
+            ).data,
+            'diferidos': DeferidoSerializer(
+                Diferido.objects.filter(usuario=user),
+                many=True,
+                context={'request': request},
+            ).data,
+        })
+
+
 class IngresoViewSet(BaseFinanzasViewSet):
     queryset = Ingreso.objects.all()
     serializer_class = IngresoSerializer
+
+    @action(detail=True, methods=['post'])
+    def convertir_a_puntual(self, request, pk=None):
+        ingreso = self.get_object()
+        payload = {
+            'descripcion': request.data.get('descripcion', ingreso.descripcion),
+            'monto': request.data.get('monto', ingreso.monto),
+            'fecha': request.data.get('fecha', ingreso.fecha_inicio),
+            'notas': request.data.get('notas', ''),
+        }
+
+        if 'incluir_en_proyeccion' in request.data:
+            payload['incluir_en_proyeccion'] = request.data.get('incluir_en_proyeccion')
+
+        serializer = IngresoPuntualSerializer(data=payload, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+
+        with transaction.atomic():
+            ingreso_puntual = serializer.save(usuario=request.user)
+            ingreso.delete()
+
+        return Response(
+            IngresoPuntualSerializer(ingreso_puntual, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class IngresoPuntualViewSet(BaseFinanzasViewSet):
     queryset = IngresoPuntual.objects.all()
     serializer_class = IngresoPuntualSerializer
 
+    @action(detail=True, methods=['post'])
+    def convertir_a_fijo(self, request, pk=None):
+        ingreso = self.get_object()
+        payload = {
+            'descripcion': request.data.get('descripcion', ingreso.descripcion),
+            'monto': request.data.get('monto', ingreso.monto),
+            'frecuencia': request.data.get('frecuencia', 'mensual'),
+            'fecha_inicio': request.data.get('fecha_inicio', ingreso.fecha),
+            'fecha_fin': request.data.get('fecha_fin', None),
+            'activo': request.data.get('activo', True),
+        }
+
+        serializer = IngresoSerializer(data=payload, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+
+        with transaction.atomic():
+            ingreso_fijo = serializer.save(usuario=request.user)
+            ingreso.delete()
+
+        return Response(
+            IngresoSerializer(ingreso_fijo, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
 
 class GastoCorrienteViewSet(BaseFinanzasViewSet):
     queryset = GastoCorriente.objects.all()
     serializer_class = GastoCorrienteSerializer
 
+    @action(detail=True, methods=['post'])
+    def convertir_a_puntual(self, request, pk=None):
+        gasto = self.get_object()
+        payload = {
+            'descripcion': request.data.get('descripcion', gasto.descripcion),
+            'categoria': request.data.get('categoria', gasto.categoria),
+            'monto': request.data.get('monto', gasto.monto),
+            'fecha': request.data.get('fecha', gasto.fecha_inicio),
+            'notas': request.data.get('notas', ''),
+        }
+
+        if 'incluir_en_proyeccion' in request.data:
+            payload['incluir_en_proyeccion'] = request.data.get('incluir_en_proyeccion')
+
+        serializer = GastoNoCorrienteSerializer(data=payload, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+
+        with transaction.atomic():
+            gasto_puntual = serializer.save(usuario=request.user)
+            gasto.delete()
+
+        return Response(
+            GastoNoCorrienteSerializer(gasto_puntual, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
 
 class GastoNoCorrienteViewSet(BaseFinanzasViewSet):
     queryset = GastoNoCorriente.objects.all()
     serializer_class = GastoNoCorrienteSerializer
+
+    @action(detail=True, methods=['post'])
+    def convertir_a_fijo(self, request, pk=None):
+        gasto = self.get_object()
+        payload = {
+            'descripcion': request.data.get('descripcion', gasto.descripcion),
+            'categoria': request.data.get('categoria', gasto.categoria),
+            'monto': request.data.get('monto', gasto.monto),
+            'frecuencia': request.data.get('frecuencia', 'mensual'),
+            'fecha_inicio': request.data.get('fecha_inicio', gasto.fecha),
+            'fecha_fin': request.data.get('fecha_fin', None),
+            'activo': request.data.get('activo', True),
+        }
+
+        serializer = GastoCorrienteSerializer(data=payload, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+
+        with transaction.atomic():
+            gasto_fijo = serializer.save(usuario=request.user)
+            gasto.delete()
+
+        return Response(
+            GastoCorrienteSerializer(gasto_fijo, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class DeferidoViewSet(BaseFinanzasViewSet):

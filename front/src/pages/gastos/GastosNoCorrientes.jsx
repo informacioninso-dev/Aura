@@ -44,6 +44,7 @@ export default function GastosNoCorrientes({ embedded = false }) {
   const [editId, setEditId] = useState(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [converting, setConverting] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [feedback, setFeedback] = useState({ type: '', message: '' })
@@ -53,6 +54,7 @@ export default function GastosNoCorrientes({ embedded = false }) {
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [confirmConvert, setConfirmConvert] = useState(false)
   const { categorias } = useCategorias()
   const canCustomizeProjection = Boolean(user?.feature_access?.advanced_projection_enabled)
 
@@ -203,6 +205,28 @@ export default function GastosNoCorrientes({ embedded = false }) {
     else setFeedback({ type: 'error', message: `Se eliminaron ${ids.length - errors} de ${ids.length}. Algunos fallaron.` })
   }
 
+  async function handleConvertToFijo() {
+    if (!editId || converting) return
+    setConverting(true)
+    setConfirmConvert(false)
+    setFeedback({ type: '', message: '' })
+    try {
+      await api.post(`/finanzas/gastos-no-corrientes/${editId}/convertir_a_fijo/`, {
+        descripcion: form.descripcion,
+        categoria: form.categoria,
+        monto: form.monto,
+        fecha_inicio: form.fecha,
+      })
+      setModal(false)
+      await fetchItems()
+      setFeedback({ type: 'success', message: 'Listo. Ahora lo veras en Gastos fijos.' })
+    } catch (err) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo convertir el gasto a fijo.') })
+    } finally {
+      setConverting(false)
+    }
+  }
+
   return (
     <div>
       {embedded ? (
@@ -259,14 +283,16 @@ export default function GastosNoCorrientes({ embedded = false }) {
             />
 
             {selectedIds.size > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', background: 'rgba(196,135,246,0.08)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', flex: 1 }}>{selectedIds.size} seleccionado{selectedIds.size !== 1 ? 's' : ''}</span>
-                <button className="btn-modal-danger" style={{ padding: '6px 14px', fontSize: 13 }} disabled={bulkDeleting} onClick={() => setConfirmBulkDelete(true)}>
-                  {bulkDeleting ? 'Eliminando...' : 'Eliminar seleccionados'}
-                </button>
-                <button className="btn-modal-cancel" style={{ padding: '6px 14px', fontSize: 13 }} onClick={() => setSelectedIds(new Set())}>
-                  Cancelar
-                </button>
+              <div className="table-bulk-bar">
+                <span className="table-bulk-info">{selectedIds.size} seleccionado{selectedIds.size !== 1 ? 's' : ''}</span>
+                <div className="table-bulk-actions">
+                  <button className="btn-modal-danger table-bulk-danger" disabled={bulkDeleting} onClick={() => setConfirmBulkDelete(true)}>
+                    {bulkDeleting ? 'Eliminando...' : 'Eliminar seleccionados'}
+                  </button>
+                  <button className="btn-modal-cancel table-bulk-cancel" onClick={() => setSelectedIds(new Set())}>
+                    Cancelar
+                  </button>
+                </div>
               </div>
             )}
             <div className="table-wrap" style={{ border: 'none', borderRadius: 20 }}>
@@ -397,6 +423,25 @@ export default function GastosNoCorrientes({ embedded = false }) {
             </p>
           )}
 
+          {editId && (
+            <div className="form-modal-convert-block">
+              <div className="form-modal-convert-copy">
+                <span className="form-modal-convert-title">Cambiar tipo de movimiento</span>
+                <span className="form-modal-convert-text">
+                  Si esto se repite todos los meses, puedes pasarlo a fijo y luego ajustar la frecuencia si hace falta.
+                </span>
+              </div>
+              <button
+                type="button"
+                className="btn-modal-convert"
+                onClick={() => setConfirmConvert(true)}
+                disabled={loading || converting}
+              >
+                {converting ? 'Convirtiendo...' : 'Pasar a fijo'}
+              </button>
+            </div>
+          )}
+
           <div className="form-modal-actions">
             <button type="button" className="btn-modal-cancel" onClick={() => setModal(false)}>Cancelar</button>
             <button type="submit" className="btn-modal-save" disabled={loading}>
@@ -405,6 +450,17 @@ export default function GastosNoCorrientes({ embedded = false }) {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={confirmConvert}
+        title="Pasar a gasto fijo"
+        message={`Se creara como gasto fijo mensual desde ${form.fecha || 'la fecha actual'} y este gasto puntual se eliminara. Luego podras ajustar la frecuencia si hace falta.`}
+        confirmText="Convertir"
+        cancelText="Cancelar"
+        loading={converting}
+        onConfirm={handleConvertToFijo}
+        onClose={() => setConfirmConvert(false)}
+      />
 
       <ConfirmDialog
         open={confirmDeleteId !== null}

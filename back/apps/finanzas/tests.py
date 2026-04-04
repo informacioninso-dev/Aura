@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -25,6 +26,10 @@ def add_months(value, months):
     year = total // 12
     month = total % 12 + 1
     return datetime.date(year, month, 1)
+
+
+def aware_midnight(value):
+    return timezone.make_aware(datetime.datetime.combine(value, datetime.time.min))
 
 
 class TestFinanzasAPI(APITestCase):
@@ -87,6 +92,45 @@ class TestFinanzasAPI(APITestCase):
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['descripcion'], 'Bono A')
 
+    def test_dashboard_resumen_lista_solo_los_del_usuario_autenticado(self):
+        Ingreso.objects.create(
+            usuario=self.user_a,
+            descripcion='Ingreso A',
+            monto=Decimal('1000.00'),
+            frecuencia='mensual',
+            fecha_inicio='2026-01-01',
+            activo=True,
+        )
+        GastoCorriente.objects.create(
+            usuario=self.user_a,
+            descripcion='Gasto A',
+            categoria='otro',
+            monto=Decimal('150.00'),
+            frecuencia='mensual',
+            fecha_inicio='2026-01-01',
+            activo=True,
+        )
+        Ingreso.objects.create(
+            usuario=self.user_b,
+            descripcion='Ingreso B',
+            monto=Decimal('2000.00'),
+            frecuencia='mensual',
+            fecha_inicio='2026-01-01',
+            activo=True,
+        )
+
+        self.client.force_authenticate(user=self.user_a)
+        response = self.client.get('/api/finanzas/dashboard/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['ingresos']), 1)
+        self.assertEqual(response.data['ingresos'][0]['descripcion'], 'Ingreso A')
+        self.assertEqual(len(response.data['gastos_corrientes']), 1)
+        self.assertEqual(response.data['gastos_corrientes'][0]['descripcion'], 'Gasto A')
+        self.assertEqual(response.data['ingresos_puntuales'], [])
+        self.assertEqual(response.data['gastos_no_corrientes'], [])
+        self.assertEqual(response.data['diferidos'], [])
+
     def test_ingreso_puntual_free_fuerza_inclusion_en_proyeccion(self):
         self.client.force_authenticate(user=self.user_a)
 
@@ -104,6 +148,30 @@ class TestFinanzasAPI(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(response.data['incluir_en_proyeccion'])
         self.assertTrue(IngresoPuntual.objects.get(pk=response.data['id']).incluir_en_proyeccion)
+
+    def test_ingreso_fijo_se_puede_convertir_a_puntual(self):
+        ingreso = Ingreso.objects.create(
+            usuario=self.user_a,
+            descripcion='Freelance mal cargado',
+            monto=Decimal('900.00'),
+            frecuencia='mensual',
+            fecha_inicio='2026-02-01',
+            activo=True,
+        )
+        self.client.force_authenticate(user=self.user_a)
+
+        response = self.client.post(
+            f'/api/finanzas/ingresos/{ingreso.id}/convertir_a_puntual/',
+            {'fecha': '2026-02-05'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(Ingreso.objects.filter(pk=ingreso.id).exists())
+        puntual = IngresoPuntual.objects.get(pk=response.data['id'])
+        self.assertEqual(puntual.descripcion, 'Freelance mal cargado')
+        self.assertEqual(puntual.monto, Decimal('900.00'))
+        self.assertEqual(str(puntual.fecha), '2026-02-05')
 
     def test_gasto_puntual_plan_pro_permite_excluir_de_proyeccion(self):
         plan_pro = Plan.objects.get(slug='pro')
@@ -257,6 +325,82 @@ class TestFinanzasAPI(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('fecha_inicio', response.data)
+
+    def test_gasto_corriente_se_puede_convertir_a_puntual(self):
+        gasto = GastoCorriente.objects.create(
+            usuario=self.user_a,
+            descripcion='Arriendo mal cargado',
+            categoria='vivienda',
+            monto=Decimal('550.00'),
+            frecuencia='mensual',
+            fecha_inicio='2026-02-01',
+            activo=True,
+        )
+        self.client.force_authenticate(user=self.user_a)
+
+        response = self.client.post(
+            f'/api/finanzas/gastos-corrientes/{gasto.id}/convertir_a_puntual/',
+            {
+                'fecha': '2026-02-03',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(GastoCorriente.objects.filter(pk=gasto.id).exists())
+        puntual = GastoNoCorriente.objects.get(pk=response.data['id'])
+        self.assertEqual(puntual.descripcion, 'Arriendo mal cargado')
+        self.assertEqual(puntual.categoria, 'vivienda')
+        self.assertEqual(puntual.monto, Decimal('550.00'))
+        self.assertEqual(str(puntual.fecha), '2026-02-03')
+
+    def test_ingreso_puntual_se_puede_convertir_a_fijo(self):
+        ingreso = IngresoPuntual.objects.create(
+            usuario=self.user_a,
+            descripcion='Cliente recurrente',
+            monto=Decimal('300.00'),
+            fecha='2026-03-10',
+        )
+        self.client.force_authenticate(user=self.user_a)
+
+        response = self.client.post(
+            f'/api/finanzas/ingresos-puntuales/{ingreso.id}/convertir_a_fijo/',
+            {},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(IngresoPuntual.objects.filter(pk=ingreso.id).exists())
+        fijo = Ingreso.objects.get(pk=response.data['id'])
+        self.assertEqual(fijo.descripcion, 'Cliente recurrente')
+        self.assertEqual(fijo.monto, Decimal('300.00'))
+        self.assertEqual(fijo.frecuencia, 'mensual')
+        self.assertEqual(str(fijo.fecha_inicio), '2026-03-10')
+
+    def test_gasto_puntual_se_puede_convertir_a_fijo(self):
+        gasto = GastoNoCorriente.objects.create(
+            usuario=self.user_a,
+            descripcion='Suscripcion mal cargada',
+            categoria='tecnologia',
+            monto=Decimal('25.00'),
+            fecha='2026-03-10',
+        )
+        self.client.force_authenticate(user=self.user_a)
+
+        response = self.client.post(
+            f'/api/finanzas/gastos-no-corrientes/{gasto.id}/convertir_a_fijo/',
+            {},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(GastoNoCorriente.objects.filter(pk=gasto.id).exists())
+        fijo = GastoCorriente.objects.get(pk=response.data['id'])
+        self.assertEqual(fijo.descripcion, 'Suscripcion mal cargada')
+        self.assertEqual(fijo.categoria, 'tecnologia')
+        self.assertEqual(fijo.monto, Decimal('25.00'))
+        self.assertEqual(fijo.frecuencia, 'mensual')
+        self.assertEqual(str(fijo.fecha_inicio), '2026-03-10')
 
     def test_ingreso_puntual_rechaza_anio_absurdo(self):
         self.client.force_authenticate(user=self.user_a)
@@ -639,7 +783,7 @@ class TestFinanzasAPI(APITestCase):
     def test_proyeccion_acumulada_para_plan_pro_retorna_serie_acumulada(self):
         current_month = first_day_of_month(datetime.date.today())
         previous_month = add_months(current_month, -1)
-        self.user_a.date_joined = add_months(current_month, -12)
+        self.user_a.date_joined = aware_midnight(add_months(current_month, -12))
         self.user_a.save(update_fields=['date_joined'])
 
         plan_pro = Plan.objects.get(slug='pro')
@@ -744,7 +888,7 @@ class TestFinanzasAPI(APITestCase):
     def test_proyeccion_acumulada_suaviza_outliers_de_puntuales(self):
         current_month = first_day_of_month(datetime.date.today())
         previous_month = add_months(current_month, -1)
-        self.user_a.date_joined = add_months(current_month, -12)
+        self.user_a.date_joined = aware_midnight(add_months(current_month, -12))
         self.user_a.save(update_fields=['date_joined'])
 
         plan_pro = Plan.objects.get(slug='pro')
@@ -793,7 +937,7 @@ class TestFinanzasAPI(APITestCase):
     def test_proyeccion_acumulada_free_no_aplica_variable_con_muestra_insuficiente(self):
         current_month = first_day_of_month(datetime.date.today())
         previous_month = add_months(current_month, -1)
-        self.user_a.date_joined = add_months(current_month, -12)
+        self.user_a.date_joined = aware_midnight(add_months(current_month, -12))
         self.user_a.save(update_fields=['date_joined'])
 
         Ingreso.objects.create(
@@ -851,7 +995,7 @@ class TestFinanzasAPI(APITestCase):
     def test_proyeccion_acumulada_plan_pro_exige_tres_meses_elegibles(self):
         current_month = first_day_of_month(datetime.date.today())
         previous_month = add_months(current_month, -1)
-        self.user_a.date_joined = add_months(current_month, -12)
+        self.user_a.date_joined = aware_midnight(add_months(current_month, -12))
         self.user_a.save(update_fields=['date_joined'])
 
         plan_pro = Plan.objects.get(slug='pro')
@@ -914,7 +1058,7 @@ class TestFinanzasAPI(APITestCase):
     def test_proyeccion_acumulada_plan_pro_aplica_variable_con_tres_meses_elegibles(self):
         current_month = first_day_of_month(datetime.date.today())
         previous_month = add_months(current_month, -1)
-        self.user_a.date_joined = add_months(current_month, -12)
+        self.user_a.date_joined = aware_midnight(add_months(current_month, -12))
         self.user_a.save(update_fields=['date_joined'])
 
         plan_pro = Plan.objects.get(slug='pro')
@@ -984,7 +1128,7 @@ class TestFinanzasAPI(APITestCase):
     def test_proyeccion_acumulada_plan_pro_modo_simple_usa_todos_los_extras(self):
         current_month = first_day_of_month(datetime.date.today())
         previous_month = add_months(current_month, -1)
-        self.user_a.date_joined = add_months(current_month, -12)
+        self.user_a.date_joined = aware_midnight(add_months(current_month, -12))
         self.user_a.projection_mode = 'simple'
         self.user_a.save(update_fields=['date_joined', 'projection_mode'])
 
@@ -1039,7 +1183,7 @@ class TestFinanzasAPI(APITestCase):
     def test_proyeccion_acumulada_no_reutiliza_cache_de_otro_modo(self):
         current_month = first_day_of_month(datetime.date.today())
         previous_month = add_months(current_month, -1)
-        self.user_a.date_joined = add_months(current_month, -12)
+        self.user_a.date_joined = aware_midnight(add_months(current_month, -12))
         self.user_a.projection_mode = 'simple'
         self.user_a.save(update_fields=['date_joined', 'projection_mode'])
 
@@ -1101,7 +1245,7 @@ class TestFinanzasAPI(APITestCase):
     def test_proyeccion_acumulada_plan_pro_estima_variable_segun_frecuencia_de_meses_activos(self):
         current_month = first_day_of_month(datetime.date.today())
         previous_month = add_months(current_month, -1)
-        self.user_a.date_joined = add_months(current_month, -12)
+        self.user_a.date_joined = aware_midnight(add_months(current_month, -12))
         self.user_a.save(update_fields=['date_joined'])
 
         plan_pro = Plan.objects.get(slug='pro')
@@ -1161,7 +1305,7 @@ class TestFinanzasAPI(APITestCase):
     def test_proyeccion_acumulada_plan_pro_amortigua_outlier_con_iqr_y_ewma(self):
         current_month = first_day_of_month(datetime.date.today())
         previous_month = add_months(current_month, -1)
-        self.user_a.date_joined = add_months(current_month, -6)
+        self.user_a.date_joined = aware_midnight(add_months(current_month, -6))
         self.user_a.save(update_fields=['date_joined'])
 
         plan_pro = Plan.objects.get(slug='pro')
@@ -1215,7 +1359,7 @@ class TestFinanzasAPI(APITestCase):
     def test_proyeccion_acumulada_cuenta_extras_anteriores_al_registro_si_caen_en_historial(self):
         current_month = first_day_of_month(datetime.date.today())
         previous_month = add_months(current_month, -1)
-        self.user_a.date_joined = current_month
+        self.user_a.date_joined = aware_midnight(current_month)
         self.user_a.save(update_fields=['date_joined'])
 
         plan_pro = Plan.objects.get(slug='pro')
@@ -1271,7 +1415,7 @@ class TestFinanzasAPI(APITestCase):
     def test_proyeccion_acumulada_deja_past_months_solo_para_la_vista(self):
         current_month = first_day_of_month(datetime.date.today())
         previous_month = add_months(current_month, -1)
-        self.user_a.date_joined = add_months(current_month, -24)
+        self.user_a.date_joined = aware_midnight(add_months(current_month, -24))
         self.user_a.save(update_fields=['date_joined'])
 
         plan_pro = Plan.objects.get(slug='pro')
