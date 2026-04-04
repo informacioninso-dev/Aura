@@ -16,6 +16,7 @@ from apps.usuarios.plans import (
     FEATURE_ADVANCED_PROJECTION_ENABLED,
     FEATURE_ADVANCED_PROJECTION_MONTHS,
     FEATURE_IMPORT_MAX_ROWS,
+    get_user_projection_mode,
     get_user_feature_value,
 )
 from .models import (
@@ -192,6 +193,7 @@ class SaldoMesViewSet(BaseFinanzasViewSet):
 
 class ProyeccionAcumuladaView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
+    MAX_ANALYSIS_HISTORY_MONTHS = 18
 
     def get(self, request):
         has_access = bool(
@@ -250,18 +252,30 @@ class ProyeccionAcumuladaView(APIView):
             real_past_months = max(1, min(24, int(raw_past)))
         except (TypeError, ValueError):
             real_past_months = 6
+        current_month = datetime.date(hoy.year, hoy.month, 1)
+        primera_fecha = _primera_fecha_con_movimientos(request.user)
+        if primera_fecha:
+            primera_mes = datetime.date(primera_fecha.year, primera_fecha.month, 1)
+            available_history_months = max(
+                0,
+                ((current_month.year - primera_mes.year) * 12) + (current_month.month - primera_mes.month),
+            )
+        else:
+            available_history_months = 0
+        analysis_history_months = min(self.MAX_ANALYSIS_HISTORY_MONTHS, available_history_months)
         cache_key = build_projection_cache_key(
             request.user.pk,
             months=months,
             past_months=real_past_months,
+            projection_mode=get_user_projection_mode(request.user),
+            analysis_history_months=analysis_history_months,
         )
         cached_data = cache.get(cache_key)
         if cached_data is not None:
             return Response(cached_data)
 
-        current_month = datetime.date(hoy.year, hoy.month, 1)
         history_end = current_month - datetime.timedelta(days=1)
-        history_start = _restar_meses(current_month, max(12, real_past_months))
+        history_start = _restar_meses(current_month, real_past_months)
         asegurar_saldos_historicos(request.user, history_end)
         asegurar_saldo_mes(request.user, history_start.year, history_start.month)
         saldo, created = obtener_o_sembrar_saldo_mes(request.user, saldo_anio, saldo_mes)
@@ -270,11 +284,14 @@ class ProyeccionAcumuladaView(APIView):
         data = calcular_proyeccion_acumulada(
             request.user,
             months=months,
-            history_months=max(12, real_past_months),
+            history_months=analysis_history_months,
             real_past_months=real_past_months,
             starting_balance=starting_balance,
         )
         data['max_months_allowed'] = max_months
+        data['display_past_months'] = real_past_months
+        data['analysis_history_months'] = analysis_history_months
+        data['analysis_history_cap_months'] = self.MAX_ANALYSIS_HISTORY_MONTHS
         data['starting_balance_applied'] = bool(saldo.activo)
         data['starting_balance_month'] = f'{saldo_anio}-{saldo_mes:02d}'
         data['starting_balance_seeded'] = created
@@ -407,8 +424,10 @@ def _build_reporte_data(usuario, anio, mes):
     for gasto in gnc_qs:
         cat_totales[gasto.categoria] = cat_totales.get(gasto.categoria, Decimal('0')) + Decimal(str(gasto.monto))
 
-    if total_dif > 0:
-        cat_totales['cuotas'] = cat_totales.get('cuotas', Decimal('0')) + total_dif
+    for diferido in dif_qs:
+        cat_totales[diferido.categoria] = (
+            cat_totales.get(diferido.categoria, Decimal('0')) + Decimal(str(diferido.cuota_mensual))
+        )
 
     categorias = {c.nombre: c for c in Categoria.objects.filter(usuario=usuario)}
     categorias_detalle = []

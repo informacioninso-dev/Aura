@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Calculator, CheckCircle, XCircle, Save, Trash2, CreditCard } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts'
 
@@ -181,6 +181,8 @@ export default function Simulador() {
     variableProjectionApplied: !advancedProjectionEnabled,
     historyMonthsUsed: 0,
     minVariableHistoryMonths: 3,
+    analysisHistoryMonths: 0,
+    analysisHistoryCapMonths: 18,
   })
   const [form, setForm] = useState(EMPTY_FORM)
   const [resultado, setResultado] = useState(null)
@@ -191,6 +193,7 @@ export default function Simulador() {
   const [agregando, setAgregando] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
+  const [confirmAddDiferidoOpen, setConfirmAddDiferidoOpen] = useState(false)
 
   const [diferidoOk, setDiferidoOk] = useState(false)
   const [feedback, setFeedback] = useState({ type: '', message: '' })
@@ -198,15 +201,19 @@ export default function Simulador() {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const flujoRequestIdRef = useRef(0)
 
   useEffect(() => {
     loadInitialData()
   }, [])
 
   async function cargarFlujoBase({ monthsNeeded = 24 } = {}) {
+    const requestId = flujoRequestIdRef.current + 1
+    flujoRequestIdRef.current = requestId
     if (advancedProjectionEnabled) {
       const months = Math.min(Math.max(24, monthsNeeded), advancedProjectionMaxMonths)
       const { data } = await api.get(`/finanzas/proyeccion-acumulada/?months=${months}&past_months=${SIMULADOR_PAST_MONTHS}`)
+      if (requestId !== flujoRequestIdRef.current) return null
       const projectedSeries = (data.series || []).filter((point) => !point.is_real).slice(0, months)
       const nextSaldoInicial = resolveSaldoInicial({
         monto: projectedSeries[0]?.opening_balance ?? data.starting_balance ?? 0,
@@ -217,6 +224,8 @@ export default function Simulador() {
         variableProjectionApplied: data.variable_projection_applied !== false,
         historyMonthsUsed: Number(data.history_months_used || 0),
         minVariableHistoryMonths: Number(data.min_variable_history_months || 3),
+        analysisHistoryMonths: Number(data.analysis_history_months || 0),
+        analysisHistoryCapMonths: Number(data.analysis_history_cap_months || 18),
       }
       setSaldoInicial(nextSaldoInicial)
       setFlujoBase(nextFlujoBase)
@@ -245,7 +254,10 @@ export default function Simulador() {
       variableProjectionApplied: true,
       historyMonthsUsed: 0,
       minVariableHistoryMonths: 3,
+      analysisHistoryMonths: 0,
+      analysisHistoryCapMonths: 18,
     }
+    if (requestId !== flujoRequestIdRef.current) return null
     setSaldoInicial(nextSaldoInicial)
     setFlujoBase(nextFlujoBase)
     setSimulationProjectionMeta(nextMeta)
@@ -421,6 +433,7 @@ export default function Simulador() {
 
   async function agregarComoDiferido() {
     if (!resultado || agregando) return
+    setConfirmAddDiferidoOpen(false)
     setAgregando(true)
     setFeedback({ type: '', message: '' })
 
@@ -474,9 +487,12 @@ export default function Simulador() {
 
   const moneda = user?.moneda_preferida || 'USD'
   const fmt = (value) => formatMoney(value, { currency: moneda })
+  const fechaInicioDiferidoLabel = form.fecha_inicio
+    ? parseLocalDate(form.fecha_inicio).toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' })
+    : ''
   const simulationModeLabel = PROJECTION_MODE_LABELS[simulationProjectionMeta.mode] || 'Simple'
   const simulationModeNote = advancedProjectionEnabled
-    ? `Usa tu modo actual de proyeccion: ${simulationModeLabel}.`
+    ? `Usa tu modo actual de proyeccion: ${simulationModeLabel}. Analiza hasta ${simulationProjectionMeta.analysisHistoryCapMonths} meses y hoy esta usando ${simulationProjectionMeta.analysisHistoryMonths || 0}.`
     : 'Usa una lectura simple de tu flujo actual.'
 
   const filteredSimulaciones = useMemo(() => {
@@ -719,7 +735,7 @@ export default function Simulador() {
                       </div>
                     ) : (
                       <button
-                        onClick={agregarComoDiferido}
+                        onClick={() => setConfirmAddDiferidoOpen(true)}
                         disabled={agregando}
                         className="btn-modal-save"
                         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '12px 0' }}
@@ -857,6 +873,17 @@ export default function Simulador() {
           </div>
         </>
       )}
+
+      <ConfirmDialog
+        open={confirmAddDiferidoOpen}
+        title="Agregar cuota a tu flujo"
+        message={`Se agregara una cuota mensual de ${fmt(resultado?.cuota || 0)} desde ${fechaInicioDiferidoLabel || form.fecha_inicio} en tus gastos a cuotas.`}
+        confirmText="Confirmar"
+        cancelText="Cancelar"
+        loading={agregando}
+        onConfirm={agregarComoDiferido}
+        onClose={() => setConfirmAddDiferidoOpen(false)}
+      />
 
       <ConfirmDialog
         open={confirmDeleteId !== null}

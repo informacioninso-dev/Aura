@@ -39,6 +39,18 @@ function getProjectionModeHelp(mode) {
   return 'Automatica: amortigua picos y aprende de tus extras.'
 }
 
+function getProjectionAnalysisHelp(mode, analysisMonths, analysisCapMonths) {
+  const historyText = analysisMonths > 0
+    ? (analysisMonths < analysisCapMonths
+        ? `La proyeccion analiza ${analysisMonths} meses porque es la historia disponible.`
+        : `La proyeccion analiza hasta ${analysisCapMonths} meses de historial disponible.`)
+    : 'Aun no hay historial suficiente para analizar extras.'
+
+  if (mode === 'simple') return `${historyText} Simple toma todos tus extras con una lectura directa.`
+  if (mode === 'personalizada') return `${historyText} Personalizada solo toma los extras que marques.`
+  return `${historyText} Automatica amortigua picos con esa historia.`
+}
+
 function parseLocalDate(value) {
   const [y, m, d] = value.split('-').map(Number)
   return new Date(y, m - 1, d)
@@ -105,6 +117,7 @@ export default function Dashboard() {
   const [futureMonths, setFutureMonths] = useState(12)
   const [seriesFocus, setSeriesFocus] = useState('all')
   const projectionDebounceRef = useRef(null)
+  const projectionRequestIdRef = useRef(0)
 
   const advancedProjectionEnabled = Boolean(user?.feature_access?.advanced_projection_enabled)
   const advancedProjectionMaxMonths = normalizePositiveInt(user?.feature_access?.advanced_projection_months, 60)
@@ -172,6 +185,8 @@ export default function Dashboard() {
   async function loadAdvancedProjection(fm = futureMonths, pm = pastMonths, { forceRecalculate = false } = {}) {
     if (!advancedProjectionEnabled) return
 
+    const requestId = projectionRequestIdRef.current + 1
+    projectionRequestIdRef.current = requestId
     const months = Math.min(fm, advancedProjectionMaxMonths)
     setProjectionLoading(true)
     setProjectionError('')
@@ -181,11 +196,14 @@ export default function Dashboard() {
         await api.post('/finanzas/saldo-mes/recalcular/')
       }
       const { data: response } = await api.get(`/finanzas/proyeccion-acumulada/?months=${months}&past_months=${pm}`)
+      if (requestId !== projectionRequestIdRef.current) return
       setAdvancedProjection(response)
     } catch (err) {
+      if (requestId !== projectionRequestIdRef.current) return
       setAdvancedProjection(null)
       setProjectionError(getApiErrorMessage(err, 'No se pudo cargar la proyeccion premium.'))
     } finally {
+      if (requestId !== projectionRequestIdRef.current) return
       setProjectionLoading(false)
     }
   }
@@ -550,7 +568,7 @@ export default function Dashboard() {
               </select>
             </label>
             <label className="dashboard-chart-control">
-              <span>Historico</span>
+              <span>Vista</span>
               <select
                 className="dashboard-chart-select"
                 value={pastMonths}
@@ -611,6 +629,14 @@ export default function Dashboard() {
             </div>
           </div>
 
+          <p className="dashboard-chart-note" style={{ marginTop: 0, marginBottom: 12 }}>
+            {getProjectionAnalysisHelp(
+              projectionMode,
+              advancedProjection?.analysis_history_months ?? 0,
+              advancedProjection?.analysis_history_cap_months ?? 18,
+            )}
+          </p>
+
           {projectionLoading ? (
             <div className="loading-screen" style={{ minHeight: '220px' }}>
               <div className="spinner" />
@@ -630,6 +656,7 @@ export default function Dashboard() {
                 const projectedGapLabel = latestProjectedPoint?.label ?? 'fin del horizonte'
                 const variableProjectionApplied = advancedProjection?.variable_projection_applied ?? true
                 const minVariableHistoryMonths = advancedProjection?.min_variable_history_months ?? 3
+                const analysisHistoryMonths = advancedProjection?.analysis_history_months ?? 0
                 return (
                   <div className="dashboard-premium-meta">
                     <div className="dashboard-premium-stat">
@@ -663,8 +690,8 @@ export default function Dashboard() {
                       </strong>
                       <span className="dashboard-chart-note">
                         {variableProjectionApplied
-                          ? 'Solo cuenta extras que entran en tu proyeccion'
-                          : `La parte variable necesita al menos ${minVariableHistoryMonths} meses`}
+                          ? `La proyeccion usa ${analysisHistoryMonths} meses de historia para estimar tus extras`
+                          : `La parte variable necesita al menos ${minVariableHistoryMonths} meses dentro de la historia analizada`}
                       </span>
                     </div>
                   </div>
@@ -675,6 +702,7 @@ export default function Dashboard() {
                 const histMesesAviso = advancedProjection?.history_months_used ?? 0
                 const variableProjectionApplied = advancedProjection?.variable_projection_applied ?? true
                 const minVariableHistoryMonths = advancedProjection?.min_variable_history_months ?? 3
+                const analysisHistoryMonths = advancedProjection?.analysis_history_months ?? 0
                 if (!variableProjectionApplied) return (
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 12, padding: '10px 14px', marginBottom: 14 }}>
                     <span style={{ fontSize: 16, lineHeight: 1 }}>⚠️</span>
@@ -682,8 +710,8 @@ export default function Dashboard() {
                       <div style={{ fontSize: 13, fontWeight: 600, color: '#FBBF24', marginBottom: 2 }}>La base fija ya esta proyectada</div>
                       <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
                         {histMesesAviso === 0
-                          ? `Tus ingresos, gastos fijos y cuotas ya estan incluidos. La parte variable aun no entra porque necesitas ${minVariableHistoryMonths} meses con extras elegibles.`
-                          : `Tus ingresos, gastos fijos y cuotas ya estan incluidos. La parte variable aun no entra porque solo hay ${histMesesAviso} ${histMesesAviso === 1 ? 'mes' : 'meses'} con extras elegibles; necesitas ${minVariableHistoryMonths}.`}
+                          ? `Tus ingresos, gastos fijos y cuotas ya estan incluidos. La parte variable aun no entra porque necesitas ${minVariableHistoryMonths} meses con extras elegibles dentro de la historia analizada (${analysisHistoryMonths} meses disponibles hoy).`
+                          : `Tus ingresos, gastos fijos y cuotas ya estan incluidos. La parte variable aun no entra porque solo hay ${histMesesAviso} ${histMesesAviso === 1 ? 'mes' : 'meses'} con extras elegibles dentro de la historia analizada (${analysisHistoryMonths} meses disponibles hoy); necesitas ${minVariableHistoryMonths}.`}
                       </div>
                     </div>
                   </div>

@@ -55,6 +55,15 @@ def _gasto_mensual_categoria(usuario, categoria, anio, mes):
         fecha__gte=primer_dia, fecha__lte=ultimo_dia,
     )
     total += sum(Decimal(str(g.monto)) for g in gnc)
+
+    diferidos = Diferido.objects.filter(
+        usuario=usuario,
+        categoria=categoria,
+        activo=True,
+        fecha_inicio__lte=ultimo_dia,
+        fecha_fin__gte=primer_dia,
+    )
+    total += sum(Decimal(str(d.cuota_mensual)) for d in diferidos)
     return total
 
 

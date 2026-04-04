@@ -101,9 +101,12 @@ def get_finanzas_cache_version(user_id):
     return version
 
 
-def build_projection_cache_key(user_id, *, months, past_months):
+def build_projection_cache_key(user_id, *, months, past_months, projection_mode='simple', analysis_history_months=0):
     version = get_finanzas_cache_version(user_id)
-    return f'finanzas:projection:{user_id}:v{version}:m{months}:p{past_months}'
+    return (
+        f'finanzas:projection:{user_id}:v{version}:m{months}:p{past_months}:'
+        f'mode{projection_mode}:ah{analysis_history_months}'
+    )
 
 
 def get_finanzas_dirty_from(user_id):
@@ -549,8 +552,6 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real
     # real_start NO se restringe por date_joined — el usuario puede tener
     # registros fijos cargados con fecha anterior a su registro en la app
     real_start = _restar_meses(current_month, real_past_months)
-    earliest_user_month = _primer_dia_mes(getattr(usuario, 'date_joined', today))
-
     history_start = _restar_meses(current_month, history_months)
     history_end = current_month - datetime.timedelta(days=1)
     projection_end = _ultimo_dia_mes(*_sumar_meses_fecha(current_month, months - 1).timetuple()[:2])
@@ -635,8 +636,7 @@ def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real
         )
 
     # Compute smoothed variable incomes/expenses from full history window
-    earliest_history_month = max(earliest_user_month, history_start)
-    history_cursor = earliest_history_month
+    history_cursor = history_start
     variable_ingresos = []
     variable_gastos = []
     history_months_used = 0

@@ -252,10 +252,27 @@ export default function Diferidos() {
               </div>
             </div>
           </div>
-          <label className="form-modal-check">
-            <input type="checkbox" checked={form.activo} onChange={e => setForm({ ...form, activo: e.target.checked })} />
-            <span>Se suma a tu flujo</span>
-          </label>
+          {editId ? (
+            <label className="form-modal-check">
+              <input type="checkbox" checked={form.activo} onChange={e => setForm({ ...form, activo: e.target.checked })} />
+              <span>Activo en tu flujo</span>
+            </label>
+          ) : (
+            <div
+              style={{
+                marginTop: 4,
+                marginBottom: 8,
+                padding: '10px 12px',
+                borderRadius: 12,
+                border: '1px solid rgba(196,135,246,0.18)',
+                background: 'rgba(196,135,246,0.06)',
+                fontSize: 13,
+                color: 'rgba(255,255,255,0.72)',
+              }}
+            >
+              Esta cuota se sumara automaticamente a tu flujo mensual.
+            </div>
+          )}
           <div className="form-modal-actions">
             <button type="button" className="btn-modal-cancel" onClick={() => setModal(false)}>Cancelar</button>
             <button type="submit" className="btn-modal-save" disabled={loading}>

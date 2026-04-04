@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2, Check, X } from 'lucide-react'
 
 import api from '../../api/client'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
+import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import Modal from '../../components/ui/Modal'
 import { formatAmount } from '../../utils/formatters'
 import '../../components/ui/app.css'
@@ -60,20 +61,23 @@ export default function Presupuesto() {
   const [deletingId, setDeletingId] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [editPresup, setEditPresup] = useState(null)
+  const [savingBudgetId, setSavingBudgetId] = useState(null)
   const [valorPresup, setValorPresup] = useState('')
   const [query, setQuery] = useState('')
   const [showAllSummary, setShowAllSummary] = useState(false)
   const [showAllIcons, setShowAllIcons] = useState(false)
+  const [feedback, setFeedback] = useState({ type: '', message: '' })
 
   useEffect(() => {
     cargarTodo()
   }, [])
 
   async function cargarTodo() {
-    const [cats, gc, gnc] = await Promise.all([
+    const [cats, gc, gnc, dif] = await Promise.all([
       api.get('/finanzas/categorias/'),
       api.get('/finanzas/gastos-corrientes/'),
       api.get('/finanzas/gastos-no-corrientes/'),
+      api.get('/finanzas/diferidos/'),
     ])
     setCategorias(cats.data)
 
@@ -98,12 +102,26 @@ export default function Presupuesto() {
       }
     })
 
+    dif.data.filter((d) => d.activo).forEach((d) => {
+      const ini = parseLocalDate(d.fecha_inicio)
+      const fin = parseLocalDate(d.fecha_fin)
+      const fecha = new Date(anio, mes, 1)
+      if (ini <= fecha && fin >= fecha) {
+        totales[d.categoria] = (totales[d.categoria] || 0) + toMoneyNumber(d.cuota_mensual)
+      }
+    })
+
     setGastos(totales)
   }
 
   function closeModal() {
     setModal(false)
     setShowAllIcons(false)
+  }
+
+  function closeBudgetEditor() {
+    setEditPresup(null)
+    setValorPresup('')
   }
 
   function openNew() {
@@ -160,20 +178,41 @@ export default function Presupuesto() {
   }
 
   async function guardarPresupuesto(cat) {
-    const limite = parseFloat(valorPresup)
-    if (!valorPresup || Number.isNaN(limite) || limite <= 0) {
-      setEditPresup(null)
+    if (savingBudgetId === cat.id) return
+    const rawValue = String(valorPresup || '').trim().replace(',', '.')
+    const limite = parseFloat(rawValue)
+    if (!rawValue || Number.isNaN(limite) || limite <= 0) {
+      setFeedback({ type: 'error', message: 'Escribe un limite mensual valido mayor que cero.' })
       return
     }
-    const { data } = await api.patch(`/finanzas/categorias/${cat.id}/`, { limite_mensual: limite })
-    setCategorias((prev) => prev.map((item) => (item.id === cat.id ? data : item)))
-    setEditPresup(null)
+    setSavingBudgetId(cat.id)
+    setFeedback({ type: '', message: '' })
+    try {
+      const { data } = await api.patch(`/finanzas/categorias/${cat.id}/`, { limite_mensual: limite })
+      setCategorias((prev) => prev.map((item) => (item.id === cat.id ? data : item)))
+      closeBudgetEditor()
+      setFeedback({ type: 'success', message: `Listo. ${cat.nombre} ya tiene presupuesto mensual.` })
+    } catch {
+      setFeedback({ type: 'error', message: 'No se pudo guardar el presupuesto. Intenta otra vez.' })
+    } finally {
+      setSavingBudgetId(null)
+    }
   }
 
   async function quitarPresupuesto(cat) {
-    const { data } = await api.patch(`/finanzas/categorias/${cat.id}/`, { limite_mensual: null })
-    setCategorias((prev) => prev.map((item) => (item.id === cat.id ? data : item)))
-    setEditPresup(null)
+    if (savingBudgetId === cat.id) return
+    setSavingBudgetId(cat.id)
+    setFeedback({ type: '', message: '' })
+    try {
+      const { data } = await api.patch(`/finanzas/categorias/${cat.id}/`, { limite_mensual: null })
+      setCategorias((prev) => prev.map((item) => (item.id === cat.id ? data : item)))
+      closeBudgetEditor()
+      setFeedback({ type: 'success', message: `Quitaste el presupuesto mensual de ${cat.nombre}.` })
+    } catch {
+      setFeedback({ type: 'error', message: 'No se pudo quitar el presupuesto. Intenta otra vez.' })
+    } finally {
+      setSavingBudgetId(null)
+    }
   }
 
   const categoriasOrdenadas = useMemo(() => sortCategoriasPorUso(categorias, gastos), [categorias, gastos])
@@ -214,6 +253,8 @@ export default function Presupuesto() {
           Nueva categoria
         </button>
       </div>
+
+      <FeedbackAlert type={feedback.type || 'error'} message={feedback.message} />
 
       <div className="stats-grid" style={{ marginBottom: 20 }}>
         <div className="stat-card">
@@ -308,8 +349,10 @@ export default function Presupuesto() {
                 setEditPresup={setEditPresup}
                 valorPresup={valorPresup}
                 setValorPresup={setValorPresup}
+                savingBudgetId={savingBudgetId}
                 guardarPresupuesto={guardarPresupuesto}
                 quitarPresupuesto={quitarPresupuesto}
+                closeBudgetEditor={closeBudgetEditor}
               />
             ))}
           </div>
@@ -334,8 +377,10 @@ export default function Presupuesto() {
                 setEditPresup={setEditPresup}
                 valorPresup={valorPresup}
                 setValorPresup={setValorPresup}
+                savingBudgetId={savingBudgetId}
                 guardarPresupuesto={guardarPresupuesto}
                 quitarPresupuesto={quitarPresupuesto}
+                closeBudgetEditor={closeBudgetEditor}
               />
             ))}
           </div>
@@ -478,14 +523,17 @@ function TarjetaCategoria({
   setEditPresup,
   valorPresup,
   setValorPresup,
+  savingBudgetId,
   guardarPresupuesto,
   quitarPresupuesto,
+  closeBudgetEditor,
 }) {
   const limite = cat.limite_mensual != null ? parseFloat(cat.limite_mensual) : null
   const pct = limite ? Math.min(100, Math.round((gasto / limite) * 100)) : null
   const over = pct !== null && pct >= 100
   const warn = pct !== null && pct >= 75 && pct < 100
   const barColor = over ? '#F87171' : warn ? '#FBBF24' : '#10B981'
+  const isSavingBudget = savingBudgetId === cat.id
 
   return (
     <div className="card" style={{ padding: 16 }}>
@@ -523,7 +571,13 @@ function TarjetaCategoria({
       )}
 
       {editPresup === cat.id ? (
-        <div className="budget-inline-edit">
+        <form
+          className="budget-inline-edit"
+          onSubmit={(e) => {
+            e.preventDefault()
+            guardarPresupuesto(cat)
+          }}
+        >
           <input
             className="form-modal-input"
             type="number"
@@ -532,30 +586,42 @@ function TarjetaCategoria({
             placeholder="Limite mensual"
             value={valorPresup}
             onChange={(e) => setValorPresup(e.target.value)}
-            style={{ flex: 1, padding: '7px 10px', fontSize: 13 }}
+            inputMode="decimal"
+            style={{ flex: 1, padding: '10px 12px', fontSize: 14 }}
             autoFocus
+            disabled={isSavingBudget}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') guardarPresupuesto(cat)
-              if (e.key === 'Escape') setEditPresup(null)
+              if (e.key === 'Escape') closeBudgetEditor()
             }}
           />
-          <button
-            type="button"
-            onClick={() => guardarPresupuesto(cat)}
-            style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.30)', borderRadius: 8, padding: '6px 8px', color: '#10B981', cursor: 'pointer', display: 'flex' }}
-          >
-            <Check size={14} />
-          </button>
-          {limite !== null && (
+          <div className="budget-inline-actions">
+            <button
+              type="submit"
+              className="budget-inline-button budget-inline-button-primary"
+              disabled={isSavingBudget}
+            >
+              <Check size={14} /> {isSavingBudget ? 'Guardando...' : 'Guardar'}
+            </button>
             <button
               type="button"
-              onClick={() => quitarPresupuesto(cat)}
-              style={{ background: 'rgba(248,113,113,0.10)', border: '1px solid rgba(248,113,113,0.20)', borderRadius: 8, padding: '6px 8px', color: '#F87171', cursor: 'pointer', display: 'flex' }}
+              className="budget-inline-button budget-inline-button-secondary"
+              onClick={closeBudgetEditor}
+              disabled={isSavingBudget}
             >
-              <X size={14} />
+              Cancelar
             </button>
-          )}
-        </div>
+            {limite !== null && (
+              <button
+                type="button"
+                className="budget-inline-button budget-inline-button-danger"
+                onClick={() => quitarPresupuesto(cat)}
+                disabled={isSavingBudget}
+              >
+                <X size={14} /> Quitar
+              </button>
+            )}
+          </div>
+        </form>
       ) : (
         <button
           type="button"

@@ -306,6 +306,35 @@ class TestFinanzasAPI(APITestCase):
         self.assertEqual(Decimal(str(response.data['resumen']['total_gastos'])), Decimal('750.00'))
         self.assertEqual(Decimal(str(response.data['resumen']['balance'])), Decimal('1750.00'))
 
+    def test_reporte_categoria_incluye_cuotas_en_su_categoria_real(self):
+        Diferido.objects.create(
+            usuario=self.user_a,
+            descripcion='Laptop',
+            categoria='tecnologia',
+            monto_total=Decimal('1200.00'),
+            num_cuotas=12,
+            cuota_mensual=Decimal('100.00'),
+            fecha_inicio='2026-01-01',
+            fecha_fin='2026-12-31',
+            activo=True,
+        )
+        GastoNoCorriente.objects.create(
+            usuario=self.user_a,
+            descripcion='Mouse',
+            categoria='tecnologia',
+            monto=Decimal('50.00'),
+            fecha='2026-02-15',
+        )
+
+        self.client.force_authenticate(user=self.user_a)
+        response = self.client.get('/api/finanzas/reporte/?anio=2026&mes=2')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Decimal(str(response.data['resumen']['cuotas'])), Decimal('100.00'))
+        tecnologia = next((item for item in response.data['categorias'] if item['categoria'] == 'tecnologia'), None)
+        self.assertIsNotNone(tecnologia)
+        self.assertEqual(Decimal(str(tecnologia['total'])), Decimal('150.00'))
+
     def test_reporte_pdf_endpoint_responde_pdf_o_servicio_no_disponible(self):
         self.client.force_authenticate(user=self.user_a)
         response = self.client.get('/api/finanzas/reporte/pdf/?anio=2026&mes=2')
@@ -671,6 +700,9 @@ class TestFinanzasAPI(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['months'], 6)
+        self.assertEqual(response.data['display_past_months'], 6)
+        self.assertEqual(response.data['analysis_history_months'], 12)
+        self.assertEqual(response.data['analysis_history_cap_months'], 18)
         self.assertEqual(response.data['history_months_used'], 12)
         self.assertTrue(response.data['variable_projection_applied'])
         self.assertEqual(response.data['min_variable_history_months'], 3)
@@ -870,14 +902,14 @@ class TestFinanzasAPI(APITestCase):
         )
 
         self.client.force_authenticate(user=self.user_a)
-        response = self.client.get('/api/finanzas/proyeccion-acumulada/?months=1&past_months=1')
+        response = self.client.get('/api/finanzas/proyeccion-acumulada/?months=1&past_months=6')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['history_months_used'], 1)
         self.assertFalse(response.data['variable_projection_applied'])
         self.assertEqual(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('0.0'))
         self.assertEqual(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('0.0'))
-        self.assertEqual(Decimal(str(response.data['series'][1]['projected_gap'])), Decimal('600.0'))
+        self.assertEqual(Decimal(str(response.data['series'][-1]['projected_gap'])), Decimal('600.0'))
 
     def test_proyeccion_acumulada_plan_pro_aplica_variable_con_tres_meses_elegibles(self):
         current_month = first_day_of_month(datetime.date.today())
@@ -940,14 +972,14 @@ class TestFinanzasAPI(APITestCase):
         )
 
         self.client.force_authenticate(user=self.user_a)
-        response = self.client.get('/api/finanzas/proyeccion-acumulada/?months=1&past_months=1')
+        response = self.client.get('/api/finanzas/proyeccion-acumulada/?months=1&past_months=6')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['history_months_used'], 3)
         self.assertTrue(response.data['variable_projection_applied'])
         self.assertGreater(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('0.0'))
         self.assertGreater(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('0.0'))
-        self.assertGreater(Decimal(str(response.data['series'][1]['projected_gap'])), Decimal('600.0'))
+        self.assertGreater(Decimal(str(response.data['series'][-1]['projected_gap'])), Decimal('600.0'))
 
     def test_proyeccion_acumulada_plan_pro_modo_simple_usa_todos_los_extras(self):
         current_month = first_day_of_month(datetime.date.today())
@@ -994,15 +1026,77 @@ class TestFinanzasAPI(APITestCase):
         )
 
         self.client.force_authenticate(user=self.user_a)
-        response = self.client.get('/api/finanzas/proyeccion-acumulada/?months=1&past_months=1')
+        response = self.client.get('/api/finanzas/proyeccion-acumulada/?months=1&past_months=6')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['projection_mode'], 'simple')
         self.assertEqual(response.data['history_months_used'], 3)
         self.assertTrue(response.data['variable_projection_applied'])
         self.assertEqual(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('0.0'))
-        self.assertEqual(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('21.15'))
-        self.assertEqual(Decimal(str(response.data['series'][1]['projected_gap'])), Decimal('578.85'))
+        self.assertEqual(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('50.0'))
+        self.assertEqual(Decimal(str(response.data['series'][-1]['projected_gap'])), Decimal('550.0'))
+
+    def test_proyeccion_acumulada_no_reutiliza_cache_de_otro_modo(self):
+        current_month = first_day_of_month(datetime.date.today())
+        previous_month = add_months(current_month, -1)
+        self.user_a.date_joined = add_months(current_month, -12)
+        self.user_a.projection_mode = 'simple'
+        self.user_a.save(update_fields=['date_joined', 'projection_mode'])
+
+        plan_pro = Plan.objects.get(slug='pro')
+        assign_plan_to_user(user=self.user_a, plan=plan_pro, assigned_by=None, notes='Projection mode cache separation')
+
+        Ingreso.objects.create(
+            usuario=self.user_a,
+            descripcion='Salario',
+            monto=Decimal('1000.00'),
+            frecuencia='mensual',
+            fecha_inicio=add_months(current_month, -3),
+            activo=True,
+        )
+        GastoCorriente.objects.create(
+            usuario=self.user_a,
+            descripcion='Arriendo',
+            categoria='vivienda',
+            monto=Decimal('400.00'),
+            frecuencia='mensual',
+            fecha_inicio=add_months(current_month, -3),
+            activo=True,
+        )
+        for offset in range(1, 4):
+            month = add_months(current_month, -offset)
+            GastoNoCorriente.objects.create(
+                usuario=self.user_a,
+                descripcion=f'Gasto fuera {offset}',
+                categoria='otro',
+                monto=Decimal('50.00'),
+                fecha=month + datetime.timedelta(days=8),
+                incluir_en_proyeccion=False,
+            )
+        SaldoMes.objects.update_or_create(
+            usuario=self.user_a,
+            anio=previous_month.year,
+            mes=previous_month.month,
+            defaults={'monto': Decimal('0.00'), 'activo': True},
+        )
+
+        self.client.force_authenticate(user=self.user_a)
+
+        response_simple = self.client.get('/api/finanzas/proyeccion-acumulada/?months=1&past_months=6')
+        self.assertEqual(response_simple.status_code, status.HTTP_200_OK)
+        self.assertEqual(response_simple.data['projection_mode'], 'simple')
+        self.assertTrue(response_simple.data['variable_projection_applied'])
+        self.assertEqual(Decimal(str(response_simple.data['smoothed_variable_gastos'])), Decimal('50.0'))
+
+        self.user_a.projection_mode = 'personalizada'
+        self.user_a.save(update_fields=['projection_mode'])
+
+        response_personalizada = self.client.get('/api/finanzas/proyeccion-acumulada/?months=1&past_months=6')
+        self.assertEqual(response_personalizada.status_code, status.HTTP_200_OK)
+        self.assertEqual(response_personalizada.data['projection_mode'], 'personalizada')
+        self.assertFalse(response_personalizada.data['variable_projection_applied'])
+        self.assertEqual(Decimal(str(response_personalizada.data['smoothed_variable_gastos'])), Decimal('0.0'))
+        self.assertEqual(Decimal(str(response_personalizada.data['series'][-1]['projected_gap'])), Decimal('600.0'))
 
     def test_proyeccion_acumulada_plan_pro_estima_variable_segun_frecuencia_de_meses_activos(self):
         current_month = first_day_of_month(datetime.date.today())
@@ -1055,14 +1149,14 @@ class TestFinanzasAPI(APITestCase):
         )
 
         self.client.force_authenticate(user=self.user_a)
-        response = self.client.get('/api/finanzas/proyeccion-acumulada/?months=1&past_months=1')
+        response = self.client.get('/api/finanzas/proyeccion-acumulada/?months=1&past_months=6')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['history_months_used'], 3)
         self.assertTrue(response.data['variable_projection_applied'])
-        self.assertEqual(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('30.0'))
-        self.assertEqual(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('15.0'))
-        self.assertEqual(Decimal(str(response.data['series'][1]['projected_gap'])), Decimal('615.0'))
+        self.assertEqual(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('120.0'))
+        self.assertEqual(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('60.0'))
+        self.assertEqual(Decimal(str(response.data['series'][-1]['projected_gap'])), Decimal('660.0'))
 
     def test_proyeccion_acumulada_plan_pro_amortigua_outlier_con_iqr_y_ewma(self):
         current_month = first_day_of_month(datetime.date.today())
@@ -1109,7 +1203,7 @@ class TestFinanzasAPI(APITestCase):
         )
 
         self.client.force_authenticate(user=self.user_a)
-        response = self.client.get('/api/finanzas/proyeccion-acumulada/?months=1&past_months=1')
+        response = self.client.get('/api/finanzas/proyeccion-acumulada/?months=1&past_months=6')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['history_months_used'], 6)
@@ -1117,3 +1211,94 @@ class TestFinanzasAPI(APITestCase):
         self.assertEqual(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('100.0'))
         self.assertEqual(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('0.0'))
         self.assertEqual(Decimal(str(response.data['series'][1]['projected_gap'])), Decimal('700.0'))
+
+    def test_proyeccion_acumulada_cuenta_extras_anteriores_al_registro_si_caen_en_historial(self):
+        current_month = first_day_of_month(datetime.date.today())
+        previous_month = add_months(current_month, -1)
+        self.user_a.date_joined = current_month
+        self.user_a.save(update_fields=['date_joined'])
+
+        plan_pro = Plan.objects.get(slug='pro')
+        assign_plan_to_user(user=self.user_a, plan=plan_pro, assigned_by=None, notes='Backfilled extras count')
+        self.user_a.projection_mode = 'personalizada'
+        self.user_a.save(update_fields=['projection_mode'])
+
+        Ingreso.objects.create(
+            usuario=self.user_a,
+            descripcion='Salario',
+            monto=Decimal('1000.00'),
+            frecuencia='mensual',
+            fecha_inicio=add_months(current_month, -3),
+            activo=True,
+        )
+        GastoCorriente.objects.create(
+            usuario=self.user_a,
+            descripcion='Arriendo',
+            categoria='vivienda',
+            monto=Decimal('400.00'),
+            frecuencia='mensual',
+            fecha_inicio=add_months(current_month, -3),
+            activo=True,
+        )
+
+        for offset in range(1, 4):
+            month = add_months(current_month, -offset)
+            GastoNoCorriente.objects.create(
+                usuario=self.user_a,
+                descripcion=f'Extra retroactivo {offset}',
+                categoria='otro',
+                monto=Decimal('75.00'),
+                fecha=month + datetime.timedelta(days=6),
+                incluir_en_proyeccion=True,
+            )
+
+        SaldoMes.objects.update_or_create(
+            usuario=self.user_a,
+            anio=previous_month.year,
+            mes=previous_month.month,
+            defaults={'monto': Decimal('0.00'), 'activo': True},
+        )
+
+        self.client.force_authenticate(user=self.user_a)
+        response = self.client.get('/api/finanzas/proyeccion-acumulada/?months=1&past_months=6')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['history_months_used'], 3)
+        self.assertTrue(response.data['variable_projection_applied'])
+        self.assertEqual(response.data['analysis_history_months'], 3)
+        self.assertEqual(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('75.0'))
+
+    def test_proyeccion_acumulada_deja_past_months_solo_para_la_vista(self):
+        current_month = first_day_of_month(datetime.date.today())
+        previous_month = add_months(current_month, -1)
+        self.user_a.date_joined = add_months(current_month, -24)
+        self.user_a.save(update_fields=['date_joined'])
+
+        plan_pro = Plan.objects.get(slug='pro')
+        assign_plan_to_user(user=self.user_a, plan=plan_pro, assigned_by=None, notes='Display window only')
+
+        Ingreso.objects.create(
+            usuario=self.user_a,
+            descripcion='Salario antiguo',
+            monto=Decimal('1000.00'),
+            frecuencia='mensual',
+            fecha_inicio=add_months(current_month, -24),
+            activo=True,
+        )
+        SaldoMes.objects.update_or_create(
+            usuario=self.user_a,
+            anio=previous_month.year,
+            mes=previous_month.month,
+            defaults={'monto': Decimal('100.00'), 'activo': True},
+        )
+
+        self.client.force_authenticate(user=self.user_a)
+        response = self.client.get('/api/finanzas/proyeccion-acumulada/?months=1&past_months=6')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['display_past_months'], 6)
+        self.assertEqual(response.data['analysis_history_months'], 18)
+        self.assertEqual(response.data['analysis_history_cap_months'], 18)
+        self.assertEqual(len(response.data['series']), 7)
+        self.assertTrue(all(point['is_real'] for point in response.data['series'][:6]))
+        self.assertTrue(all(not point['is_real'] for point in response.data['series'][6:]))
