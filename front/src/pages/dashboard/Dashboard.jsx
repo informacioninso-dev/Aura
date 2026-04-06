@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts'
-import { TrendingUp, TrendingDown, Wallet, Lock, PiggyBank, RefreshCw } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, Lock, PiggyBank, RefreshCw, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 
 import api from '../../api/client'
 import { getApiErrorMessage } from '../../api/errors'
@@ -21,6 +21,16 @@ const FREQ = {
   semestral: 0.167,
   anual: 0.083,
 }
+const FREQUENCY_LABELS = {
+  diario: 'Diario',
+  semanal: 'Semanal',
+  quincenal: 'Quincenal',
+  mensual: 'Mensual',
+  bimestral: 'Bimestral',
+  trimestral: 'Trimestral',
+  semestral: 'Semestral',
+  anual: 'Anual',
+}
 
 const SERIES_FOCUS_OPTIONS = [
   { value: 'all', label: 'Todas' },
@@ -32,6 +42,7 @@ const PROJECTION_MODE_OPTIONS = [
   { value: 'simple', label: 'Simple' },
   { value: 'personalizada', label: 'Personalizada' },
 ]
+const DASHBOARD_FUTURE_MONTHS = 12
 
 function getProjectionModeHelp(mode) {
   if (mode === 'simple') return 'Simple: usa una lectura directa de tus extras.'
@@ -51,6 +62,10 @@ function getProjectionAnalysisHelp(mode, analysisMonths, analysisCapMonths) {
   return `${historyText} Automatica amortigua picos con esa historia.`
 }
 
+function getFrequencyLabel(frequency) {
+  return FREQUENCY_LABELS[frequency] || 'Mensual'
+}
+
 function parseLocalDate(value) {
   const [y, m, d] = value.split('-').map(Number)
   return new Date(y, m - 1, d)
@@ -58,6 +73,10 @@ function parseLocalDate(value) {
 
 function startOfMonth(date) {
   return new Date(date.getFullYear(), date.getMonth(), 1)
+}
+
+function addMonths(date, amount) {
+  return startOfMonth(new Date(date.getFullYear(), date.getMonth() + amount, 1))
 }
 
 function endOfMonth(date) {
@@ -116,6 +135,8 @@ export default function Dashboard() {
   const [pastMonths, setPastMonths] = useState(6)
   const [futureMonths, setFutureMonths] = useState(12)
   const [seriesFocus, setSeriesFocus] = useState('all')
+  const [activeSummaryDetail, setActiveSummaryDetail] = useState(null)
+  const [selectedMonth, setSelectedMonth] = useState(() => startOfMonth(new Date()))
   const projectionDebounceRef = useRef(null)
   const projectionRequestIdRef = useRef(0)
 
@@ -210,6 +231,10 @@ export default function Dashboard() {
     void loadDashboard({ silent: true })
   }
 
+  function toggleSummaryDetail(kind) {
+    setActiveSummaryDetail((current) => (current === kind ? null : kind))
+  }
+
   async function handleProjectionModeChange(nextMode) {
     if (!advancedProjectionEnabled || projectionModeSaving || nextMode === projectionMode) return
     const previousMode = projectionMode
@@ -238,27 +263,188 @@ export default function Dashboard() {
     maximumFractionDigits: 1,
   })
   const mensualizado = (monto, freq) => Number(monto) * (FREQ[freq] || 1)
-  const mesActual = startOfMonth(new Date())
+  const realMonth = useMemo(() => startOfMonth(new Date()), [])
+
+  const dashboardMonthBounds = useMemo(() => {
+    const minCandidates = [realMonth]
+    const maxCandidates = [realMonth, addMonths(realMonth, DASHBOARD_FUTURE_MONTHS)]
+
+    data.ingresos.forEach((item) => {
+      if (item.fecha_inicio) minCandidates.push(startOfMonth(parseLocalDate(item.fecha_inicio)))
+      if (item.fecha_fin) maxCandidates.push(startOfMonth(parseLocalDate(item.fecha_fin)))
+      else maxCandidates.push(addMonths(realMonth, DASHBOARD_FUTURE_MONTHS))
+    })
+
+    data.gastosCorrientes.forEach((item) => {
+      if (item.fecha_inicio) minCandidates.push(startOfMonth(parseLocalDate(item.fecha_inicio)))
+      if (item.fecha_fin) maxCandidates.push(startOfMonth(parseLocalDate(item.fecha_fin)))
+      else maxCandidates.push(addMonths(realMonth, DASHBOARD_FUTURE_MONTHS))
+    })
+
+    data.diferidos.forEach((item) => {
+      if (item.fecha_inicio) minCandidates.push(startOfMonth(parseLocalDate(item.fecha_inicio)))
+      if (item.fecha_fin) maxCandidates.push(startOfMonth(parseLocalDate(item.fecha_fin)))
+      else maxCandidates.push(addMonths(realMonth, DASHBOARD_FUTURE_MONTHS))
+    })
+
+    data.ingresosPuntuales.forEach((item) => {
+      if (item.fecha) {
+        const monthDate = startOfMonth(parseLocalDate(item.fecha))
+        minCandidates.push(monthDate)
+        maxCandidates.push(monthDate)
+      }
+    })
+
+    data.gastosNoCorrientes.forEach((item) => {
+      if (item.fecha) {
+        const monthDate = startOfMonth(parseLocalDate(item.fecha))
+        minCandidates.push(monthDate)
+        maxCandidates.push(monthDate)
+      }
+    })
+
+    const minMonth = minCandidates.reduce((earliest, date) => (date < earliest ? date : earliest), minCandidates[0])
+    const maxMonth = maxCandidates.reduce((latest, date) => (date > latest ? date : latest), maxCandidates[0])
+
+    return { minMonth, maxMonth }
+  }, [data, realMonth])
+
+  useEffect(() => {
+    setSelectedMonth((current) => {
+      if (current < dashboardMonthBounds.minMonth) return dashboardMonthBounds.minMonth
+      if (current > dashboardMonthBounds.maxMonth) return dashboardMonthBounds.maxMonth
+      return current
+    })
+  }, [dashboardMonthBounds])
+
+  function moveSelectedMonth(offset) {
+    setSelectedMonth((current) => {
+      const next = addMonths(current, offset)
+      if (next < dashboardMonthBounds.minMonth) return dashboardMonthBounds.minMonth
+      if (next > dashboardMonthBounds.maxMonth) return dashboardMonthBounds.maxMonth
+      return next
+    })
+  }
+
+  const canGoPrevMonth = selectedMonth > dashboardMonthBounds.minMonth
+  const canGoNextMonth = selectedMonth < dashboardMonthBounds.maxMonth
+  const isFutureSelectedMonth = selectedMonth > realMonth
+  const selectedMonthLabel = `${MESES_FULL[selectedMonth.getMonth()]} ${selectedMonth.getFullYear()}`
+  const monthReferenceText = selectedMonthLabel.toLowerCase()
 
   const totalIngFijos = data.ingresos
-    .filter((item) => overlapsMonth(item, mesActual))
+    .filter((item) => overlapsMonth(item, selectedMonth))
     .reduce((sum, item) => sum + mensualizado(item.monto, item.frecuencia), 0)
   const totalIngPuntuales = data.ingresosPuntuales
-    .filter((item) => occursInMonth(item, mesActual))
+    .filter((item) => occursInMonth(item, selectedMonth))
     .reduce((sum, item) => sum + Number(item.monto), 0)
   const totalIng = totalIngFijos + totalIngPuntuales
 
   const totalGC = data.gastosCorrientes
-    .filter((item) => overlapsMonth(item, mesActual))
+    .filter((item) => overlapsMonth(item, selectedMonth))
     .reduce((sum, item) => sum + mensualizado(item.monto, item.frecuencia), 0)
   const totalGNC = data.gastosNoCorrientes
-    .filter((item) => occursInMonth(item, mesActual))
+    .filter((item) => occursInMonth(item, selectedMonth))
     .reduce((sum, item) => sum + Number(item.monto), 0)
   const totalDif = data.diferidos
-    .filter((item) => overlapsMonth(item, mesActual))
+    .filter((item) => overlapsMonth(item, selectedMonth))
     .reduce((sum, item) => sum + Number(item.cuota_mensual), 0)
   const totalGastos = totalGC + totalGNC + totalDif
   const balance = totalIng - totalGastos
+
+  const incomeDetailSections = [
+    {
+      id: 'income-fixed',
+      title: 'Ingresos fijos',
+      tone: 'income',
+      total: totalIngFijos,
+      emptyLabel: `No tienes ingresos fijos activos en ${monthReferenceText}.`,
+      items: data.ingresos
+        .filter((item) => overlapsMonth(item, selectedMonth))
+        .map((item) => ({
+          id: `income-fixed-${item.id}`,
+          label: item.descripcion,
+          meta: `${getFrequencyLabel(item.frecuencia)} · impacto mensual`,
+          amount: mensualizado(item.monto, item.frecuencia),
+        }))
+        .sort((a, b) => b.amount - a.amount),
+    },
+    {
+      id: 'income-extra',
+      title: 'Ingresos puntuales',
+      tone: 'income',
+      total: totalIngPuntuales,
+      emptyLabel: `No tienes ingresos puntuales guardados en ${monthReferenceText}.`,
+      items: data.ingresosPuntuales
+        .filter((item) => occursInMonth(item, selectedMonth))
+        .map((item) => ({
+          id: `income-extra-${item.id}`,
+          label: item.descripcion,
+          meta: `Puntual · ${item.fecha}`,
+          amount: Number(item.monto),
+        }))
+        .sort((a, b) => b.amount - a.amount),
+    },
+  ]
+
+  const expenseDetailSections = [
+    {
+      id: 'expense-fixed',
+      title: 'Gastos fijos',
+      tone: 'expense',
+      total: totalGC,
+      emptyLabel: `No tienes gastos fijos activos en ${monthReferenceText}.`,
+      items: data.gastosCorrientes
+        .filter((item) => overlapsMonth(item, selectedMonth))
+        .map((item) => ({
+          id: `expense-fixed-${item.id}`,
+          label: item.descripcion,
+          meta: `${item.categoria || 'Sin categoria'} · ${getFrequencyLabel(item.frecuencia)}`,
+          amount: mensualizado(item.monto, item.frecuencia),
+        }))
+        .sort((a, b) => b.amount - a.amount),
+    },
+    {
+      id: 'expense-installment',
+      title: 'Cuotas activas',
+      tone: 'expense',
+      total: totalDif,
+      emptyLabel: `No tienes cuotas activas en ${monthReferenceText}.`,
+      items: data.diferidos
+        .filter((item) => overlapsMonth(item, selectedMonth))
+        .map((item) => ({
+          id: `expense-installment-${item.id}`,
+          label: item.descripcion,
+          meta: `${item.categoria || 'Sin categoria'} · cuota mensual`,
+          amount: Number(item.cuota_mensual),
+        }))
+        .sort((a, b) => b.amount - a.amount),
+    },
+    {
+      id: 'expense-extra',
+      title: 'Gastos puntuales',
+      tone: 'expense',
+      total: totalGNC,
+      emptyLabel: `No tienes gastos puntuales guardados en ${monthReferenceText}.`,
+      items: data.gastosNoCorrientes
+        .filter((item) => occursInMonth(item, selectedMonth))
+        .map((item) => ({
+          id: `expense-extra-${item.id}`,
+          label: item.descripcion,
+          meta: `${item.categoria || 'Sin categoria'} · ${item.fecha}`,
+          amount: Number(item.monto),
+        }))
+        .sort((a, b) => b.amount - a.amount),
+    },
+  ]
+
+  const activeSummarySections = activeSummaryDetail === 'income' ? incomeDetailSections : expenseDetailSections
+  const activeSummaryTitle = activeSummaryDetail === 'income'
+    ? `Detalle de ingresos de ${selectedMonthLabel}`
+    : `Detalle de gastos de ${selectedMonthLabel}`
+  const activeSummarySubtitle = activeSummaryDetail === 'income'
+    ? `Aqui ves rapido los ingresos guardados que cuentan en ${monthReferenceText}.`
+    : `Aqui ves rapido los gastos guardados que cuentan en ${monthReferenceText}.`
 
 
   const hasAnyMovement = data.ingresos.length > 0
@@ -339,10 +525,10 @@ export default function Dashboard() {
                 }}
               />
               {({
-                ing_real: 'Disponible (real)',
-                ing_proj: 'Disponible (proy.)',
-                gasto_real: 'Gastos del mes (real)',
-                gasto_proj: 'Gastos del mes (proy.)',
+                ing_real: 'Total de ingresos del mes (real)',
+                ing_proj: 'Total de ingresos del mes (proy.)',
+                gasto_real: 'Total de gastos del mes (real)',
+                gasto_proj: 'Total de gastos del mes (proy.)',
               }[entry.dataKey] || entry.value)}
             </button>
           )
@@ -365,11 +551,11 @@ export default function Dashboard() {
         </div>
         {point.gapAcumulado != null && (
           <div style={{ color: '#C487F6', fontWeight: 700, marginBottom: 4 }}>
-            {`${point.is_real ? 'Saldo al cierre' : 'Saldo proyectado'}: ${fmt(point.gapAcumulado)}`}
+            {`Saldo disponible: ${fmt(point.gapAcumulado)}`}
           </div>
         )}
-        <div style={{ color: '#10B981' }}>{`Disponible este mes: ${fmt(ingDisponible)}`}</div>
-        <div style={{ color: '#F87171' }}>{`Gastos del mes: ${fmt(gastoDisplay)}`}</div>
+        <div style={{ color: '#10B981' }}>{`Total de ingresos del mes: ${fmt(ingDisponible)}`}</div>
+        <div style={{ color: '#F87171' }}>{`Total de gastos del mes: ${fmt(gastoDisplay)}`}</div>
         {point.opening != null && (
           <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, marginTop: 4 }}>
             {`Saldo anterior: ${fmt(point.opening)} + ingresos: ${fmt(point.ingMes)}`}
@@ -412,9 +598,32 @@ export default function Dashboard() {
           </div>
           <p className="page-subtitle">Tu mes, claro y sin vueltas.</p>
         </div>
-        <span className="dashboard-mes-badge">
-          {MESES_FULL[mesActual.getMonth()]} {mesActual.getFullYear()}
-        </span>
+        <div className="dashboard-month-switcher" aria-label="Cambiar mes del dashboard">
+          <button
+            type="button"
+            className="dashboard-month-nav"
+            onClick={() => moveSelectedMonth(-1)}
+            disabled={!canGoPrevMonth}
+            aria-label="Ver mes anterior"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <div className="dashboard-month-indicator">
+            <span className={`dashboard-mes-badge ${isFutureSelectedMonth ? 'is-future' : ''}`}>{selectedMonthLabel}</span>
+            {isFutureSelectedMonth && (
+              <span className="dashboard-month-future-hint">Proyectado</span>
+            )}
+          </div>
+          <button
+            type="button"
+            className="dashboard-month-nav"
+            onClick={() => moveSelectedMonth(1)}
+            disabled={!canGoNextMonth}
+            aria-label="Ver mes siguiente"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
       </div>
 
       <FeedbackAlert type={feedback.type || 'error'} message={feedback.message} />
@@ -441,23 +650,41 @@ export default function Dashboard() {
 
       {/* ── 4 KPI Cards ── */}
       <div className="stats-grid dashboard-stats-grid">
-        <div className="stat-card">
+        <button
+          type="button"
+          className={`stat-card stat-card-button ${activeSummaryDetail === 'income' ? 'is-active' : ''}`}
+          onClick={() => toggleSummaryDetail('income')}
+          aria-expanded={activeSummaryDetail === 'income'}
+        >
           <div className="stat-card-header">
             <span className="stat-label">Ingresos</span>
             <TrendingUp size={16} style={{ color: '#10B981' }} />
           </div>
           <div className="stat-value green">{fmt(totalIng)}</div>
-          <div className="stat-sub">Fijos + puntuales este mes</div>
-        </div>
+          <div className="stat-sub">Fijos + puntuales en {monthReferenceText}</div>
+          <div className="stat-card-action">
+            <span>{activeSummaryDetail === 'income' ? 'Ocultar detalle' : 'Ver detalle'}</span>
+            <ChevronDown size={16} className={activeSummaryDetail === 'income' ? 'is-open' : ''} />
+          </div>
+        </button>
 
-        <div className="stat-card">
+        <button
+          type="button"
+          className={`stat-card stat-card-button ${activeSummaryDetail === 'expense' ? 'is-active' : ''}`}
+          onClick={() => toggleSummaryDetail('expense')}
+          aria-expanded={activeSummaryDetail === 'expense'}
+        >
           <div className="stat-card-header">
             <span className="stat-label">Gastos</span>
             <TrendingDown size={16} style={{ color: '#F87171' }} />
           </div>
           <div className="stat-value red">{fmt(totalGastos)}</div>
-          <div className="stat-sub">Fijos + puntuales + cuotas</div>
-        </div>
+          <div className="stat-sub">Fijos + puntuales + cuotas en {monthReferenceText}</div>
+          <div className="stat-card-action">
+            <span>{activeSummaryDetail === 'expense' ? 'Ocultar detalle' : 'Ver detalle'}</span>
+            <ChevronDown size={16} className={activeSummaryDetail === 'expense' ? 'is-open' : ''} />
+          </div>
+        </button>
 
         <div className="stat-card">
           <div className="stat-card-header">
@@ -478,6 +705,55 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {activeSummaryDetail && (
+        <div className="dashboard-summary-detail-card">
+          <div className="dashboard-summary-detail-head">
+            <div className="dashboard-summary-detail-copy">
+              <h2 className="dashboard-summary-detail-title">{activeSummaryTitle}</h2>
+              <p className="dashboard-summary-detail-subtitle">{activeSummarySubtitle}</p>
+            </div>
+            <button
+              type="button"
+              className="dashboard-summary-detail-close"
+              onClick={() => setActiveSummaryDetail(null)}
+            >
+              Ocultar
+            </button>
+          </div>
+
+          <div className="dashboard-summary-detail-grid">
+            {activeSummarySections.map((section) => (
+              <section key={section.id} className="dashboard-summary-detail-section">
+                <div className="dashboard-summary-detail-section-head">
+                  <span className="dashboard-summary-detail-section-title">{section.title}</span>
+                  <strong className={`dashboard-summary-detail-section-total ${section.tone}`}>
+                    {fmt(section.total)}
+                  </strong>
+                </div>
+
+                {section.items.length ? (
+                  <div className="dashboard-summary-detail-list">
+                    {section.items.map((item) => (
+                      <div key={item.id} className="dashboard-summary-detail-item">
+                        <div className="dashboard-summary-detail-item-copy">
+                          <span className="dashboard-summary-detail-item-label">{item.label}</span>
+                          <span className="dashboard-summary-detail-item-meta">{item.meta}</span>
+                        </div>
+                        <span className={`dashboard-summary-detail-item-amount ${section.tone}`}>
+                          {fmt(item.amount)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="dashboard-summary-detail-empty">{section.emptyLabel}</p>
+                )}
+              </section>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── Barra de salud ── */}
       {totalIng > 0 && (
         <div className="dashboard-health-card">
@@ -493,40 +769,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-
-      {/* ── Desglose ── */}
-      <div className="dashboard-breakdown-section">
-        <div className="dashboard-breakdown-group">
-          <div className="dashboard-breakdown-group-title income">↑ Ingresos</div>
-          <div className="dashboard-breakdown-cols">
-            {[
-              { label: 'Fijos', value: totalIngFijos },
-              { label: 'Puntuales', value: totalIngPuntuales },
-            ].map(({ label, value }) => (
-              <div key={label} className="dashboard-breakdown-item income">
-                <div className="dashboard-breakdown-item-label">{label}</div>
-                <div className="dashboard-breakdown-item-value">{fmt(value)}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="dashboard-breakdown-group">
-          <div className="dashboard-breakdown-group-title expense">↓ Gastos</div>
-          <div className="dashboard-breakdown-cols">
-            {[
-              { label: 'Fijos', value: totalGC },
-              { label: 'Cuotas', value: totalDif },
-              { label: 'Puntuales', value: totalGNC },
-            ].map(({ label, value }) => (
-              <div key={label} className="dashboard-breakdown-item expense">
-                <div className="dashboard-breakdown-item-label">{label}</div>
-                <div className="dashboard-breakdown-item-value">{fmt(value)}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
 
       {advancedProjectionEnabled ? (
         <div className="card dashboard-chart-card dashboard-premium-card">
@@ -757,8 +999,8 @@ export default function Dashboard() {
                       formatter={(value, name) => {
                         if (value == null) return null
                         const labels = {
-                          ing_real: 'Disponible (real)', ing_proj: 'Disponible (proy.)',
-                          gasto_real: 'Gastos del mes (real)', gasto_proj: 'Gastos del mes (proy.)',
+                          ing_real: 'Total de ingresos del mes (real)', ing_proj: 'Total de ingresos del mes (proy.)',
+                          gasto_real: 'Total de gastos del mes (real)', gasto_proj: 'Total de gastos del mes (proy.)',
                         }
                         return [fmt(value), labels[name] || name]
                       }}
