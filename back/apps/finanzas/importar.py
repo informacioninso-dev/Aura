@@ -10,11 +10,14 @@ Columnas esperadas (insensible a mayusculas/tildes):
 """
 
 import csv
-import io
 import datetime
+import io
+import unicodedata
 from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
+
+from .dates import local_today
 
 
 ALIAS_COLUMNAS = {
@@ -32,13 +35,18 @@ MAX_ALLOWED_YEAR = 2100
 
 
 def _normalizar(s: str) -> str:
-    return (
-        s.strip()
-        .lower()
-        .replace('á', 'a').replace('é', 'e').replace('í', 'i')
-        .replace('ó', 'o').replace('ú', 'u').replace('ü', 'u')
-        .replace('ñ', 'n')
-    )
+    text = str(s or '').strip().lower()
+
+    # Intenta reparar cabeceras que llegaron con mojibake clasico
+    # antes de eliminar diacriticos reales.
+    if any(marker in text for marker in ('ã', 'â', 'ð')):
+        try:
+            text = text.encode('latin-1').decode('utf-8')
+        except UnicodeError:
+            pass
+
+    normalized = unicodedata.normalize('NFKD', text)
+    return ''.join(char for char in normalized if not unicodedata.combining(char))
 
 
 def _mapear_cabeceras(cabeceras: list[str]) -> dict:
@@ -67,6 +75,10 @@ def _fecha_en_rango(fecha: datetime.date | None) -> bool:
     return bool(fecha and MIN_ALLOWED_YEAR <= fecha.year <= MAX_ALLOWED_YEAR)
 
 
+def _is_future_expense(fecha: datetime.date, tipo: str) -> bool:
+    return tipo == 'gasto' and fecha > local_today()
+
+
 def _parse_monto(s) -> Decimal | None:
     if isinstance(s, Decimal):
         return s
@@ -74,7 +86,7 @@ def _parse_monto(s) -> Decimal | None:
         return Decimal(str(s))
 
     text = str(s).strip().replace(' ', '').replace(',', '.')
-    text = text.replace('$', '').replace('€', '').replace('US', '')
+    text = text.replace('$', '').replace('\u20ac', '').replace('US', '')
 
     # Quitar separador de miles cuando aplica.
     import re
@@ -188,12 +200,22 @@ def parsear_archivo(nombre: str, file_bytes: bytes, max_filas: int = MAX_FILAS) 
             continue
 
         tipo_raw = _normalizar(get('tipo'))
-        if tipo_raw in ('ingreso', 'income', 'credito', 'credito', 'abono', 'entrada'):
+        if tipo_raw in ('ingreso', 'income', 'credito', 'abono', 'entrada'):
             tipo = 'ingreso'
-        elif tipo_raw in ('gasto', 'egreso', 'expense', 'debito', 'debito', 'cargo', 'salida'):
+        elif tipo_raw in ('gasto', 'egreso', 'expense', 'debito', 'cargo', 'salida'):
             tipo = 'gasto'
         else:
             tipo = 'ingreso' if monto > 0 else 'gasto'
+
+        if _is_future_expense(fecha, tipo):
+            filas_error.append(
+                {
+                    'fila': num,
+                    'raw': fila,
+                    'error': 'Los gastos futuros no se importan. Simulalos desde el simulador con tasa 0%.',
+                }
+            )
+            continue
 
         categoria = (get('categoria') or 'otro').lower().strip()[:50]
 
@@ -243,6 +265,10 @@ def validar_filas_confirmacion(filas: list[dict], max_filas: int = MAX_FILAS) ->
         tipo = _normalizar(str(fila.get('tipo', '')).strip())
         if tipo not in ('ingreso', 'gasto'):
             raise ValueError(f'Fila {idx}: tipo invalido. Usa "ingreso" o "gasto".')
+        if _is_future_expense(fecha, tipo):
+            raise ValueError(
+                f'Fila {idx}: los gastos futuros no se importan. Simulalos desde el simulador con tasa 0%.'
+            )
 
         descripcion = (str(fila.get('descripcion', '')).strip() or '(sin descripcion)')[:200]
         categoria = (str(fila.get('categoria', 'otro')).strip().lower() or 'otro')[:50]

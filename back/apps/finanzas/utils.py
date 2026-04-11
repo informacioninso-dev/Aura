@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.core.cache import cache
 from django.db import models as db_models
 
+from .dates import local_today
 from apps.usuarios.models import (
     PROJECTION_MODE_AUTOMATICA,
     PROJECTION_MODE_PERSONALIZADA,
@@ -166,7 +167,7 @@ def asegurar_saldos_historicos(usuario, fecha_hasta=None):
     if not primera_fecha:
         return False
 
-    hoy = datetime.date.today()
+    hoy = local_today()
     limite = _coerce_date(fecha_hasta) or hoy
     limite_mes = _primer_dia_mes(min(limite, hoy))
     primera_mes = _primer_dia_mes(primera_fecha)
@@ -454,7 +455,7 @@ def recalcular_saldo_mes_para(usuario, fecha_desde, fecha_hasta=None):
     fecha_desde = _coerce_date(fecha_desde)
     fecha_hasta = _coerce_date(fecha_hasta)
     user_id = getattr(usuario, 'pk', usuario)
-    hoy = datetime.date.today()
+    hoy = local_today()
     hoy_mes = _primer_dia_mes(hoy)
     hasta = min(fecha_hasta, hoy) if fecha_hasta else hoy
     desde_mes = _primer_dia_mes(fecha_desde)
@@ -543,10 +544,10 @@ def obtener_o_sembrar_saldo_mes(usuario, anio, mes):
     return saldo, True
 
 
-def calcular_proyeccion_acumulada(usuario, *, months=60, history_months=12, real_past_months=6, starting_balance=Decimal('0.00')):
+def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, real_past_months=6, starting_balance=Decimal('0.00')):
     from .models import Diferido, GastoCorriente, GastoNoCorriente, Ingreso, IngresoPuntual, SaldoMes
 
-    today = datetime.date.today()
+    today = local_today()
     current_month = datetime.date(today.year, today.month, 1)
     projection_mode = get_user_projection_mode(usuario)
     # real_start NO se restringe por date_joined — el usuario puede tener

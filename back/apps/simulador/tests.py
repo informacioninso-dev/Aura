@@ -1,6 +1,8 @@
 from decimal import Decimal
+import datetime
 
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -8,6 +10,10 @@ from .models import Banco, Simulacion
 
 
 User = get_user_model()
+
+
+def future_start_date():
+    return (timezone.localdate() + datetime.timedelta(days=1)).isoformat()
 
 
 class TestSimuladorAPI(APITestCase):
@@ -47,7 +53,7 @@ class TestSimuladorAPI(APITestCase):
             'cuota_mensual': '1.00',
             'total_a_pagar': '1.00',
             'total_intereses': '1.00',
-            'fecha_inicio': '2026-01-01',
+            'fecha_inicio': future_start_date(),
         }
 
         response = self.client.post('/api/simulador/simulaciones/', payload, format='json')
@@ -72,7 +78,7 @@ class TestSimuladorAPI(APITestCase):
             'tasa_anual': '10.00',
             'plazo_meses': 10,
             'colchon_minimo': '200.00',
-            'fecha_inicio': '2026-01-01',
+            'fecha_inicio': future_start_date(),
         }
 
         response = self.client.post('/api/simulador/simulaciones/', payload, format='json')
@@ -88,7 +94,7 @@ class TestSimuladorAPI(APITestCase):
             'banco': self.banco_activo.id,
             'tasa_anual': '11.00',
             'plazo_meses': 24,
-            'fecha_inicio': '2026-01-01',
+            'fecha_inicio': future_start_date(),
         }
 
         response = self.client.post('/api/simulador/simulaciones/', payload, format='json')
@@ -105,13 +111,30 @@ class TestSimuladorAPI(APITestCase):
             'tasa_anual': '11.00',
             'plazo_meses': 24,
             'colchon_minimo': '0',
-            'fecha_inicio': '2026-01-01',
+            'fecha_inicio': future_start_date(),
         }
 
         response = self.client.post('/api/simulador/simulaciones/', payload, format='json')
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('colchon_minimo', response.data)
+
+    def test_simulacion_rechaza_fecha_inicio_pasada(self):
+        self.client.force_authenticate(user=self.user_a)
+        payload = {
+            'nombre': 'Laptop',
+            'monto': '2000.00',
+            'banco': self.banco_activo.id,
+            'tasa_anual': '10.00',
+            'plazo_meses': 10,
+            'colchon_minimo': '200.00',
+            'fecha_inicio': (timezone.localdate() - datetime.timedelta(days=1)).isoformat(),
+        }
+
+        response = self.client.post('/api/simulador/simulaciones/', payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('fecha_inicio', response.data)
 
     def test_simulaciones_lista_solo_las_del_usuario_autenticado(self):
         Simulacion.objects.create(

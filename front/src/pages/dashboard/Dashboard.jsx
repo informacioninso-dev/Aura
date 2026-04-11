@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts'
-import { TrendingUp, TrendingDown, Wallet, Lock, PiggyBank, RefreshCw, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, PiggyBank, RefreshCw, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 
 import api from '../../api/client'
 import { getApiErrorMessage } from '../../api/errors'
@@ -42,12 +42,22 @@ const PROJECTION_MODE_OPTIONS = [
   { value: 'simple', label: 'Simple' },
   { value: 'personalizada', label: 'Personalizada' },
 ]
+const FUTURE_PROJECTION_OPTIONS = [
+  { value: 12, label: '1 ano' },
+  { value: 24, label: '2 anos' },
+  { value: 60, label: '5 anos' },
+  { value: 120, label: '10 anos' },
+]
 const DASHBOARD_FUTURE_MONTHS = 12
+const DEFAULT_FREE_PROJECTION_DISPLAY_MONTHS = 6
+const MOBILE_PROJECTION_WINDOW_MONTHS = 6
+const DESKTOP_PROJECTION_WINDOW_MONTHS = 12
+const MOBILE_CHART_BREAKPOINT = 768
 
 function getProjectionModeHelp(mode) {
-  if (mode === 'simple') return 'Simple: usa una lectura directa de tus extras.'
-  if (mode === 'personalizada') return 'Personalizada: usa solo los extras que marques.'
-  return 'Automatica: amortigua picos y aprende de tus extras.'
+  if (mode === 'simple') return 'Simple: usa una lectura directa de tus ingresos y gastos puntuales.'
+  if (mode === 'personalizada') return 'Personalizada: usa solo los ingresos y gastos puntuales que marques.'
+  return 'Automatica: amortigua picos y aprende de tus ingresos y gastos puntuales.'
 }
 
 function getProjectionAnalysisHelp(mode, analysisMonths, analysisCapMonths) {
@@ -55,10 +65,10 @@ function getProjectionAnalysisHelp(mode, analysisMonths, analysisCapMonths) {
     ? (analysisMonths < analysisCapMonths
         ? `La proyeccion analiza ${analysisMonths} meses porque es la historia disponible.`
         : `La proyeccion analiza hasta ${analysisCapMonths} meses de historial disponible.`)
-    : 'Aun no hay historial suficiente para analizar extras.'
+    : 'Aun no hay historial suficiente para analizar ingresos y gastos puntuales.'
 
-  if (mode === 'simple') return `${historyText} Simple toma todos tus extras con una lectura directa.`
-  if (mode === 'personalizada') return `${historyText} Personalizada solo toma los extras que marques.`
+  if (mode === 'simple') return `${historyText} Simple toma todos tus ingresos y gastos puntuales con una lectura directa.`
+  if (mode === 'personalizada') return `${historyText} Personalizada solo toma los ingresos y gastos puntuales que marques.`
   return `${historyText} Automatica amortigua picos con esa historia.`
 }
 
@@ -113,6 +123,40 @@ function getSeriesFamily(dataKey = '') {
   return 'all'
 }
 
+function formatDetailShare(amount, total) {
+  const safeAmount = Number(amount || 0)
+  const safeTotal = Number(total || 0)
+  if (!Number.isFinite(safeAmount) || !Number.isFinite(safeTotal) || safeTotal <= 0) return null
+
+  const percentage = (safeAmount / safeTotal) * 100
+  return `${new Intl.NumberFormat('es-EC', { maximumFractionDigits: 1 }).format(percentage)}%`
+}
+
+function clampProjectionWindow(startIndex, totalPoints, windowSize) {
+  if (totalPoints <= 0) {
+    return { startIndex: 0, endIndex: 0 }
+  }
+
+  const safeWindowSize = Math.max(1, Math.min(windowSize, totalPoints))
+  const maxStartIndex = Math.max(0, totalPoints - safeWindowSize)
+  const safeStartIndex = Math.min(Math.max(0, startIndex), maxStartIndex)
+
+  return {
+    startIndex: safeStartIndex,
+    endIndex: Math.min(totalPoints - 1, safeStartIndex + safeWindowSize - 1),
+  }
+}
+
+function buildProjectionWindowAroundIndex(targetIndex, totalPoints, windowSize) {
+  if (totalPoints <= 0) {
+    return { startIndex: 0, endIndex: 0 }
+  }
+
+  const safeWindowSize = Math.max(1, Math.min(windowSize, totalPoints))
+  const centeredStartIndex = Math.max(0, targetIndex - Math.floor(safeWindowSize / 2))
+  return clampProjectionWindow(centeredStartIndex, totalPoints, safeWindowSize)
+}
+
 export default function Dashboard() {
   const { user, fetchPerfil } = useAuth()
 
@@ -137,13 +181,37 @@ export default function Dashboard() {
   const [seriesFocus, setSeriesFocus] = useState('all')
   const [activeSummaryDetail, setActiveSummaryDetail] = useState(null)
   const [selectedMonth, setSelectedMonth] = useState(() => startOfMonth(new Date()))
+  const [isCompactProjectionChart, setIsCompactProjectionChart] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < MOBILE_CHART_BREAKPOINT,
+  )
+  const [projectionChartDragging, setProjectionChartDragging] = useState(false)
+  const [projectionWindow, setProjectionWindow] = useState({ startIndex: 0, endIndex: 0 })
   const projectionDebounceRef = useRef(null)
   const projectionRequestIdRef = useRef(0)
+  const projectionGestureRef = useRef(null)
 
   const advancedProjectionEnabled = Boolean(user?.feature_access?.advanced_projection_enabled)
-  const advancedProjectionMaxMonths = normalizePositiveInt(user?.feature_access?.advanced_projection_months, 60)
-  const currentPlanLabel = user?.plan?.slug === 'pro' ? 'Pro' : 'Free'
+  const projectionDisplayMonths = Math.max(2, normalizePositiveInt(
+    user?.feature_access?.projection_months,
+    DEFAULT_FREE_PROJECTION_DISPLAY_MONTHS,
+  ))
+  const freeProjectionFutureMonths = Math.max(1, Math.floor(projectionDisplayMonths / 2))
+  const freeProjectionPastMonths = Math.max(1, projectionDisplayMonths - freeProjectionFutureMonths)
+  const advancedProjectionMaxMonths = normalizePositiveInt(user?.feature_access?.advanced_projection_months, 120)
+  const currentPlanLabel = user?.plan?.slug === 'pro' ? 'Pro' : 'Gratis'
   const currentPlanBadgeClass = user?.plan?.slug === 'pro' ? 'is-pro' : 'is-free'
+  const availableFutureProjectionOptions = useMemo(() => {
+    const baseOptions = FUTURE_PROJECTION_OPTIONS.filter((option) => option.value <= advancedProjectionMaxMonths)
+    if (!baseOptions.length || baseOptions[baseOptions.length - 1].value !== advancedProjectionMaxMonths) {
+      baseOptions.push({
+        value: advancedProjectionMaxMonths,
+        label: advancedProjectionMaxMonths % 12 === 0
+          ? `${advancedProjectionMaxMonths / 12} anos`
+          : `${advancedProjectionMaxMonths} meses`,
+      })
+    }
+    return baseOptions
+  }, [advancedProjectionMaxMonths])
 
   useEffect(() => {
     if (!advancedProjectionEnabled) {
@@ -154,10 +222,61 @@ export default function Dashboard() {
   }, [advancedProjectionEnabled, user?.projection_mode])
 
   useEffect(() => {
-    loadDashboard()
-  }, [advancedProjectionEnabled, advancedProjectionMaxMonths])
+    if (futureMonths <= advancedProjectionMaxMonths) return
+    setFutureMonths(advancedProjectionMaxMonths)
+  }, [advancedProjectionMaxMonths, futureMonths])
 
-  async function loadDashboard({ silent = false } = {}) {
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    function handleResize() {
+      setIsCompactProjectionChart(window.innerWidth < MOBILE_CHART_BREAKPOINT)
+    }
+
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  const loadProjectionChart = useCallback(async (fm = futureMonths, pm = pastMonths, { forceRecalculate = false } = {}) => {
+    const requestId = projectionRequestIdRef.current + 1
+    projectionRequestIdRef.current = requestId
+    const months = advancedProjectionEnabled
+      ? Math.min(fm, advancedProjectionMaxMonths)
+      : freeProjectionFutureMonths
+    const realPastMonths = advancedProjectionEnabled ? pm : freeProjectionPastMonths
+    setProjectionLoading(true)
+    setProjectionError('')
+
+    try {
+      if (forceRecalculate) {
+        await api.post('/finanzas/saldo-mes/recalcular/')
+      }
+      const { data: response } = await api.get(`/finanzas/proyeccion-acumulada/?months=${months}&past_months=${realPastMonths}`)
+      if (requestId !== projectionRequestIdRef.current) return
+      setAdvancedProjection(response)
+    } catch (err) {
+      if (requestId !== projectionRequestIdRef.current) return
+      setAdvancedProjection(null)
+      setProjectionError(getApiErrorMessage(
+        err,
+        advancedProjectionEnabled ? 'No se pudo cargar la proyeccion Pro.' : 'No se pudo cargar la proyeccion.',
+      ))
+    } finally {
+      if (requestId === projectionRequestIdRef.current) {
+        setProjectionLoading(false)
+      }
+    }
+  }, [
+    advancedProjectionEnabled,
+    advancedProjectionMaxMonths,
+    freeProjectionFutureMonths,
+    freeProjectionPastMonths,
+    futureMonths,
+    pastMonths,
+  ])
+
+  const loadDashboard = useCallback(async ({ silent = false } = {}) => {
     if (silent) setRefreshing(true)
     else setLoading(true)
     setProjectionError('')
@@ -188,44 +307,16 @@ export default function Dashboard() {
       setRefreshing(false)
     }
 
-    if (advancedProjectionEnabled) {
-      void loadAdvancedProjection()
-    } else {
-      setAdvancedProjection(null)
-      setProjectionLoading(false)
-      setProjectionError('')
-    }
-  }
+    await loadProjectionChart()
+  }, [loadProjectionChart])
 
-  async function loadAdvancedProjection(fm = futureMonths, pm = pastMonths, { forceRecalculate = false } = {}) {
-    if (!advancedProjectionEnabled) return
-
-    const requestId = projectionRequestIdRef.current + 1
-    projectionRequestIdRef.current = requestId
-    const months = Math.min(fm, advancedProjectionMaxMonths)
-    setProjectionLoading(true)
-    setProjectionError('')
-
-    try {
-      if (forceRecalculate) {
-        await api.post('/finanzas/saldo-mes/recalcular/')
-      }
-      const { data: response } = await api.get(`/finanzas/proyeccion-acumulada/?months=${months}&past_months=${pm}`)
-      if (requestId !== projectionRequestIdRef.current) return
-      setAdvancedProjection(response)
-    } catch (err) {
-      if (requestId !== projectionRequestIdRef.current) return
-      setAdvancedProjection(null)
-      setProjectionError(getApiErrorMessage(err, 'No se pudo cargar la proyeccion Pro.'))
-    } finally {
-      if (requestId !== projectionRequestIdRef.current) return
-      setProjectionLoading(false)
-    }
-  }
+  useEffect(() => {
+    void loadDashboard()
+  }, [loadDashboard])
 
   function handleManualRefresh() {
     if (advancedProjectionEnabled) {
-      void loadAdvancedProjection(futureMonths, pastMonths, { forceRecalculate: true })
+      void loadProjectionChart(futureMonths, pastMonths, { forceRecalculate: true })
       return
     }
     void loadDashboard({ silent: true })
@@ -245,7 +336,7 @@ export default function Dashboard() {
     try {
       await api.patch('/usuarios/perfil/', { projection_mode: nextMode })
       await fetchPerfil()
-      await loadAdvancedProjection(futureMonths, pastMonths)
+      await loadProjectionChart(futureMonths, pastMonths)
     } catch (err) {
       setProjectionMode(previousMode)
       setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo actualizar el modo de proyeccion.') })
@@ -332,22 +423,38 @@ export default function Dashboard() {
   const selectedMonthLabel = `${MESES_FULL[selectedMonth.getMonth()]} ${selectedMonth.getFullYear()}`
   const monthReferenceText = selectedMonthLabel.toLowerCase()
 
-  const totalIngFijos = data.ingresos
-    .filter((item) => overlapsMonth(item, selectedMonth))
+  const fixedIncomesThisMonth = useMemo(
+    () => data.ingresos.filter((item) => overlapsMonth(item, selectedMonth)),
+    [data.ingresos, selectedMonth],
+  )
+  const punctualIncomesThisMonth = useMemo(
+    () => data.ingresosPuntuales.filter((item) => occursInMonth(item, selectedMonth)),
+    [data.ingresosPuntuales, selectedMonth],
+  )
+  const fixedExpensesThisMonth = useMemo(
+    () => data.gastosCorrientes.filter((item) => overlapsMonth(item, selectedMonth)),
+    [data.gastosCorrientes, selectedMonth],
+  )
+  const punctualExpensesThisMonth = useMemo(
+    () => data.gastosNoCorrientes.filter((item) => occursInMonth(item, selectedMonth)),
+    [data.gastosNoCorrientes, selectedMonth],
+  )
+  const installmentsThisMonth = useMemo(
+    () => data.diferidos.filter((item) => overlapsMonth(item, selectedMonth)),
+    [data.diferidos, selectedMonth],
+  )
+
+  const totalIngFijos = fixedIncomesThisMonth
     .reduce((sum, item) => sum + mensualizado(item.monto, item.frecuencia), 0)
-  const totalIngPuntuales = data.ingresosPuntuales
-    .filter((item) => occursInMonth(item, selectedMonth))
+  const totalIngPuntuales = punctualIncomesThisMonth
     .reduce((sum, item) => sum + Number(item.monto), 0)
   const totalIng = totalIngFijos + totalIngPuntuales
 
-  const totalGC = data.gastosCorrientes
-    .filter((item) => overlapsMonth(item, selectedMonth))
+  const totalGC = fixedExpensesThisMonth
     .reduce((sum, item) => sum + mensualizado(item.monto, item.frecuencia), 0)
-  const totalGNC = data.gastosNoCorrientes
-    .filter((item) => occursInMonth(item, selectedMonth))
+  const totalGNC = punctualExpensesThisMonth
     .reduce((sum, item) => sum + Number(item.monto), 0)
-  const totalDif = data.diferidos
-    .filter((item) => overlapsMonth(item, selectedMonth))
+  const totalDif = installmentsThisMonth
     .reduce((sum, item) => sum + Number(item.cuota_mensual), 0)
   const totalGastos = totalGC + totalGNC + totalDif
   const balance = totalIng - totalGastos
@@ -359,28 +466,26 @@ export default function Dashboard() {
       tone: 'income',
       total: totalIngFijos,
       emptyLabel: `No tienes ingresos fijos activos en ${monthReferenceText}.`,
-      items: data.ingresos
-        .filter((item) => overlapsMonth(item, selectedMonth))
+      items: fixedIncomesThisMonth
         .map((item) => ({
           id: `income-fixed-${item.id}`,
           label: item.descripcion,
-          meta: `${getFrequencyLabel(item.frecuencia)} · impacto mensual`,
+          meta: `${getFrequencyLabel(item.frecuencia)} - impacto mensual`,
           amount: mensualizado(item.monto, item.frecuencia),
         }))
         .sort((a, b) => b.amount - a.amount),
     },
     {
-      id: 'income-extra',
+      id: 'income-punctual',
       title: 'Ingresos puntuales',
       tone: 'income',
       total: totalIngPuntuales,
       emptyLabel: `No tienes ingresos puntuales guardados en ${monthReferenceText}.`,
-      items: data.ingresosPuntuales
-        .filter((item) => occursInMonth(item, selectedMonth))
+      items: punctualIncomesThisMonth
         .map((item) => ({
-          id: `income-extra-${item.id}`,
+          id: `income-punctual-${item.id}`,
           label: item.descripcion,
-          meta: `Puntual · ${item.fecha}`,
+          meta: `Puntual - ${item.fecha}`,
           amount: Number(item.monto),
         }))
         .sort((a, b) => b.amount - a.amount),
@@ -394,12 +499,11 @@ export default function Dashboard() {
       tone: 'expense',
       total: totalGC,
       emptyLabel: `No tienes gastos fijos activos en ${monthReferenceText}.`,
-      items: data.gastosCorrientes
-        .filter((item) => overlapsMonth(item, selectedMonth))
+      items: fixedExpensesThisMonth
         .map((item) => ({
           id: `expense-fixed-${item.id}`,
           label: item.descripcion,
-          meta: `${item.categoria || 'Sin categoria'} · ${getFrequencyLabel(item.frecuencia)}`,
+          meta: `${item.categoria || 'Sin categoria'} - ${getFrequencyLabel(item.frecuencia)}`,
           amount: mensualizado(item.monto, item.frecuencia),
         }))
         .sort((a, b) => b.amount - a.amount),
@@ -410,28 +514,26 @@ export default function Dashboard() {
       tone: 'expense',
       total: totalDif,
       emptyLabel: `No tienes cuotas activas en ${monthReferenceText}.`,
-      items: data.diferidos
-        .filter((item) => overlapsMonth(item, selectedMonth))
+      items: installmentsThisMonth
         .map((item) => ({
           id: `expense-installment-${item.id}`,
           label: item.descripcion,
-          meta: `${item.categoria || 'Sin categoria'} · cuota mensual`,
+          meta: `${item.categoria || 'Sin categoria'} - cuota mensual`,
           amount: Number(item.cuota_mensual),
         }))
         .sort((a, b) => b.amount - a.amount),
     },
     {
-      id: 'expense-extra',
+      id: 'expense-punctual',
       title: 'Gastos puntuales',
       tone: 'expense',
       total: totalGNC,
       emptyLabel: `No tienes gastos puntuales guardados en ${monthReferenceText}.`,
-      items: data.gastosNoCorrientes
-        .filter((item) => occursInMonth(item, selectedMonth))
+      items: punctualExpensesThisMonth
         .map((item) => ({
-          id: `expense-extra-${item.id}`,
+          id: `expense-punctual-${item.id}`,
           label: item.descripcion,
-          meta: `${item.categoria || 'Sin categoria'} · ${item.fecha}`,
+          meta: `${item.categoria || 'Sin categoria'} - ${item.fecha}`,
           amount: Number(item.monto),
         }))
         .sort((a, b) => b.amount - a.amount),
@@ -455,7 +557,7 @@ export default function Dashboard() {
 
   const tasaAhorro = totalIng > 0 ? Math.round((balance / totalIng) * 100) : 0
 
-  const advancedSeries = advancedProjection?.series || []
+  const advancedSeries = useMemo(() => advancedProjection?.series || [], [advancedProjection])
   const currentMonthKey = advancedProjection?.current_month || null
 
   // Dividir series en real/proyectado manteniendo un punto de conexión
@@ -471,7 +573,7 @@ export default function Dashboard() {
       const opening = Number(point.opening_balance ?? 0)
       const ingMes = Number(point.monthly_ingresos ?? 0)
       const gastoMes = Number(point.monthly_gastos ?? 0)
-      const ingDisponible = opening + ingMes
+      const ingDisponible = advancedProjectionEnabled ? opening + ingMes : ingMes
       // Saldo al cierre del mes (closing_balance)
       const gapAcumulado = Number(point.closing_balance ?? 0)
 
@@ -489,9 +591,75 @@ export default function Dashboard() {
         gasto_proj: isConnectProj ? gastoMes : null,
       }
     })
-  }, [advancedSeries])
+  }, [advancedProjectionEnabled, advancedSeries])
+
+  const projectionWindowSize = isCompactProjectionChart
+    ? MOBILE_PROJECTION_WINDOW_MONTHS
+    : DESKTOP_PROJECTION_WINDOW_MONTHS
+  const currentMonthIndex = useMemo(
+    () => chartSeries.findIndex((point) => point.month === currentMonthKey),
+    [chartSeries, currentMonthKey],
+  )
+  const showProjectionNavigator = chartSeries.length > projectionWindowSize
+
+  useEffect(() => {
+    if (!chartSeries.length) {
+      setProjectionWindow({ startIndex: 0, endIndex: 0 })
+      return
+    }
+
+    setProjectionWindow((current) => {
+      const currentWindowSize = current.endIndex >= current.startIndex
+        ? current.endIndex - current.startIndex + 1
+        : 0
+      const expectedWindowSize = Math.min(projectionWindowSize, chartSeries.length)
+      if (
+        currentWindowSize === expectedWindowSize
+        && current.startIndex >= 0
+        && current.endIndex < chartSeries.length
+      ) {
+        return clampProjectionWindow(current.startIndex, chartSeries.length, projectionWindowSize)
+      }
+
+      const anchorIndex = currentMonthIndex >= 0 ? currentMonthIndex : 0
+      return buildProjectionWindowAroundIndex(anchorIndex, chartSeries.length, projectionWindowSize)
+    })
+  }, [chartSeries.length, currentMonthIndex, projectionWindowSize])
 
   const latestProjectedPoint = chartSeries.filter((point) => !point.is_real).at(-1) || null
+  const visibleProjectionSeries = chartSeries.slice(projectionWindow.startIndex, projectionWindow.endIndex + 1)
+  const visibleCurrentMonthLabel = visibleProjectionSeries.find((point) => point.month === currentMonthKey)?.label || null
+
+  function resetProjectionGesture() {
+    projectionGestureRef.current = null
+    setProjectionChartDragging(false)
+  }
+
+  function handleProjectionPointerDown(event) {
+    if (!showProjectionNavigator) return
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+
+    projectionGestureRef.current = {
+      startX: event.clientX,
+      startIndex: projectionWindow.startIndex,
+      width: event.currentTarget.getBoundingClientRect().width,
+    }
+    setProjectionChartDragging(true)
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+  }
+
+  function handleProjectionPointerMove(event) {
+    const gesture = projectionGestureRef.current
+    if (!gesture || !showProjectionNavigator) return
+
+    const deltaX = event.clientX - gesture.startX
+    if (Math.abs(deltaX) < 12) return
+
+    const pixelPerMonth = Math.max(24, gesture.width / Math.max(1, projectionWindowSize))
+    const monthOffset = Math.round((-deltaX) / pixelPerMonth)
+    const nextStartIndex = gesture.startIndex + monthOffset
+    setProjectionWindow(clampProjectionWindow(nextStartIndex, chartSeries.length, projectionWindowSize))
+  }
 
   function shouldShowSeries(kind) {
     return seriesFocus === 'all' || seriesFocus === kind
@@ -526,9 +694,9 @@ export default function Dashboard() {
               />
               {({
                 ing_real: 'Total de ingresos del mes (real)',
-                ing_proj: 'Total de ingresos del mes (proy.)',
+                ing_proj: 'Total de ingresos del mes (proyectado)',
                 gasto_real: 'Total de gastos del mes (real)',
-                gasto_proj: 'Total de gastos del mes (proy.)',
+                gasto_proj: 'Total de gastos del mes (proyectado)',
               }[entry.dataKey] || entry.value)}
             </button>
           )
@@ -547,16 +715,16 @@ export default function Dashboard() {
     return (
       <div style={{ background: 'rgba(26,37,64,0.97)', border: '1px solid rgba(196,135,246,0.2)', borderRadius: 12, padding: '10px 12px' }}>
         <div style={{ color: '#FFFFFF', marginBottom: 6, fontWeight: 700 }}>
-          {`${label} · ${point.is_real ? 'Real' : 'Proyectado'}`}
+          {`${label} - ${point.is_real ? 'Real' : 'Proyectado'}`}
         </div>
-        {point.gapAcumulado != null && (
+        {advancedProjectionEnabled && point.gapAcumulado != null && (
           <div style={{ color: '#C487F6', fontWeight: 700, marginBottom: 4 }}>
             {`Saldo disponible: ${fmt(point.gapAcumulado)}`}
           </div>
         )}
-        <div style={{ color: '#10B981' }}>{`Total de ingresos del mes: ${fmt(ingDisponible)}`}</div>
-        <div style={{ color: '#F87171' }}>{`Total de gastos del mes: ${fmt(gastoDisplay)}`}</div>
-        {point.opening != null && (
+        <div style={{ color: '#10B981' }}>{`Ingresos del mes: ${fmt(ingDisponible)}`}</div>
+        <div style={{ color: '#F87171' }}>{`Gastos del mes: ${fmt(gastoDisplay)}`}</div>
+        {advancedProjectionEnabled && point.opening != null && (
           <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, marginTop: 4 }}>
             {`Saldo anterior: ${fmt(point.opening)} + ingresos: ${fmt(point.ingMes)}`}
           </div>
@@ -568,6 +736,98 @@ export default function Dashboard() {
   const advancedChartEmpty = advancedSeries.length === 0 || advancedSeries.every(
     (point) => point.monthly_ingresos === 0 && point.monthly_gastos === 0,
   )
+
+  function renderProjectionAreaChart({ interactive = false } = {}) {
+    const chart = (
+      <ResponsiveContainer width="100%" height={isCompactProjectionChart ? 320 : 360}>
+        <AreaChart data={visibleProjectionSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="gIngReal" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
+              <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="gIngProj" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#10B981" stopOpacity={0.10} />
+              <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="gGastoReal" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#F87171" stopOpacity={0.25} />
+              <stop offset="95%" stopColor="#F87171" stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="gGastoProj" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#F87171" stopOpacity={0.10} />
+              <stop offset="95%" stopColor="#F87171" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+          <XAxis dataKey="label" tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 11 }} />
+          <YAxis tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 11 }} tickFormatter={fmtAxis} width={82} />
+          {visibleCurrentMonthLabel && (
+            <ReferenceLine
+              x={visibleCurrentMonthLabel}
+              stroke="rgba(255,255,255,0.25)"
+              strokeDasharray="4 4"
+              label={{ value: 'Hoy', position: 'insideTopRight', fill: 'rgba(255,255,255,0.40)', fontSize: 11 }}
+            />
+          )}
+          <ReferenceLine y={0} stroke="rgba(248,113,113,0.35)" strokeDasharray="4 3" />
+          <Tooltip
+            content={renderProjectionTooltip}
+            contentStyle={{ background: 'rgba(26,37,64,0.97)', border: '1px solid rgba(196,135,246,0.2)', borderRadius: 12 }}
+            labelStyle={{ color: '#FFFFFF', marginBottom: 6, fontWeight: 700 }}
+            itemSorter={(item) => ({
+              ing_real: 0,
+              ing_proj: 1,
+              gasto_real: 2,
+              gasto_proj: 3,
+            }[item?.dataKey] ?? 99)}
+            formatter={(value, name) => {
+              if (value == null) return null
+              const labels = {
+                ing_real: 'Total de ingresos del mes (real)',
+                ing_proj: 'Total de ingresos del mes (proyectado)',
+                gasto_real: 'Total de gastos del mes (real)',
+                gasto_proj: 'Total de gastos del mes (proyectado)',
+              }
+              return [fmt(value), labels[name] || name]
+            }}
+            labelFormatter={(label, payload) => {
+              const point = payload?.[0]?.payload
+              return point ? `${label} - ${point.is_real ? 'Real' : 'Proyectado'}` : label
+            }}
+          />
+          {!isCompactProjectionChart && <Legend content={renderProjectionLegend} />}
+          {shouldShowSeries('income') && (
+            <>
+              <Area connectNulls={false} type="monotone" dataKey="ing_real" stroke="#10B981" strokeWidth={2.5} fill="url(#gIngReal)" dot={false} />
+              <Area connectNulls={false} type="monotone" dataKey="ing_proj" stroke="#10B981" strokeWidth={2} fill="url(#gIngProj)" strokeDasharray="5 4" dot={false} />
+            </>
+          )}
+          {shouldShowSeries('expense') && (
+            <>
+              <Area connectNulls={false} type="monotone" dataKey="gasto_real" stroke="#F87171" strokeWidth={2.5} fill="url(#gGastoReal)" dot={false} />
+              <Area connectNulls={false} type="monotone" dataKey="gasto_proj" stroke="#F87171" strokeWidth={2} fill="url(#gGastoProj)" strokeDasharray="5 4" dot={false} />
+            </>
+          )}
+        </AreaChart>
+      </ResponsiveContainer>
+    )
+
+    if (!interactive) return chart
+
+    return (
+      <div
+        className={`dashboard-chart-gesture-surface ${projectionChartDragging ? 'is-dragging' : ''}`}
+        onPointerDown={handleProjectionPointerDown}
+        onPointerMove={handleProjectionPointerMove}
+        onPointerUp={resetProjectionGesture}
+        onPointerCancel={resetProjectionGesture}
+        onLostPointerCapture={resetProjectionGesture}
+      >
+        {chart}
+      </div>
+    )
+  }
 
   if (loading) {
     return (
@@ -732,19 +992,29 @@ export default function Dashboard() {
                 </div>
 
                 {section.items.length ? (
-                  <div className="dashboard-summary-detail-list">
-                    {section.items.map((item) => (
-                      <div key={item.id} className="dashboard-summary-detail-item">
-                        <div className="dashboard-summary-detail-item-copy">
-                          <span className="dashboard-summary-detail-item-label">{item.label}</span>
-                          <span className="dashboard-summary-detail-item-meta">{item.meta}</span>
-                        </div>
-                        <span className={`dashboard-summary-detail-item-amount ${section.tone}`}>
-                          {fmt(item.amount)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                    <div className="dashboard-summary-detail-list">
+                      {section.items.map((item) => {
+                        const share = formatDetailShare(item.amount, section.total)
+                        return (
+                          <div key={item.id} className="dashboard-summary-detail-item">
+                            <div className="dashboard-summary-detail-item-copy">
+                              <span className="dashboard-summary-detail-item-label">{item.label}</span>
+                              <span className="dashboard-summary-detail-item-meta">{item.meta}</span>
+                            </div>
+                            <div className="dashboard-summary-detail-item-trailing">
+                              <span className={`dashboard-summary-detail-item-amount ${section.tone}`}>
+                                {fmt(item.amount)}
+                              </span>
+                              {share && (
+                                <span className={`dashboard-summary-detail-item-share ${section.tone}`}>
+                                  ({share})
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
                 ) : (
                   <p className="dashboard-summary-detail-empty">{section.emptyLabel}</p>
                 )}
@@ -805,7 +1075,7 @@ export default function Dashboard() {
                   const val = Number(e.target.value)
                   setPastMonths(val)
                   clearTimeout(projectionDebounceRef.current)
-                  projectionDebounceRef.current = setTimeout(() => loadAdvancedProjection(futureMonths, val), 300)
+                  projectionDebounceRef.current = setTimeout(() => loadProjectionChart(futureMonths, val), 300)
                 }}
               >
                 <option value={3}>3 meses</option>
@@ -823,12 +1093,15 @@ export default function Dashboard() {
                   const val = Number(e.target.value)
                   setFutureMonths(val)
                   clearTimeout(projectionDebounceRef.current)
-                  projectionDebounceRef.current = setTimeout(() => loadAdvancedProjection(val, pastMonths), 300)
+                  projectionDebounceRef.current = setTimeout(() => loadProjectionChart(val, pastMonths), 300)
                 }}
               >
                 <option value={12}>1 año</option>
                 <option value={24}>2 años</option>
                 <option value={60}>5 años</option>
+                {availableFutureProjectionOptions.some((option) => option.value === 120) && (
+                  <option value={120}>10 años</option>
+                )}
               </select>
             </label>
             <button
@@ -901,13 +1174,13 @@ export default function Dashboard() {
                       <span className="dashboard-chart-note">Saldo con el que arranca esta proyeccion</span>
                     </div>
                     <div className="dashboard-premium-stat">
-                      <span className="dashboard-premium-stat-label">Ingresos extra promedio</span>
+                      <span className="dashboard-premium-stat-label">Promedio de ingresos puntuales</span>
                       <strong className="dashboard-premium-stat-value" style={{ color: '#10B981' }}>
                         {fmt(svi)}
                       </strong>
                     </div>
                     <div className="dashboard-premium-stat">
-                      <span className="dashboard-premium-stat-label">Gastos extra promedio</span>
+                      <span className="dashboard-premium-stat-label">Promedio de gastos puntuales</span>
                       <strong className="dashboard-premium-stat-value" style={{ color: '#F87171' }}>
                         {fmt(svg)}
                       </strong>
@@ -915,12 +1188,12 @@ export default function Dashboard() {
                     <div className="dashboard-premium-stat">
                       <span className="dashboard-premium-stat-label">Calculado usando</span>
                       <strong className="dashboard-premium-stat-value">
-                        {histMeses} {histMeses === 1 ? 'mes con movimientos extra' : 'meses con movimientos extra'}
+                        {histMeses} {histMeses === 1 ? 'mes con ingresos o gastos puntuales' : 'meses con ingresos o gastos puntuales'}
                       </strong>
                       <span className="dashboard-chart-note">
                         {variableProjectionApplied
-                          ? `La proyeccion usa ${analysisHistoryMonths} meses de historia para estimar tus extras`
-                          : `La parte variable necesita al menos ${minVariableHistoryMonths} meses dentro de la historia analizada`}
+                          ? `La proyeccion usa ${analysisHistoryMonths} meses de historia para estimar tus puntuales`
+                          : `Los puntuales necesitan al menos ${minVariableHistoryMonths} meses dentro de la historia analizada`}
                       </span>
                     </div>
                   </div>
@@ -934,13 +1207,13 @@ export default function Dashboard() {
                 const analysisHistoryMonths = advancedProjection?.analysis_history_months ?? 0
                 if (!variableProjectionApplied) return (
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 12, padding: '10px 14px', marginBottom: 14 }}>
-                    <span style={{ fontSize: 16, lineHeight: 1 }}>⚠️</span>
+                    <span style={{ fontSize: 16, lineHeight: 1 }}>!</span>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: '#FBBF24', marginBottom: 2 }}>La base fija ya esta proyectada</div>
                       <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
                         {histMesesAviso === 0
-                          ? `Tus ingresos, gastos fijos y cuotas ya estan incluidos. La parte variable aun no entra porque necesitas ${minVariableHistoryMonths} meses con extras elegibles dentro de la historia analizada (${analysisHistoryMonths} meses disponibles hoy).`
-                          : `Tus ingresos, gastos fijos y cuotas ya estan incluidos. La parte variable aun no entra porque solo hay ${histMesesAviso} ${histMesesAviso === 1 ? 'mes' : 'meses'} con extras elegibles dentro de la historia analizada (${analysisHistoryMonths} meses disponibles hoy); necesitas ${minVariableHistoryMonths}.`}
+                          ? `Tus ingresos, gastos fijos y cuotas ya estan incluidos. Los puntuales aun no entran porque necesitas ${minVariableHistoryMonths} meses con ingresos o gastos puntuales dentro de la historia analizada (${analysisHistoryMonths} meses disponibles hoy).`
+                          : `Tus ingresos, gastos fijos y cuotas ya estan incluidos. Los puntuales aun no entran porque solo hay ${histMesesAviso} ${histMesesAviso === 1 ? 'mes' : 'meses'} con ingresos o gastos puntuales dentro de la historia analizada (${analysisHistoryMonths} meses disponibles hoy); necesitas ${minVariableHistoryMonths}.`}
                       </div>
                     </div>
                   </div>
@@ -955,103 +1228,50 @@ export default function Dashboard() {
                   <p className="empty-sub">Cuando registres movimientos, aqui veras tus ingresos y gastos mensuales proyectados.</p>
                 </div>
               ) : (
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={chartSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="gIngReal" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
-                        <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="gIngProj" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10B981" stopOpacity={0.10} />
-                        <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="gGastoReal" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#F87171" stopOpacity={0.25} />
-                        <stop offset="95%" stopColor="#F87171" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="gGastoProj" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#F87171" stopOpacity={0.10} />
-                        <stop offset="95%" stopColor="#F87171" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                    <XAxis dataKey="label" tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 11 }} />
-                    <YAxis tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 11 }} tickFormatter={fmtAxis} width={82} />
-                    {currentMonthKey && (
-                      <ReferenceLine
-                        x={chartSeries.find((p) => p.month === currentMonthKey)?.label}
-                        stroke="rgba(255,255,255,0.25)"
-                        strokeDasharray="4 4"
-                        label={{ value: 'Hoy', position: 'insideTopRight', fill: 'rgba(255,255,255,0.40)', fontSize: 11 }}
-                      />
-                    )}
-                    <ReferenceLine y={0} stroke="rgba(248,113,113,0.35)" strokeDasharray="4 3" />
-                    <Tooltip content={renderProjectionTooltip}
-                      contentStyle={{ background: 'rgba(26,37,64,0.97)', border: '1px solid rgba(196,135,246,0.2)', borderRadius: 12 }}
-                      labelStyle={{ color: '#FFFFFF', marginBottom: 6, fontWeight: 700 }}
-                      itemSorter={(item) => ({
-                        ing_real: 0,
-                        ing_proj: 1,
-                        gasto_real: 2,
-                        gasto_proj: 3,
-                      }[item?.dataKey] ?? 99)}
-                      formatter={(value, name) => {
-                        if (value == null) return null
-                        const labels = {
-                          ing_real: 'Total de ingresos del mes (real)', ing_proj: 'Total de ingresos del mes (proy.)',
-                          gasto_real: 'Total de gastos del mes (real)', gasto_proj: 'Total de gastos del mes (proy.)',
-                        }
-                        return [fmt(value), labels[name] || name]
-                      }}
-                      labelFormatter={(label, payload) => {
-                        const point = payload?.[0]?.payload
-                        return point ? `${label} · ${point.is_real ? 'Real' : 'Proyectado'}` : label
-                      }}
-                    />
-                    <Legend content={renderProjectionLegend} />
-                    {shouldShowSeries('income') && (
-                      <>
-                        <Area connectNulls={false} type="monotone" dataKey="ing_real" stroke="#10B981" strokeWidth={2.5} fill="url(#gIngReal)" dot={false} />
-                        <Area connectNulls={false} type="monotone" dataKey="ing_proj" stroke="#10B981" strokeWidth={2} fill="url(#gIngProj)" strokeDasharray="5 4" dot={false} />
-                      </>
-                    )}
-                    {shouldShowSeries('expense') && (
-                      <>
-                        <Area connectNulls={false} type="monotone" dataKey="gasto_real" stroke="#F87171" strokeWidth={2.5} fill="url(#gGastoReal)" dot={false} />
-                        <Area connectNulls={false} type="monotone" dataKey="gasto_proj" stroke="#F87171" strokeWidth={2} fill="url(#gGastoProj)" strokeDasharray="5 4" dot={false} />
-                      </>
-                    )}
-                  </AreaChart>
-                </ResponsiveContainer>
+                renderProjectionAreaChart({ interactive: showProjectionNavigator })
               )}
             </>
           )}
         </div>
       ) : (
-        <div className="card dashboard-chart-card dashboard-premium-locked">
+        <div className="card dashboard-chart-card dashboard-free-card">
           <div className="dashboard-premium-lock-head">
             <div className="dashboard-card-copy">
               <h2 className="card-title">Proyeccion mensual</h2>
               <p className="dashboard-card-subtitle">
-                Mira como podria crecer o caer tu caja con el paso de los meses.
+                Vista simple con {freeProjectionPastMonths} meses reales y {freeProjectionFutureMonths} proyectados.
               </p>
             </div>
-            <span className="dashboard-premium-lock-badge">
-              <Lock size={14} />
-              Pro
-            </span>
+            <span className="dashboard-free-badge">Gratis</span>
           </div>
 
           <p className="dashboard-premium-lock-text">
-            Esta vista usa tu saldo inicial, suaviza picos fuertes y proyecta la tendencia para ayudarte a evitar bolas de nieve financieras.
+            Tu plan gratuito muestra una lectura corta y directa de lo que entra y sale por mes, sin controles avanzados.
           </p>
 
           <div className="dashboard-premium-chip-row">
-            <span className="dashboard-premium-chip">Hasta 5 anos</span>
-            <span className="dashboard-premium-chip">Picos suavizados</span>
-            <span className="dashboard-premium-chip">Saldo acumulado</span>
+            <span className="dashboard-premium-chip">Modo simple</span>
+            <span className="dashboard-premium-chip">{freeProjectionPastMonths} meses reales</span>
+            <span className="dashboard-premium-chip">{freeProjectionFutureMonths} proyectados</span>
           </div>
+
+          {projectionLoading ? (
+            <div className="loading-screen" style={{ minHeight: '220px' }}>
+              <div className="spinner" />
+            </div>
+          ) : projectionError ? (
+            <div className="empty-state">
+              <p className="empty-text">No pudimos cargar la proyeccion</p>
+              <p className="empty-sub">{projectionError}</p>
+            </div>
+          ) : advancedChartEmpty ? (
+            <div className="empty-state">
+              <p className="empty-text">Aun no hay base suficiente</p>
+              <p className="empty-sub">Cuando registres movimientos, aqui veras tus ultimos meses y una proyeccion corta.</p>
+            </div>
+          ) : (
+            renderProjectionAreaChart()
+          )}
         </div>
       )}
     </div>

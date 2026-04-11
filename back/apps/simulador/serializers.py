@@ -1,5 +1,6 @@
 from decimal import Decimal, ROUND_HALF_UP
 
+from django.utils import timezone
 from rest_framework import serializers
 
 from .models import Banco, Simulacion
@@ -36,6 +37,7 @@ class SimulacionSerializer(serializers.ModelSerializer):
         plazo_meses = self._get_value(attrs, 'plazo_meses')
         colchon_minimo = self._get_value(attrs, 'colchon_minimo')
         banco = self._get_value(attrs, 'banco')
+        fecha_inicio = self._get_value(attrs, 'fecha_inicio')
 
         errors = {}
         if self.instance is None and 'colchon_minimo' not in self.initial_data:
@@ -50,6 +52,8 @@ class SimulacionSerializer(serializers.ModelSerializer):
             errors['colchon_minimo'] = 'El colchon minimo debe ser mayor que 0.'
         if banco is not None and not banco.activo:
             errors['banco'] = 'No se puede simular con un banco inactivo.'
+        if fecha_inicio is not None and fecha_inicio < timezone.localdate():
+            errors['fecha_inicio'] = 'La simulacion solo permite fechas desde hoy hacia adelante.'
         if errors:
             raise serializers.ValidationError(errors)
 

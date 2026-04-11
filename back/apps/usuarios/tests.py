@@ -72,8 +72,9 @@ class TestUsuarioAPI(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['plan']['slug'], 'free')
         self.assertEqual(response.data['feature_access']['import_max_rows'], 2000)
+        self.assertEqual(response.data['feature_access']['projection_months'], 6)
         self.assertFalse(response.data['feature_access']['advanced_projection_enabled'])
-        self.assertEqual(response.data['feature_access']['advanced_projection_months'], 60)
+        self.assertEqual(response.data['feature_access']['advanced_projection_months'], 120)
         self.assertEqual(response.data['projection_mode'], 'simple')
 
     def test_perfil_free_ignora_cambio_de_projection_mode(self):
@@ -316,7 +317,7 @@ class TestSuperAdminAPI(APITestCase):
         self.assertEqual(response.data['plan']['slug'], 'pro')
         self.assertEqual(response.data['feature_access']['import_max_rows'], 5000)
         self.assertTrue(response.data['feature_access']['advanced_projection_enabled'])
-        self.assertEqual(response.data['feature_access']['advanced_projection_months'], 60)
+        self.assertEqual(response.data['feature_access']['advanced_projection_months'], 120)
         self.assertTrue(AdminActionLog.objects.filter(action='user_plan_assigned', target_user=self.user).exists())
 
     def test_superadmin_puede_listar_planes_y_features(self):

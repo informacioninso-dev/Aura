@@ -16,9 +16,11 @@ from apps.usuarios.plans import (
     FEATURE_ADVANCED_PROJECTION_ENABLED,
     FEATURE_ADVANCED_PROJECTION_MONTHS,
     FEATURE_IMPORT_MAX_ROWS,
+    FEATURE_PROJECTION_MONTHS,
     get_user_projection_mode,
     get_user_feature_value,
 )
+from .dates import local_today
 from .models import (
     Categoria,
     CuentaPorCobrar,
@@ -274,7 +276,7 @@ class SaldoMesViewSet(BaseFinanzasViewSet):
     @action(detail=False, methods=['get'])
     def actual(self, request):
         """Saldo del mes anterior que aplica al mes actual."""
-        hoy = datetime.date.today()
+        hoy = local_today()
         anio, mes = hoy.year, hoy.month
 
         if mes == 1:
@@ -294,7 +296,7 @@ class SaldoMesViewSet(BaseFinanzasViewSet):
     @action(detail=False, methods=['post'])
     def recalcular(self, request):
         """Recalcula y guarda el balance del mes indicado."""
-        hoy = datetime.date.today()
+        hoy = local_today()
         anio = request.data.get('anio')
         mes = request.data.get('mes')
 
@@ -328,6 +330,23 @@ class SaldoMesViewSet(BaseFinanzasViewSet):
 class ProyeccionAcumuladaView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
     MAX_ANALYSIS_HISTORY_MONTHS = 18
+    DEFAULT_ADVANCED_PROJECTION_MONTHS = 120
+    DEFAULT_FREE_DISPLAY_MONTHS = 6
+
+    def _get_free_projection_limits(self, user):
+        raw_display_months = get_user_feature_value(
+            user,
+            FEATURE_PROJECTION_MONTHS,
+            default=self.DEFAULT_FREE_DISPLAY_MONTHS,
+        )
+        try:
+            display_months = max(2, int(raw_display_months))
+        except (TypeError, ValueError):
+            display_months = self.DEFAULT_FREE_DISPLAY_MONTHS
+
+        future_months = max(1, display_months // 2)
+        past_months = max(1, display_months - future_months)
+        return display_months, past_months, future_months
 
     def get(self, request):
         has_access = bool(
@@ -337,55 +356,57 @@ class ProyeccionAcumuladaView(APIView):
                 default=False,
             )
         )
-        if not has_access:
-            return Response(
-                {'detail': 'Tu plan no tiene acceso a la proyeccion acumulada.'},
-                status=status.HTTP_403_FORBIDDEN,
+        if has_access:
+            raw_max_months = get_user_feature_value(
+                request.user,
+                FEATURE_ADVANCED_PROJECTION_MONTHS,
+                default=self.DEFAULT_ADVANCED_PROJECTION_MONTHS,
             )
-
-        raw_max_months = get_user_feature_value(
-            request.user,
-            FEATURE_ADVANCED_PROJECTION_MONTHS,
-            default=60,
-        )
-        try:
-            max_months = max(1, int(raw_max_months))
-        except (TypeError, ValueError):
-            max_months = 60
-
-        raw_months = request.query_params.get('months')
-        if raw_months in (None, ''):
-            months = min(60, max_months)
-        else:
             try:
-                months = int(raw_months)
+                max_months = max(1, int(raw_max_months))
             except (TypeError, ValueError):
-                return Response(
-                    {'error': 'months debe ser un numero entero positivo.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            if months <= 0:
-                return Response(
-                    {'error': 'months debe ser mayor que 0.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            if months > max_months:
-                return Response(
-                    {'error': f'Tu plan permite hasta {max_months} meses de proyeccion acumulada.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+                max_months = self.DEFAULT_ADVANCED_PROJECTION_MONTHS
 
-        hoy = datetime.date.today()
+            raw_months = request.query_params.get('months')
+            if raw_months in (None, ''):
+                months = min(self.DEFAULT_ADVANCED_PROJECTION_MONTHS, max_months)
+            else:
+                try:
+                    months = int(raw_months)
+                except (TypeError, ValueError):
+                    return Response(
+                        {'error': 'months debe ser un numero entero positivo.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if months <= 0:
+                    return Response(
+                        {'error': 'months debe ser mayor que 0.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if months > max_months:
+                    return Response(
+                        {'error': f'Tu plan permite hasta {max_months} meses de proyeccion acumulada.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+        else:
+            _, free_past_months, free_future_months = self._get_free_projection_limits(request.user)
+            months = free_future_months
+            max_months = free_future_months
+
+        hoy = local_today()
         if hoy.month == 1:
             saldo_anio, saldo_mes = hoy.year - 1, 12
         else:
             saldo_anio, saldo_mes = hoy.year, hoy.month - 1
 
-        raw_past = request.query_params.get('past_months', '6')
-        try:
-            real_past_months = max(1, min(24, int(raw_past)))
-        except (TypeError, ValueError):
-            real_past_months = 6
+        if has_access:
+            raw_past = request.query_params.get('past_months', '6')
+            try:
+                real_past_months = max(1, min(24, int(raw_past)))
+            except (TypeError, ValueError):
+                real_past_months = 6
+        else:
+            _, real_past_months, _ = self._get_free_projection_limits(request.user)
         current_month = datetime.date(hoy.year, hoy.month, 1)
         primera_fecha = _primera_fecha_con_movimientos(request.user)
         if primera_fecha:
@@ -605,7 +626,7 @@ class ReporteView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request):
-        hoy = datetime.date.today()
+        hoy = local_today()
         try:
             anio, mes = _parse_anio_mes(
                 request.query_params.get('anio', hoy.year),
@@ -621,7 +642,7 @@ class ReportePDFView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request):
-        hoy = datetime.date.today()
+        hoy = local_today()
         try:
             anio, mes = _parse_anio_mes(
                 request.query_params.get('anio', hoy.year),

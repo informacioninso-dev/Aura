@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { clearAuthTokens, setAccessToken } from '../api/authStorage'
 import api, { refreshAccessToken } from '../api/client'
 import AuthContext from './auth-context'
@@ -7,22 +7,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    bootstrapAuth()
-  }, [])
-
-  async function bootstrapAuth() {
-    try {
-      await refreshAccessToken()
-      await fetchPerfil()
-    } catch {
-      clearAuthTokens()
-      setUser(null)
-      setLoading(false)
-    }
-  }
-
-  async function fetchPerfil() {
+  const fetchPerfil = useCallback(async () => {
     try {
       const { data } = await api.get('/usuarios/perfil/')
       setUser(data)
@@ -32,7 +17,22 @@ export function AuthProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    async function bootstrapAuth() {
+      try {
+        await refreshAccessToken()
+        await fetchPerfil()
+      } catch {
+        clearAuthTokens()
+        setUser(null)
+        setLoading(false)
+      }
+    }
+
+    void bootstrapAuth()
+  }, [fetchPerfil])
 
   async function login(email, password) {
     const { data } = await api.post('/usuarios/login/', { email, password })

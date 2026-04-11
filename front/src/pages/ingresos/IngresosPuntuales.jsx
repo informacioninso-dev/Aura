@@ -258,7 +258,7 @@ export default function IngresosPuntuales({ embedded = false }) {
           <div className="empty-state">
             <div className="empty-icon">$</div>
             <p className="empty-text">No hay ingresos puntuales</p>
-            <p className="empty-sub">Suma bonos, ventas o extras</p>
+            <p className="empty-sub">Suma bonos, ventas u otros ingresos puntuales</p>
           </div>
         ) : (
           <>
@@ -367,7 +367,7 @@ export default function IngresosPuntuales({ embedded = false }) {
 
           {!editId && !showAdvanced && canCustomizeProjection && (
             <p style={{ marginTop: -4, marginBottom: 14, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
-              Aqui tambien puedes decidir si este extra entra o no en tu proyeccion personalizada.
+              Aqui tambien puedes decidir si este ingreso puntual entra o no en tu proyeccion personalizada.
             </p>
           )}
 
@@ -394,9 +394,9 @@ export default function IngresosPuntuales({ embedded = false }) {
                       style={{ marginTop: 3, accentColor: '#C487F6' }}
                     />
                     <div>
-                      <div className="form-modal-label" style={{ marginBottom: 4 }}>Considerar en mi proyeccion futura</div>
+                      <div className="form-modal-label" style={{ marginBottom: 4 }}>Usar en mi proyeccion personalizada</div>
                       <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.45 }}>
-                        Se usa cuando eliges el modo Personalizada. Dejalo activo si este extra podria repetirse; apagalo para bonos u otros casos especiales.
+                        Solo aplica en modo Personalizada. Dejalo activo si este ingreso puntual podria repetirse; apagalo para bonos u otros casos especiales.
                       </div>
                     </div>
                   </label>
@@ -416,7 +416,7 @@ export default function IngresosPuntuales({ embedded = false }) {
               <div className="form-modal-convert-copy">
                 <span className="form-modal-convert-title">Cambiar tipo de movimiento</span>
                 <span className="form-modal-convert-text">
-                  Si este extra en realidad se repite, puedes pasarlo a fijo sin volverlo a cargar desde cero.
+                  Si este ingreso puntual en realidad se repite, puedes pasarlo a fijo sin volverlo a cargar desde cero.
                 </span>
               </div>
               <button

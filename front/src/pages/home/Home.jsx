@@ -204,13 +204,13 @@ export default function Home() {
             </p>
           </div>
           <div className="features-grid">
-            {features.map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="feature-card">
+            {features.map((feature) => (
+              <div key={feature.title} className="feature-card">
                 <div className="feature-icon">
-                  <Icon size={22} strokeWidth={2.2} />
+                  <feature.icon size={22} strokeWidth={2.2} />
                 </div>
-                <h3 className="feature-title">{title}</h3>
-                <p className="feature-desc">{desc}</p>
+                <h3 className="feature-title">{feature.title}</h3>
+                <p className="feature-desc">{feature.desc}</p>
               </div>
             ))}
           </div>

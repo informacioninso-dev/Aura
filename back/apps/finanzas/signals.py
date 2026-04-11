@@ -1,11 +1,13 @@
 import datetime
 from decimal import Decimal
 from functools import partial
-from django.db.models.signals import post_save, post_delete, pre_save
-from django.db import transaction
-from django.dispatch import receiver
-from django.conf import settings
 
+from django.conf import settings
+from django.db import transaction
+from django.db.models.signals import post_save, post_delete, pre_save
+from django.dispatch import receiver
+
+from .dates import local_today
 from .models import (
     CATEGORIAS_DEFAULT,
     Categoria,
@@ -76,7 +78,7 @@ def _evaluar_presupuesto(usuario, categoria):
     if not cat.limite_mensual:
         return
 
-    hoy   = datetime.date.today()
+    hoy   = local_today()
     anio, mes = hoy.year, hoy.month
     total   = _gasto_mensual_categoria(usuario, categoria, anio, mes)
     limite  = Decimal(str(cat.limite_mensual))

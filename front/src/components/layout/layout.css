@@ -115,11 +115,22 @@
 }
 
 .sidebar-footer {
-  padding: 12px;
+  padding: 18px 14px calc(18px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid rgba(255,255,255,0.06);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 10px;
+}
+
+.sidebar-footer .nav-item {
+  min-height: 48px;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.sidebar-footer .nav-item-icon {
+  width: 20px;
+  min-width: 20px;
 }
 
 .nav-item-danger:hover {

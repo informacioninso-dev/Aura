@@ -18,6 +18,7 @@ const FRECUENCIAS = ['diario', 'semanal', 'quincenal', 'mensual', 'bimestral', '
 const FREQ = { diario: 30, semanal: 4.33, quincenal: 2, mensual: 1, bimestral: 0.5, trimestral: 0.333, semestral: 0.167, anual: 0.083 }
 const FRECUENCIA_STORAGE_KEY = 'gastos_corrientes_last_frecuencia'
 const CATEGORIA_STORAGE_KEY = 'gastos_corrientes_last_categoria'
+const FUTURE_EXPENSE_MESSAGE = 'Los gastos futuros no se cargan aqui. Simulalos desde el simulador con tasa 0%.'
 
 function getTodayDate() {
   const now = new Date()
@@ -50,6 +51,7 @@ function buildEmptyForm() {
 export default function GastosCorrientes({ embedded = false }) {
   const { user } = useAuth()
   const { categorias } = useCategorias()
+  const maxExpenseDate = getTodayDate()
 
   // — lista y paginacion —
   const [items, setItems] = useState([])
@@ -83,6 +85,25 @@ export default function GastosCorrientes({ embedded = false }) {
   const [feedback, setFeedback] = useState({ type: '', message: '' })
 
   useEffect(() => { fetchItems() }, [])
+
+  function clampExpenseDate(value) {
+    if (!value) return value
+    return value > maxExpenseDate ? maxExpenseDate : value
+  }
+
+  function setStartDate(value) {
+    const nextValue = clampExpenseDate(value)
+    setForm((prev) => ({
+      ...prev,
+      fecha_inicio: nextValue,
+      fecha_fin: prev.fecha_fin && prev.fecha_fin < nextValue ? '' : prev.fecha_fin,
+    }))
+  }
+
+  function setVersionStartDate(value) {
+    const nextValue = clampExpenseDate(value)
+    setVersionForm((prev) => ({ ...prev, nuevaFecha: nextValue }))
+  }
 
   async function fetchItems() {
     try {
@@ -119,6 +140,10 @@ export default function GastosCorrientes({ embedded = false }) {
   async function handleSubmit(e) {
     e.preventDefault()
     if (loading) return
+    if (form.fecha_inicio > maxExpenseDate) {
+      setFeedback({ type: 'error', message: FUTURE_EXPENSE_MESSAGE })
+      return
+    }
     setLoading(true)
     setFeedback({ type: '', message: '' })
     try {
@@ -177,6 +202,10 @@ export default function GastosCorrientes({ embedded = false }) {
   async function handleVersion(e) {
     e.preventDefault()
     if (versionLoading) return
+    if (versionForm.nuevaFecha > maxExpenseDate) {
+      setFeedback({ type: 'error', message: FUTURE_EXPENSE_MESSAGE })
+      return
+    }
     setVersionLoading(true)
     setFeedback({ type: '', message: '' })
     try {
@@ -435,9 +464,12 @@ export default function GastosCorrientes({ embedded = false }) {
           <div className="form-modal-group">
             <label className="form-modal-label">Desde <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>— afecta el historico y la proyeccion</span></label>
             <div className="date-input-wrap">
-              <input className="form-modal-input" type="date" required min={DATE_INPUT_MIN} max={DATE_INPUT_MAX} value={form.fecha_inicio} onChange={(e) => setForm((prev) => ({ ...prev, fecha_inicio: e.target.value, fecha_fin: prev.fecha_fin && prev.fecha_fin < e.target.value ? '' : prev.fecha_fin }))} />
+              <input className="form-modal-input" type="date" required min={DATE_INPUT_MIN} max={maxExpenseDate} value={form.fecha_inicio} onChange={(e) => setStartDate(e.target.value)} />
             </div>
-            <DateQuickActions value={form.fecha_inicio} onChange={(value) => setForm((prev) => ({ ...prev, fecha_inicio: value, fecha_fin: prev.fecha_fin && prev.fecha_fin < value ? '' : prev.fecha_fin }))} disabled={loading} />
+            <DateQuickActions value={form.fecha_inicio} onChange={setStartDate} disabled={loading} />
+            <p style={{ marginTop: 8, fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45 }}>
+              Si este gasto empieza mas adelante, no lo cargues aqui. Simulalo en el simulador usando tasa 0%.
+            </p>
           </div>
 
           {!editId && (
@@ -541,9 +573,12 @@ export default function GastosCorrientes({ embedded = false }) {
               <div className="form-modal-group">
                 <label className="form-modal-label">Aplica desde</label>
                 <div className="date-input-wrap">
-                  <input className="form-modal-input" type="date" required min={DATE_INPUT_MIN} max={DATE_INPUT_MAX} value={versionForm.nuevaFecha} onChange={(e) => setVersionForm({ ...versionForm, nuevaFecha: e.target.value })} />
+                  <input className="form-modal-input" type="date" required min={DATE_INPUT_MIN} max={maxExpenseDate} value={versionForm.nuevaFecha} onChange={(e) => setVersionStartDate(e.target.value)} />
                 </div>
-                <DateQuickActions value={versionForm.nuevaFecha} onChange={(value) => setVersionForm({ ...versionForm, nuevaFecha: value })} disabled={versionLoading} />
+                <DateQuickActions value={versionForm.nuevaFecha} onChange={setVersionStartDate} disabled={versionLoading} />
+                <p style={{ marginTop: 8, fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45 }}>
+                  Si el nuevo gasto arranca en el futuro, llevalo al simulador con tasa 0% en vez de versionarlo aqui.
+                </p>
               </div>
             </div>
 

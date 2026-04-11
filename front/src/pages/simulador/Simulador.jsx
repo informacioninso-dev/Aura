@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Calculator, CheckCircle, XCircle, Save, Trash2, CreditCard } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts'
 
@@ -9,7 +9,7 @@ import DateQuickActions from '../../components/ui/DateQuickActions'
 import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import { useAuth } from '../../context/useAuth'
-import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../../utils/dateBounds'
+import { DATE_INPUT_MAX } from '../../utils/dateBounds'
 import { formatMoney } from '../../utils/formatters'
 import '../../components/ui/app.css'
 
@@ -31,6 +31,7 @@ const PROJECTION_MODE_LABELS = {
   simple: 'Simple',
   personalizada: 'Personalizada',
 }
+const PAST_SIMULATION_DATE_MESSAGE = 'El simulador solo permite fechas desde hoy hacia adelante.'
 
 function parseLocalDate(value) {
   const [y, m, d] = value.split('-').map(Number)
@@ -43,6 +44,13 @@ function startOfMonth(date) {
 
 function endOfMonth(date) {
   return new Date(date.getFullYear(), date.getMonth() + 1, 0)
+}
+
+function shiftMonths(date, amount) {
+  const target = new Date(date.getFullYear(), date.getMonth() + amount, 1)
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()
+  target.setDate(Math.min(date.getDate(), lastDay))
+  return target
 }
 
 function overlapsMonth(item, monthDate) {
@@ -83,6 +91,24 @@ function roundMoneyNumber(value) {
   const numeric = Number(value)
   if (!Number.isFinite(numeric)) return 0
   return Number(numeric.toFixed(2))
+}
+
+function normalizeApiMessage(value) {
+  if (Array.isArray(value)) return value.map(normalizeApiMessage).filter(Boolean).join(' ')
+  if (value && typeof value === 'object') return Object.values(value).map(normalizeApiMessage).filter(Boolean).join(' ')
+  if (value == null) return ''
+  return String(value)
+}
+
+function normalizeDetectedDuplicates(items) {
+  if (!Array.isArray(items)) return []
+  return items.map((item) => ({
+    id: Number(item?.id),
+    descripcion: normalizeApiMessage(item?.descripcion),
+    fecha_inicio: normalizeApiMessage(item?.fecha_inicio),
+    fecha_fin: normalizeApiMessage(item?.fecha_fin),
+    cuota_mensual: normalizeApiMessage(item?.cuota_mensual),
+  }))
 }
 
 function getInitialColchonMinimo() {
@@ -167,10 +193,18 @@ function resolveSaldoInicial(responseData) {
   return Number.isFinite(monto) ? roundMoneyNumber(monto) : 0
 }
 
+const SIMULATOR_DATE_ACTIONS = [
+  { key: 'today', label: 'Hoy', resolve: () => new Date() },
+  { key: 'month-end', label: 'Fin de mes', resolve: (base) => endOfMonth(base) },
+  { key: 'next-month', label: 'Mes siguiente', resolve: (base) => shiftMonths(base, 1) },
+  { key: 'next-month-start', label: 'Prox. inicio', resolve: (base) => startOfMonth(shiftMonths(base, 1)) },
+]
+
 export default function Simulador() {
   const { user } = useAuth()
   const advancedProjectionEnabled = Boolean(user?.feature_access?.advanced_projection_enabled)
-  const advancedProjectionMaxMonths = Number(user?.feature_access?.advanced_projection_months || 60)
+  const advancedProjectionMaxMonths = Number(user?.feature_access?.advanced_projection_months || 120)
+  const todayDate = formatDateLocal(new Date())
 
   const [bancos, setBancos] = useState([])
   const [simulaciones, setSimulaciones] = useState([])
@@ -194,6 +228,7 @@ export default function Simulador() {
   const [deletingId, setDeletingId] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [confirmAddDiferidoOpen, setConfirmAddDiferidoOpen] = useState(false)
+  const [duplicateDiferidoWarning, setDuplicateDiferidoWarning] = useState(null)
 
   const [diferidoOk, setDiferidoOk] = useState(false)
   const [feedback, setFeedback] = useState({ type: '', message: '' })
@@ -203,11 +238,7 @@ export default function Simulador() {
   const [pageSize, setPageSize] = useState(10)
   const flujoRequestIdRef = useRef(0)
 
-  useEffect(() => {
-    loadInitialData()
-  }, [])
-
-  async function cargarFlujoBase({ monthsNeeded = 24 } = {}) {
+  const cargarFlujoBase = useCallback(async ({ monthsNeeded = 24 } = {}) => {
     const requestId = flujoRequestIdRef.current + 1
     flujoRequestIdRef.current = requestId
     if (advancedProjectionEnabled) {
@@ -262,9 +293,9 @@ export default function Simulador() {
     setFlujoBase(nextFlujoBase)
     setSimulationProjectionMeta(nextMeta)
     return { flujoBase: nextFlujoBase, saldoInicial: nextSaldoInicial, meta: nextMeta }
-  }
+  }, [advancedProjectionEnabled, advancedProjectionMaxMonths, user?.projection_mode])
 
-  async function loadInitialData() {
+  const loadInitialData = useCallback(async () => {
     setLoadingData(true)
     try {
       const [bancosRes, simulacionesRes] = await Promise.all([
@@ -283,13 +314,17 @@ export default function Simulador() {
     } finally {
       setLoadingData(false)
     }
-  }
+  }, [cargarFlujoBase])
+
+  useEffect(() => {
+    void loadInitialData()
+  }, [loadInitialData])
 
   async function recargarFlujoBase() {
     try {
       await cargarFlujoBase({ monthsNeeded: Math.max(24, Number(form.plazo_meses || 24)) })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo actualizar el flujo base.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo actualizar la base de la proyeccion.') })
     }
   }
 
@@ -302,10 +337,28 @@ export default function Simulador() {
     }))
   }
 
+  function clampSimulationStartDate(value) {
+    if (!value) return value
+    return value < todayDate ? todayDate : value
+  }
+
+  function setSimulationStartDate(value) {
+    setForm((prev) => ({ ...prev, fecha_inicio: clampSimulationStartDate(value) }))
+  }
+
+  function ensureFutureSimulationDate() {
+    if (form.fecha_inicio < todayDate) {
+      setFeedback({ type: 'error', message: PAST_SIMULATION_DATE_MESSAGE })
+      return false
+    }
+    return true
+  }
+
   async function simular(e) {
     e.preventDefault()
     if (simulating) return
     setFeedback({ type: '', message: '' })
+    if (!ensureFutureSimulationDate()) return
     setSimulating(true)
 
     try {
@@ -405,6 +458,7 @@ export default function Simulador() {
 
   async function guardarSimulacion() {
     if (!resultado || guardando) return
+    if (!ensureFutureSimulationDate()) return
     setGuardando(true)
     setFeedback({ type: '', message: '' })
     try {
@@ -431,8 +485,10 @@ export default function Simulador() {
     }
   }
 
-  async function agregarComoDiferido() {
+  async function agregarComoDiferido({ confirmarDuplicado = false } = {}) {
     if (!resultado || agregando) return
+    if (!ensureFutureSimulationDate()) return
+    if (confirmarDuplicado) setDuplicateDiferidoWarning(null)
     setConfirmAddDiferidoOpen(false)
     setAgregando(true)
     setFeedback({ type: '', message: '' })
@@ -450,13 +506,24 @@ export default function Simulador() {
         fecha_inicio: form.fecha_inicio,
         fecha_fin: formatDateLocal(fin),
         activo: true,
+        confirmar_duplicado: confirmarDuplicado,
       })
 
       await recargarFlujoBase()
       setDiferidoOk(true)
+      setDuplicateDiferidoWarning(null)
       setFeedback({ type: 'success', message: 'Gasto a cuotas agregado a tu plan.' })
       setTimeout(() => setDiferidoOk(false), 3500)
     } catch (err) {
+      const duplicateMessage = normalizeApiMessage(err?.response?.data?.duplicado).trim()
+      const detectedDuplicates = normalizeDetectedDuplicates(err?.response?.data?.duplicados_detectados)
+      if (!confirmarDuplicado && duplicateMessage && detectedDuplicates.length > 0) {
+        setDuplicateDiferidoWarning({
+          message: duplicateMessage,
+          duplicates: detectedDuplicates,
+        })
+        return
+      }
       setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo agregar el gasto a cuotas.') })
     } finally {
       setAgregando(false)
@@ -513,15 +580,31 @@ export default function Simulador() {
   const start = (safePage - 1) * pageSize
   const paginatedSimulaciones = filteredSimulaciones.slice(start, start + pageSize)
 
+  function buildDuplicateDiferidoMessage() {
+    if (!duplicateDiferidoWarning) return ''
+    const duplicates = duplicateDiferidoWarning.duplicates || []
+    const firstDuplicate = duplicates[0]
+    if (!firstDuplicate) {
+      return duplicateDiferidoWarning.message || 'Ya tienes un gasto a cuotas parecido en este periodo.'
+    }
+
+    const startLabel = parseLocalDate(firstDuplicate.fecha_inicio)?.toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' }) || firstDuplicate.fecha_inicio
+    const endLabel = parseLocalDate(firstDuplicate.fecha_fin)?.toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' }) || firstDuplicate.fecha_fin
+    const cuotaLabel = firstDuplicate.cuota_mensual ? fmt(firstDuplicate.cuota_mensual) : null
+    const moreLabel = duplicates.length > 1 ? ` Tambien hay ${duplicates.length - 1} parecido(s).` : ''
+
+    return `${duplicateDiferidoWarning.message || 'Ya existe un gasto a cuotas parecido.'} Encontramos "${firstDuplicate.descripcion}"${cuotaLabel ? ` por ${cuotaLabel} al mes` : ''} entre ${startLabel} y ${endLabel}. Si sigues, quedara duplicado en tus egresos.${moreLabel}`
+  }
+
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Simulador de prestamos</h1>
-        <p className="page-subtitle">Mira si una cuota te cabe antes de tomarla.</p>
+        <h1 className="page-title">Simulador de gastos y prestamos</h1>
+        <p className="page-subtitle">Mira si una cuota o un gasto futuro te caben antes de cargarlos.</p>
         <p className="dashboard-chart-note" style={{ marginTop: 6 }}>
           {simulationModeNote}
           {advancedProjectionEnabled && !simulationProjectionMeta.variableProjectionApplied
-            ? ` Aun no hay suficientes extras para meter variable futura, asi que usa tu base fija.`
+            ? ' Aun no hay suficientes movimientos variables para estimar la parte variable, asi que usa tu base fija.'
             : ''}
         </p>
       </div>
@@ -538,16 +621,21 @@ export default function Simulador() {
             <div className="card">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
                 <Calculator size={18} style={{ color: '#C487F6' }} />
-                <h2 style={{ fontWeight: 700, fontSize: 15 }}>Haz una simulacion</h2>
+                <div>
+                  <h2 style={{ fontWeight: 700, fontSize: 15 }}>Haz una simulacion</h2>
+                  <p style={{ marginTop: 4, fontSize: 11, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45 }}>
+                    Si quieres simular un gasto y no un prestamo, deja el banco vacio y usa interes 0%.
+                  </p>
+                </div>
               </div>
 
               <form onSubmit={simular}>
                 <div className="form-modal-group">
-                  <label className="form-modal-label">Que quieres financiar?</label>
+                  <label className="form-modal-label">Que quieres simular?</label>
                   <input
                     className="form-modal-input"
                     required
-                    placeholder="Ej: telefono, moto, viaje"
+                    placeholder="Ej: telefono, viaje o gasto futuro"
                     value={form.nombre}
                     onChange={(e) => setForm({ ...form, nombre: e.target.value })}
                   />
@@ -556,7 +644,7 @@ export default function Simulador() {
                 <div className="form-modal-group">
                   <label className="form-modal-label">Monto</label>
                   <input
-                    className="form-modal-input"
+                    className="form-modal-input form-modal-input-no-spinner"
                     type="number"
                     required
                     min="1"
@@ -564,6 +652,7 @@ export default function Simulador() {
                     placeholder="0"
                     value={form.monto}
                     onChange={(e) => setForm({ ...form, monto: e.target.value })}
+                    onWheel={(e) => e.currentTarget.blur()}
                   />
                 </div>
 
@@ -631,13 +720,21 @@ export default function Simulador() {
                       className="form-modal-input"
                       type="date"
                       required
-                      min={DATE_INPUT_MIN}
+                      min={todayDate}
                       max={DATE_INPUT_MAX}
                       value={form.fecha_inicio}
-                      onChange={(e) => setForm({ ...form, fecha_inicio: e.target.value })}
+                      onChange={(e) => setSimulationStartDate(e.target.value)}
                     />
                   </div>
-                  <DateQuickActions value={form.fecha_inicio} onChange={(value) => setForm({ ...form, fecha_inicio: value })} disabled={agregando || simulating} />
+                  <DateQuickActions
+                    value={form.fecha_inicio}
+                    onChange={setSimulationStartDate}
+                    disabled={agregando || simulating}
+                    actions={SIMULATOR_DATE_ACTIONS}
+                  />
+                  <p style={{ marginTop: 8, fontSize: 11, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45 }}>
+                    Solo puedes arrancar desde hoy hacia adelante. El simulador no acepta fechas pasadas.
+                  </p>
                 </div>
 
                 <button type="submit" className="btn-modal-save" disabled={simulating} style={{ width: '100%', padding: '12px 0', marginTop: 4 }}>
@@ -883,6 +980,17 @@ export default function Simulador() {
         loading={agregando}
         onConfirm={agregarComoDiferido}
         onClose={() => setConfirmAddDiferidoOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={duplicateDiferidoWarning !== null}
+        title="Posible gasto duplicado"
+        message={buildDuplicateDiferidoMessage()}
+        confirmText="Agregar igual"
+        cancelText="Cancelar"
+        loading={agregando}
+        onConfirm={() => agregarComoDiferido({ confirmarDuplicado: true })}
+        onClose={() => setDuplicateDiferidoWarning(null)}
       />
 
       <ConfirmDialog

@@ -1,5 +1,6 @@
-from django.db import models
 from django.conf import settings
+from django.db import models
+from django.utils import timezone
 
 
 FRECUENCIA_CHOICES = [
@@ -185,8 +186,7 @@ class SaldoMes(models.Model):
         verbose_name_plural = 'Saldos mes'
 
     def recalculos_restantes(self):
-        import datetime as dt
-        if self.ultimo_recalculo and self.ultimo_recalculo.date() == dt.date.today():
+        if self.ultimo_recalculo and self.ultimo_recalculo.date() == timezone.localdate():
             return max(0, MAX_RECALCULOS_DIA - self.recalculos_hoy)
         return MAX_RECALCULOS_DIA
 

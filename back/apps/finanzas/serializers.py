@@ -5,6 +5,7 @@ from rest_framework import serializers
 
 from apps.usuarios.plans import FEATURE_ADVANCED_PROJECTION_ENABLED, get_user_feature_value
 
+from .dates import local_today
 from .models import (
     Categoria,
     CuentaPorCobrar,
@@ -51,6 +52,17 @@ def validate_reasonable_date(errors, field_name, value, *, label=None):
         label = label or field_name.replace('_', ' ')
         errors[field_name] = (
             f'La fecha de {label} debe estar entre {MIN_ALLOWED_YEAR} y {MAX_ALLOWED_YEAR}.'
+        )
+
+
+def validate_not_future_expense_date(errors, field_name, value, *, label=None):
+    if value is None or not isinstance(value, date):
+        return
+    if value > local_today():
+        label = label or field_name.replace('_', ' ')
+        errors[field_name] = (
+            f'La fecha de {label} no puede estar en el futuro. '
+            'Si ese gasto todavia no ocurre, simula el escenario desde el simulador con tasa 0%.'
         )
 
 
@@ -166,6 +178,7 @@ class GastoCorrienteSerializer(serializers.ModelSerializer):
             errors['monto'] = 'El monto debe ser mayor que 0.'
         validate_reasonable_date(errors, 'fecha_inicio', fecha_inicio, label='inicio')
         validate_reasonable_date(errors, 'fecha_fin', fecha_fin, label='fin')
+        validate_not_future_expense_date(errors, 'fecha_inicio', fecha_inicio, label='inicio')
         if fecha_inicio and fecha_fin and fecha_fin < fecha_inicio:
             errors['fecha_fin'] = 'La fecha fin no puede ser menor que la fecha de inicio.'
         if errors:
@@ -186,6 +199,7 @@ class GastoNoCorrienteSerializer(ProjectionEligibilitySerializerMixin, serialize
         if monto is not None and monto <= 0:
             errors['monto'] = 'El monto debe ser mayor que 0.'
         validate_reasonable_date(errors, 'fecha', fecha)
+        validate_not_future_expense_date(errors, 'fecha', fecha)
         if errors:
             raise serializers.ValidationError(errors)
         self.enforce_projection_eligibility(attrs)
@@ -199,6 +213,7 @@ class GastoNoCorrienteSerializer(ProjectionEligibilitySerializerMixin, serialize
 
 class DeferidoSerializer(serializers.ModelSerializer):
     cuota_mensual = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    confirmar_duplicado = serializers.BooleanField(write_only=True, required=False, default=False)
 
     def _get_value(self, attrs, field):
         if field in attrs:
@@ -207,13 +222,36 @@ class DeferidoSerializer(serializers.ModelSerializer):
             return getattr(self.instance, field)
         return None
 
+    def _find_possible_duplicates(self, descripcion, fecha_inicio, fecha_fin):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if not getattr(user, 'is_authenticated', False):
+            return []
+        if not descripcion or not fecha_inicio or not fecha_fin:
+            return []
+
+        duplicates = Diferido.objects.filter(
+            usuario=user,
+            activo=True,
+            descripcion__iexact=descripcion,
+            fecha_inicio__lte=fecha_fin,
+            fecha_fin__gte=fecha_inicio,
+        )
+        if self.instance is not None:
+            duplicates = duplicates.exclude(pk=self.instance.pk)
+        return list(duplicates.order_by('-fecha_inicio')[:3])
+
     def validate(self, attrs):
+        descripcion = str(self._get_value(attrs, 'descripcion') or '').strip()
         monto_total  = self._get_value(attrs, 'monto_total')
         num_cuotas   = self._get_value(attrs, 'num_cuotas')
         fecha_inicio = self._get_value(attrs, 'fecha_inicio')
         fecha_fin    = self._get_value(attrs, 'fecha_fin')
+        confirmar_duplicado = bool(attrs.get('confirmar_duplicado', False))
 
         errors = {}
+        if not descripcion:
+            errors['descripcion'] = 'La descripcion no puede estar vacia.'
         if monto_total is not None and monto_total <= 0:
             errors['monto_total'] = 'El monto total debe ser mayor que 0.'
         if num_cuotas is not None and num_cuotas <= 0:
@@ -222,9 +260,31 @@ class DeferidoSerializer(serializers.ModelSerializer):
         validate_reasonable_date(errors, 'fecha_fin', fecha_fin, label='fin')
         if fecha_inicio and fecha_fin and fecha_fin < fecha_inicio:
             errors['fecha_fin'] = 'La fecha fin no puede ser menor que la fecha de inicio.'
+        duplicates = self._find_possible_duplicates(descripcion, fecha_inicio, fecha_fin)
+        if duplicates and not confirmar_duplicado:
+            errors['duplicado'] = (
+                'Ya tienes un gasto a cuotas activo con ese nombre en ese periodo. '
+                'Confirma si quieres agregarlo igual.'
+            )
+            errors['duplicados_detectados'] = [
+                {
+                    'id': duplicate.id,
+                    'descripcion': duplicate.descripcion,
+                    'fecha_inicio': duplicate.fecha_inicio.isoformat(),
+                    'fecha_fin': duplicate.fecha_fin.isoformat(),
+                    'cuota_mensual': str(duplicate.cuota_mensual),
+                }
+                for duplicate in duplicates
+            ]
         if errors:
             raise serializers.ValidationError(errors)
+        if 'descripcion' in attrs:
+            attrs['descripcion'] = descripcion
         return attrs
+
+    def _prepare_validated_data(self, validated_data):
+        validated_data.pop('confirmar_duplicado', None)
+        return self._set_cuota_mensual(validated_data)
 
     def _set_cuota_mensual(self, validated_data):
         monto_total = self._get_value(validated_data, 'monto_total')
@@ -234,10 +294,10 @@ class DeferidoSerializer(serializers.ModelSerializer):
         return validated_data
 
     def create(self, validated_data):
-        return super().create(self._set_cuota_mensual(validated_data))
+        return super().create(self._prepare_validated_data(validated_data))
 
     def update(self, instance, validated_data):
-        return super().update(instance, self._set_cuota_mensual(validated_data))
+        return super().update(instance, self._prepare_validated_data(validated_data))
 
     class Meta:
         model = Diferido

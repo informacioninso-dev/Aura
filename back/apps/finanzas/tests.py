@@ -1,9 +1,11 @@
 import datetime
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -194,6 +196,44 @@ class TestFinanzasAPI(APITestCase):
         self.assertFalse(response.data['incluir_en_proyeccion'])
         self.assertFalse(GastoNoCorriente.objects.get(pk=response.data['id']).incluir_en_proyeccion)
 
+    def test_gasto_puntual_rechaza_fecha_futura(self):
+        self.client.force_authenticate(user=self.user_a)
+        future_date = (timezone.localdate() + datetime.timedelta(days=1)).isoformat()
+
+        response = self.client.post(
+            '/api/finanzas/gastos-no-corrientes/',
+            {
+                'descripcion': 'Compra futura',
+                'categoria': 'otro',
+                'monto': '120.00',
+                'fecha': future_date,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('simulador', str(response.data).lower())
+
+    def test_gasto_fijo_rechaza_inicio_futuro(self):
+        self.client.force_authenticate(user=self.user_a)
+        future_date = (timezone.localdate() + datetime.timedelta(days=1)).isoformat()
+
+        response = self.client.post(
+            '/api/finanzas/gastos-corrientes/',
+            {
+                'descripcion': 'Servicio futuro',
+                'categoria': 'otro',
+                'monto': '55.00',
+                'frecuencia': 'mensual',
+                'fecha_inicio': future_date,
+                'activo': True,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('simulador', str(response.data).lower())
+
     def test_cuentas_por_cobrar_lista_solo_las_del_usuario_y_calcula_saldo(self):
         CuentaPorCobrar.objects.create(
             usuario=self.user_a,
@@ -276,6 +316,64 @@ class TestFinanzasAPI(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('fecha_fin', response.data)
+
+    def test_diferido_alerta_posible_duplicado_en_mismo_periodo(self):
+        Diferido.objects.create(
+            usuario=self.user_a,
+            descripcion='Moto',
+            categoria='transporte',
+            monto_total=Decimal('2400.00'),
+            num_cuotas=12,
+            cuota_mensual=Decimal('200.00'),
+            fecha_inicio='2026-05-01',
+            fecha_fin='2027-04-01',
+            activo=True,
+        )
+        self.client.force_authenticate(user=self.user_a)
+        payload = {
+            'descripcion': 'Moto',
+            'categoria': 'transporte',
+            'monto_total': '3600.00',
+            'num_cuotas': 18,
+            'fecha_inicio': '2026-06-01',
+            'fecha_fin': '2027-11-01',
+            'activo': True,
+        }
+
+        response = self.client.post('/api/finanzas/diferidos/', payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('duplicado', response.data)
+        self.assertIn('duplicados_detectados', response.data)
+
+    def test_diferido_permite_confirmar_duplicado_detectado(self):
+        Diferido.objects.create(
+            usuario=self.user_a,
+            descripcion='Moto',
+            categoria='transporte',
+            monto_total=Decimal('2400.00'),
+            num_cuotas=12,
+            cuota_mensual=Decimal('200.00'),
+            fecha_inicio='2026-05-01',
+            fecha_fin='2027-04-01',
+            activo=True,
+        )
+        self.client.force_authenticate(user=self.user_a)
+        payload = {
+            'descripcion': 'Moto',
+            'categoria': 'transporte',
+            'monto_total': '3600.00',
+            'num_cuotas': 18,
+            'fecha_inicio': '2026-06-01',
+            'fecha_fin': '2027-11-01',
+            'activo': True,
+            'confirmar_duplicado': True,
+        }
+
+        response = self.client.post('/api/finanzas/diferidos/', payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Diferido.objects.filter(usuario=self.user_a, descripcion='Moto').count(), 2)
 
     def test_ingreso_rechaza_fecha_fin_menor_a_inicio(self):
         self.client.force_authenticate(user=self.user_a)
@@ -579,6 +677,52 @@ class TestFinanzasAPI(APITestCase):
         self.assertEqual(len(response.data['filas_error']), 1)
         self.assertIn('rango permitido', response.data['filas_error'][0]['error'])
 
+    def test_importar_preview_detecta_cabeceras_con_tildes_reales(self):
+        self.client.force_authenticate(user=self.user_a)
+        content = SimpleUploadedFile(
+            'movimientos.csv',
+            '\n'.join([
+                'fecha,descripción,monto,tipo,categoría',
+                '2026-02-10,Freelance,350,ingreso,otro',
+                '2026-02-12,Supermercado,-80,gasto,alimentacion',
+            ]).encode('utf-8'),
+            content_type='text/csv',
+        )
+
+        response = self.client.post(
+            '/api/finanzas/importar/preview/',
+            {'archivo': content},
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['filas_ok']), 2)
+        self.assertEqual(response.data['mapa_columnas']['descripcion'], 'descripción')
+        self.assertEqual(response.data['mapa_columnas']['categoria'], 'categoría')
+
+    def test_importar_preview_rechaza_gasto_futuro(self):
+        self.client.force_authenticate(user=self.user_a)
+        future_date = (timezone.localdate() + datetime.timedelta(days=1)).isoformat()
+        content = SimpleUploadedFile(
+            'movimientos.csv',
+            '\n'.join([
+                'fecha,descripcion,monto,tipo,categoria',
+                f'{future_date},Compra futura,120,gasto,otro',
+            ]).encode('utf-8'),
+            content_type='text/csv',
+        )
+
+        response = self.client.post(
+            '/api/finanzas/importar/preview/',
+            {'archivo': content},
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['filas_ok']), 0)
+        self.assertEqual(len(response.data['filas_error']), 1)
+        self.assertIn('simulador', response.data['filas_error'][0]['error'].lower())
+
     def test_importar_confirmar_rechaza_fecha_absurda(self):
         self.client.force_authenticate(user=self.user_a)
         payload = {
@@ -597,6 +741,18 @@ class TestFinanzasAPI(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('2000', response.data['error'])
+
+    @override_settings(TIME_ZONE='America/Guayaquil')
+    def test_saldo_actual_usa_fecha_local_en_lugar_de_utc_naive(self):
+        self.client.force_authenticate(user=self.user_a)
+        fake_now = datetime.datetime(2026, 2, 1, 2, 30, tzinfo=datetime.timezone.utc)
+
+        with patch('django.utils.timezone.now', return_value=fake_now):
+            response = self.client.get('/api/finanzas/saldo-mes/actual/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['anio_origen'], 2025)
+        self.assertEqual(response.data['mes_origen'], 12)
 
     def test_saldo_actual_no_recalcula_si_ya_existe(self):
         current_month = first_day_of_month(datetime.date.today())
@@ -773,12 +929,62 @@ class TestFinanzasAPI(APITestCase):
             ).exists()
         )
 
-    def test_proyeccion_acumulada_requiere_feature_premium(self):
+    def test_proyeccion_acumulada_plan_free_retorna_lectura_simple_limitada(self):
+        current_month = first_day_of_month(datetime.date.today())
+        previous_month = add_months(current_month, -1)
+        self.user_a.date_joined = aware_midnight(add_months(current_month, -6))
+        self.user_a.save(update_fields=['date_joined'])
+
+        Ingreso.objects.create(
+            usuario=self.user_a,
+            descripcion='Salario base',
+            monto=Decimal('1000.00'),
+            frecuencia='mensual',
+            fecha_inicio=add_months(current_month, -2),
+            activo=True,
+        )
+        GastoCorriente.objects.create(
+            usuario=self.user_a,
+            descripcion='Arriendo base',
+            categoria='vivienda',
+            monto=Decimal('400.00'),
+            frecuencia='mensual',
+            fecha_inicio=add_months(current_month, -2),
+            activo=True,
+        )
+        for offset in range(1, 4):
+            month = add_months(current_month, -offset)
+            IngresoPuntual.objects.create(
+                usuario=self.user_a,
+                descripcion=f'Extra free {offset}',
+                monto=Decimal('50.00'),
+                fecha=month + datetime.timedelta(days=4),
+            )
+            GastoNoCorriente.objects.create(
+                usuario=self.user_a,
+                descripcion=f'Gasto free {offset}',
+                categoria='otro',
+                monto=Decimal('20.00'),
+                fecha=month + datetime.timedelta(days=7),
+            )
+        SaldoMes.objects.update_or_create(
+            usuario=self.user_a,
+            anio=previous_month.year,
+            mes=previous_month.month,
+            defaults={'monto': Decimal('120.00'), 'activo': True},
+        )
+
         self.client.force_authenticate(user=self.user_a)
+        response = self.client.get('/api/finanzas/proyeccion-acumulada/?months=12&past_months=12')
 
-        response = self.client.get('/api/finanzas/proyeccion-acumulada/')
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['projection_mode'], 'simple')
+        self.assertEqual(response.data['months'], 3)
+        self.assertEqual(response.data['display_past_months'], 3)
+        self.assertEqual(response.data['max_months_allowed'], 3)
+        self.assertEqual(len(response.data['series']), 6)
+        self.assertTrue(all(point['is_real'] for point in response.data['series'][:3]))
+        self.assertTrue(all(not point['is_real'] for point in response.data['series'][3:]))
 
     def test_proyeccion_acumulada_para_plan_pro_retorna_serie_acumulada(self):
         current_month = first_day_of_month(datetime.date.today())

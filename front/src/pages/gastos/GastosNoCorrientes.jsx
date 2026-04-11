@@ -10,11 +10,12 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import DateQuickActions from '../../components/ui/DateQuickActions'
 import Modal from '../../components/ui/Modal'
 import { useCategorias } from '../../hooks/useCategorias'
-import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../../utils/dateBounds'
+import { DATE_INPUT_MIN } from '../../utils/dateBounds'
 import { formatAmount } from '../../utils/formatters'
 import '../../components/ui/app.css'
 
 const CATEGORIA_STORAGE_KEY = 'gastos_puntuales_last_categoria'
+const FUTURE_EXPENSE_MESSAGE = 'Los gastos futuros no se cargan aqui. Simulalos desde el simulador con tasa 0%.'
 
 function getTodayDate() {
   const now = new Date()
@@ -38,6 +39,7 @@ function buildEmptyForm() {
 
 export default function GastosNoCorrientes({ embedded = false }) {
   const { user } = useAuth()
+  const maxExpenseDate = getTodayDate()
   const [items, setItems] = useState([])
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState(buildEmptyForm())
@@ -59,6 +61,11 @@ export default function GastosNoCorrientes({ embedded = false }) {
   const canCustomizeProjection = Boolean(user?.feature_access?.advanced_projection_enabled)
 
   useEffect(() => { fetchItems() }, [])
+
+  function clampExpenseDate(value) {
+    if (!value) return value
+    return value > maxExpenseDate ? maxExpenseDate : value
+  }
 
   async function fetchItems() {
     try {
@@ -93,6 +100,10 @@ export default function GastosNoCorrientes({ embedded = false }) {
   async function handleSubmit(e) {
     e.preventDefault()
     if (loading) return
+    if (form.fecha > maxExpenseDate) {
+      setFeedback({ type: 'error', message: FUTURE_EXPENSE_MESSAGE })
+      return
+    }
     setLoading(true)
     setFeedback({ type: '', message: '' })
     try {
@@ -379,7 +390,7 @@ export default function GastosNoCorrientes({ embedded = false }) {
 
           {!editId && !showAdvanced && canCustomizeProjection && (
             <p style={{ marginTop: -4, marginBottom: 14, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
-              Aqui tambien puedes decidir si este extra entra o no en tu proyeccion personalizada.
+              Aqui tambien puedes decidir si este gasto puntual entra o no en tu proyeccion personalizada.
             </p>
           )}
 
@@ -388,9 +399,12 @@ export default function GastosNoCorrientes({ embedded = false }) {
               <div className="form-modal-group">
                 <label className="form-modal-label">Fecha</label>
                 <div className="date-input-wrap">
-                  <input className="form-modal-input" type="date" required min={DATE_INPUT_MIN} max={DATE_INPUT_MAX} value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
+                  <input className="form-modal-input" type="date" required min={DATE_INPUT_MIN} max={maxExpenseDate} value={form.fecha} onChange={(e) => setForm({ ...form, fecha: clampExpenseDate(e.target.value) })} />
                 </div>
-                <DateQuickActions value={form.fecha} onChange={(value) => setForm({ ...form, fecha: value })} disabled={loading} />
+                <DateQuickActions value={form.fecha} onChange={(value) => setForm({ ...form, fecha: clampExpenseDate(value) })} disabled={loading} />
+                <p style={{ marginTop: 8, fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45 }}>
+                  Si este gasto todavia no pasa, simulalo en el simulador con tasa 0% en lugar de dejarlo futuro aqui.
+                </p>
               </div>
               <div className="form-modal-group">
                 <label className="form-modal-label">Notas <span>(opcional)</span></label>
@@ -406,9 +420,9 @@ export default function GastosNoCorrientes({ embedded = false }) {
                       style={{ marginTop: 3, accentColor: '#C487F6' }}
                     />
                     <div>
-                      <div className="form-modal-label" style={{ marginBottom: 4 }}>Considerar en mi proyeccion futura</div>
+                      <div className="form-modal-label" style={{ marginBottom: 4 }}>Usar en mi proyeccion personalizada</div>
                       <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.45 }}>
-                        Se usa cuando eliges el modo Personalizada. Dejalo activo si este extra podria repetirse; apagalo para viajes u otros casos especiales.
+                        Solo aplica en modo Personalizada. Dejalo activo si este gasto puntual podria repetirse; apagalo para viajes u otros casos especiales.
                       </div>
                     </div>
                   </label>
@@ -419,7 +433,7 @@ export default function GastosNoCorrientes({ embedded = false }) {
 
           {!editId && !showAdvanced && (
             <p style={{ marginTop: -4, marginBottom: 18, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
-              Si no cambias nada, queda con fecha de hoy.
+              Si no cambias nada, queda con fecha de hoy. Si es para mas adelante, simulalo en el simulador con tasa 0%.
             </p>
           )}
 
