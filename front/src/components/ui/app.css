@@ -1606,9 +1606,9 @@
   gap: 8px;
   flex: 1;
   justify-content: center;
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(255,255,255,0.42);
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.60);
   text-align: center;
   min-width: 0;
 }
@@ -2638,6 +2638,12 @@
     flex: 1 1 auto;
     justify-content: flex-start;
   }
+  /* Recalcular dentro del toolbar NO debe ser full-width como los otros btn-modal-cancel */
+  .dashboard-chart-toolbar-row .btn-modal-cancel {
+    width: auto;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
   .dashboard-chart-select {
     width: 100%;
     min-width: 0;
@@ -2652,8 +2658,9 @@
     margin-top: 16px;
   }
   .dashboard-chart-window-button {
-    min-width: 48px;
-    min-height: 48px;
+    min-width: 36px;
+    min-height: 36px;
+    border-radius: 10px;
   }
   .dashboard-premium-meta {
     grid-template-columns: 1fr 1fr;
