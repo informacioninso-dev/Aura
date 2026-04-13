@@ -184,6 +184,7 @@ export default function Dashboard() {
   const [showFullChart, setShowFullChart] = useState(false)
   const projectionDebounceRef = useRef(null)
   const projectionRequestIdRef = useRef(0)
+  const loadProjectionChartRef = useRef(null)
   const projectionGestureRef = useRef(null)
 
   const advancedProjectionEnabled = Boolean(user?.feature_access?.advanced_projection_enabled)
@@ -271,6 +272,7 @@ export default function Dashboard() {
     futureMonths,
     pastMonths,
   ])
+  loadProjectionChartRef.current = loadProjectionChart
 
   const loadDashboard = useCallback(async ({ silent = false } = {}) => {
     if (silent) setRefreshing(true)
@@ -303,8 +305,8 @@ export default function Dashboard() {
       setRefreshing(false)
     }
 
-    await loadProjectionChart()
-  }, [loadProjectionChart])
+    await loadProjectionChartRef.current()
+  }, [])
 
   useEffect(() => {
     void loadDashboard()
@@ -640,16 +642,8 @@ export default function Dashboard() {
 
   function preserveScroll(fn) {
     const y = window.scrollY
-    document.body.style.position = 'fixed'
-    document.body.style.top = `-${y}px`
-    document.body.style.width = '100%'
     fn()
-    requestAnimationFrame(() => {
-      document.body.style.position = ''
-      document.body.style.top = ''
-      document.body.style.width = ''
-      window.scrollTo(0, y)
-    })
+    requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo({ top: y, behavior: 'instant' })))
   }
 
   function resetProjectionGesture() {
