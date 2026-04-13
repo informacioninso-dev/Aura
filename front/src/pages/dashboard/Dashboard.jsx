@@ -850,15 +850,6 @@ export default function Dashboard() {
 
     const footer = (
       <div className="dashboard-chart-window-row">
-        <button
-          type="button"
-          className="dashboard-chart-window-button"
-          onClick={() => slideProjectionPage(-1)}
-          disabled={!canGoPrev}
-          aria-label="Periodo anterior"
-        >
-          <ChevronLeft size={18} />
-        </button>
         <div className="dashboard-chart-window-label">
           {!isCurrentMonthVisible && (
             <button type="button" className="dashboard-chart-window-today" onClick={resetToCurrentMonth}>
@@ -867,15 +858,6 @@ export default function Dashboard() {
           )}
           {rangeLabel && <span>{rangeLabel}</span>}
         </div>
-        <button
-          type="button"
-          className="dashboard-chart-window-button"
-          onClick={() => slideProjectionPage(1)}
-          disabled={!canGoNext}
-          aria-label="Periodo siguiente"
-        >
-          <ChevronRight size={18} />
-        </button>
       </div>
     )
 
