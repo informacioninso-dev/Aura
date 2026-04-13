@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts'
-import { TrendingUp, TrendingDown, Wallet, PiggyBank, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, Maximize2, X } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, PiggyBank, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react'
 
 import api from '../../api/client'
 import { getApiErrorMessage } from '../../api/errors'
@@ -54,11 +54,6 @@ const MOBILE_PROJECTION_WINDOW_MONTHS = 12
 const DESKTOP_PROJECTION_WINDOW_MONTHS = 12
 const MOBILE_CHART_BREAKPOINT = 768
 
-function getProjectionModeHelp(mode) {
-  if (mode === 'simple') return 'Simple: usa una lectura directa de tus ingresos y gastos puntuales.'
-  if (mode === 'personalizada') return 'Personalizada: usa solo los ingresos y gastos puntuales que marques.'
-  return 'Automatica: amortigua picos y aprende de tus ingresos y gastos puntuales.'
-}
 
 function getProjectionAnalysisHelp(mode, analysisMonths, analysisCapMonths) {
   const historyText = analysisMonths > 0
@@ -643,6 +638,12 @@ export default function Dashboard() {
     setProjectionWindow(buildProjectionWindowAroundIndex(anchorIndex, chartSeries.length, projectionWindowSize))
   }
 
+  function preserveScroll(fn) {
+    const y = window.scrollY
+    fn()
+    requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo({ top: y, behavior: 'instant' })))
+  }
+
   function resetProjectionGesture() {
     projectionGestureRef.current = null
     setProjectionChartDragging(false)
@@ -849,6 +850,15 @@ export default function Dashboard() {
 
     const footer = (
       <div className="dashboard-chart-window-row">
+        <button
+          type="button"
+          className="dashboard-chart-window-button"
+          onClick={() => slideProjectionPage(-1)}
+          disabled={!canGoPrev}
+          aria-label="Periodo anterior"
+        >
+          <ChevronLeft size={18} />
+        </button>
         <div className="dashboard-chart-window-label">
           {!isCurrentMonthVisible && (
             <button type="button" className="dashboard-chart-window-today" onClick={resetToCurrentMonth}>
@@ -857,6 +867,15 @@ export default function Dashboard() {
           )}
           {rangeLabel && <span>{rangeLabel}</span>}
         </div>
+        <button
+          type="button"
+          className="dashboard-chart-window-button"
+          onClick={() => slideProjectionPage(1)}
+          disabled={!canGoNext}
+          aria-label="Periodo siguiente"
+        >
+          <ChevronRight size={18} />
+        </button>
       </div>
     )
 
@@ -951,14 +970,6 @@ export default function Dashboard() {
               <ChevronRight size={18} />
             </div>
           )}
-          <button
-            type="button"
-            className="dashboard-chart-expand-btn"
-            onClick={() => setShowFullChart(true)}
-            aria-label="Ver proyeccion completa"
-          >
-            <Maximize2 size={14} />
-          </button>
           {chart}
         </div>
         {footer}
@@ -1179,195 +1190,203 @@ export default function Dashboard() {
 
       {advancedProjectionEnabled ? (
         <div className="card dashboard-chart-card dashboard-premium-card">
+
+          {/* ── Header ── */}
           <div className="card-header dashboard-card-header-compact">
             <div className="dashboard-card-copy">
               <h2 className="card-title">Proyeccion mensual</h2>
-              <p className="dashboard-card-subtitle">
-                {getProjectionModeHelp(projectionMode)}
-              </p>
             </div>
             <span className="dashboard-premium-badge">Pro</span>
           </div>
 
-          <div className="dashboard-chart-toolbar" style={{ marginBottom: 12 }}>
-            <label className="dashboard-chart-control">
-              <span>Modo</span>
-              <select
-                className="dashboard-chart-select"
-                value={projectionMode}
-                onChange={(e) => void handleProjectionModeChange(e.target.value)}
-                disabled={projectionModeSaving || projectionLoading}
-              >
-                {PROJECTION_MODE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </label>
-            <label className="dashboard-chart-control">
-              <span>Vista</span>
-              <select
-                className="dashboard-chart-select"
-                value={pastMonths}
-                onChange={(e) => {
-                  const val = Number(e.target.value)
-                  setPastMonths(val)
-                  clearTimeout(projectionDebounceRef.current)
-                  projectionDebounceRef.current = setTimeout(() => loadProjectionChart(futureMonths, val), 300)
-                }}
-              >
-                <option value={3}>3 meses</option>
-                <option value={6}>6 meses</option>
-                <option value={12}>12 meses</option>
-                <option value={24}>24 meses</option>
-              </select>
-            </label>
-            <label className="dashboard-chart-control">
-              <span>Proyeccion</span>
-              <select
-                className="dashboard-chart-select"
-                value={futureMonths}
-                onChange={(e) => {
-                  const val = Number(e.target.value)
-                  setFutureMonths(val)
-                  clearTimeout(projectionDebounceRef.current)
-                  projectionDebounceRef.current = setTimeout(() => loadProjectionChart(val, pastMonths), 300)
-                }}
-              >
-                <option value={12}>1 año</option>
-                <option value={24}>2 años</option>
-                <option value={60}>5 años</option>
-                {availableFutureProjectionOptions.some((option) => option.value === 120) && (
-                  <option value={120}>10 años</option>
-                )}
-              </select>
-            </label>
-            <button
-              type="button"
-              className="btn-modal-cancel"
-              onClick={handleManualRefresh}
-              disabled={loading || refreshing || projectionLoading}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 14px' }}
-            >
-              <RefreshCw size={15} style={{ opacity: refreshing || projectionLoading ? 0.7 : 1 }} />
-              {advancedProjectionEnabled
-                ? (projectionLoading ? 'Recalculando...' : 'Recalcular proyeccion')
-                : (refreshing ? 'Recargando...' : 'Recargar')}
-            </button>
-            <div className="dashboard-chart-toggle-group" role="tablist" aria-label="Curvas de la proyeccion">
-              {SERIES_FOCUS_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={`dashboard-chart-toggle ${seriesFocus === option.value ? 'active' : ''}`}
-                  onClick={() => setSeriesFocus(option.value)}
-                  aria-pressed={seriesFocus === option.value}
+          {/* ── 1. Stats clave — se muestran con datos anteriores mientras recalcula ── */}
+          {advancedProjection && !projectionError && !advancedChartEmpty && (() => {
+            const histMeses = advancedProjection?.history_months_used ?? 0
+            const svi = advancedProjection?.smoothed_variable_ingresos ?? 0
+            const svg = advancedProjection?.smoothed_variable_gastos ?? 0
+            const projectedGap = latestProjectedPoint?.gapAcumulado ?? 0
+            const projectedGapLabel = latestProjectedPoint?.label ?? 'fin del horizonte'
+            const variableProjectionApplied = advancedProjection?.variable_projection_applied ?? true
+            const minVariableHistoryMonths = advancedProjection?.min_variable_history_months ?? 3
+            const analysisHistoryMonths = advancedProjection?.analysis_history_months ?? 0
+            return (
+              <div className="dashboard-premium-meta">
+                <div className="dashboard-premium-stat">
+                  <span className="dashboard-premium-stat-label">Si sigues asi, terminarias con</span>
+                  <strong className="dashboard-premium-stat-value" style={{ color: projectedGap >= 0 ? '#C487F6' : '#F87171' }}>
+                    {fmt(projectedGap)}
+                  </strong>
+                  <span className="dashboard-chart-note">Saldo estimado al cierre de {projectedGapLabel}</span>
+                </div>
+                <div className="dashboard-premium-stat">
+                  <span className="dashboard-premium-stat-label">Hoy partes con</span>
+                  <strong className="dashboard-premium-stat-value">{fmt(advancedProjection?.starting_balance ?? 0)}</strong>
+                  <span className="dashboard-chart-note">Saldo con el que arranca esta proyeccion</span>
+                </div>
+                <div className="dashboard-premium-stat">
+                  <span className="dashboard-premium-stat-label">Promedio de ingresos puntuales</span>
+                  <strong className="dashboard-premium-stat-value" style={{ color: '#10B981' }}>{fmt(svi)}</strong>
+                </div>
+                <div className="dashboard-premium-stat">
+                  <span className="dashboard-premium-stat-label">Promedio de gastos puntuales</span>
+                  <strong className="dashboard-premium-stat-value" style={{ color: '#F87171' }}>{fmt(svg)}</strong>
+                </div>
+                <div className="dashboard-premium-stat">
+                  <span className="dashboard-premium-stat-label">Calculado usando</span>
+                  <strong className="dashboard-premium-stat-value">
+                    {histMeses} {histMeses === 1 ? 'mes con puntuales' : 'meses con puntuales'}
+                  </strong>
+                  <span className="dashboard-chart-note">
+                    {variableProjectionApplied
+                      ? `Proyeccion basada en ${analysisHistoryMonths} meses de historia`
+                      : `Necesitas al menos ${minVariableHistoryMonths} meses con puntuales`}
+                  </span>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* ── 2. Controles ── */}
+          <div className="dashboard-chart-toolbar">
+            {/* Fila 1: selectores */}
+            <div className="dashboard-chart-toolbar-row">
+              <label className="dashboard-chart-control">
+                <span>Modo</span>
+                <select
+                  className="dashboard-chart-select"
+                  value={projectionMode}
+                  onChange={(e) => void handleProjectionModeChange(e.target.value)}
+                  disabled={projectionModeSaving || projectionLoading}
                 >
-                  {option.label}
-                </button>
-              ))}
+                  {PROJECTION_MODE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="dashboard-chart-control">
+                <span>Historia</span>
+                <select
+                  className="dashboard-chart-select"
+                  value={pastMonths}
+                  onChange={(e) => {
+                    const val = Number(e.target.value)
+                    preserveScroll(() => setPastMonths(val))
+                    clearTimeout(projectionDebounceRef.current)
+                    projectionDebounceRef.current = setTimeout(() => loadProjectionChart(futureMonths, val), 300)
+                  }}
+                >
+                  <option value={3}>3 meses</option>
+                  <option value={6}>6 meses</option>
+                  <option value={12}>12 meses</option>
+                  <option value={24}>24 meses</option>
+                </select>
+              </label>
+              <label className="dashboard-chart-control">
+                <span>Horizonte</span>
+                <select
+                  className="dashboard-chart-select"
+                  value={futureMonths}
+                  onChange={(e) => {
+                    const val = Number(e.target.value)
+                    preserveScroll(() => setFutureMonths(val))
+                    clearTimeout(projectionDebounceRef.current)
+                    projectionDebounceRef.current = setTimeout(() => loadProjectionChart(val, pastMonths), 300)
+                  }}
+                >
+                  <option value={12}>1 año</option>
+                  <option value={24}>2 años</option>
+                  <option value={60}>5 años</option>
+                  {availableFutureProjectionOptions.some((option) => option.value === 120) && (
+                    <option value={120}>10 años</option>
+                  )}
+                </select>
+              </label>
+            </div>
+            {/* Fila 2: toggles + recalcular + ver todo (desktop) */}
+            <div className="dashboard-chart-toolbar-row">
+              <div className="dashboard-chart-toggle-group" role="tablist" aria-label="Curvas de la proyeccion">
+                {SERIES_FOCUS_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`dashboard-chart-toggle ${seriesFocus === option.value ? 'active' : ''}`}
+                    onClick={() => setSeriesFocus(option.value)}
+                    aria-pressed={seriesFocus === option.value}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="btn-modal-cancel"
+                onClick={handleManualRefresh}
+                disabled={loading || refreshing || projectionLoading}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 13px', whiteSpace: 'nowrap', flexShrink: 0 }}
+              >
+                <RefreshCw size={14} style={{ opacity: refreshing || projectionLoading ? 0.7 : 1 }} />
+                {projectionLoading ? 'Recalculando...' : 'Recalcular'}
+              </button>
+              <button type="button" className="dashboard-chart-view-all" onClick={() => setShowFullChart(true)}>
+                Ver todo
+              </button>
             </div>
           </div>
 
-          <p className="dashboard-chart-note" style={{ marginTop: 0, marginBottom: 12 }}>
+          {/* ── 3. Nota de analisis ── */}
+          <p className="dashboard-chart-note" style={{ marginTop: 10 }}>
             {getProjectionAnalysisHelp(
               projectionMode,
               advancedProjection?.analysis_history_months ?? 0,
               advancedProjection?.analysis_history_cap_months ?? 18,
             )}
           </p>
+          {advancedProjection && !projectionError && !advancedChartEmpty && (() => {
+            const histMesesAviso = advancedProjection?.history_months_used ?? 0
+            const variableProjectionApplied = advancedProjection?.variable_projection_applied ?? true
+            const minVariableHistoryMonths = advancedProjection?.min_variable_history_months ?? 3
+            const analysisHistoryMonths = advancedProjection?.analysis_history_months ?? 0
+            if (!variableProjectionApplied) return (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 12, padding: '10px 14px', marginTop: 8 }}>
+                <span style={{ fontSize: 16, lineHeight: 1 }}>!</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#FBBF24', marginBottom: 2 }}>La base fija ya esta proyectada</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
+                    {histMesesAviso === 0
+                      ? `Tus ingresos, gastos fijos y cuotas ya estan incluidos. Los puntuales aun no entran porque necesitas ${minVariableHistoryMonths} meses con ingresos o gastos puntuales dentro de la historia analizada (${analysisHistoryMonths} meses disponibles hoy).`
+                      : `Tus ingresos, gastos fijos y cuotas ya estan incluidos. Los puntuales aun no entran porque solo hay ${histMesesAviso} ${histMesesAviso === 1 ? 'mes' : 'meses'} con ingresos o gastos puntuales dentro de la historia analizada (${analysisHistoryMonths} meses disponibles hoy); necesitas ${minVariableHistoryMonths}.`}
+                  </div>
+                </div>
+              </div>
+            )
+            return null
+          })()}
 
-          {projectionLoading ? (
-            <div className="loading-screen" style={{ minHeight: '220px' }}>
-              <div className="spinner" />
-            </div>
-          ) : projectionError ? (
+          {/* ── 4. Chart ── */}
+          {projectionError ? (
             <div className="empty-state">
               <p className="empty-text">No pudimos cargar la proyeccion</p>
               <p className="empty-sub">{projectionError}</p>
             </div>
+          ) : advancedChartEmpty && !projectionLoading ? (
+            <div className="empty-state">
+              <p className="empty-text">Aun no hay base suficiente</p>
+              <p className="empty-sub">Cuando registres movimientos, aqui veras tus ingresos y gastos mensuales proyectados.</p>
+            </div>
           ) : (
-            <>
-              {(() => {
-                const histMeses = advancedProjection?.history_months_used ?? 0
-                const svi = advancedProjection?.smoothed_variable_ingresos ?? 0
-                const svg = advancedProjection?.smoothed_variable_gastos ?? 0
-                const projectedGap = latestProjectedPoint?.gapAcumulado ?? 0
-                const projectedGapLabel = latestProjectedPoint?.label ?? 'fin del horizonte'
-                const variableProjectionApplied = advancedProjection?.variable_projection_applied ?? true
-                const minVariableHistoryMonths = advancedProjection?.min_variable_history_months ?? 3
-                const analysisHistoryMonths = advancedProjection?.analysis_history_months ?? 0
-                return (
-                  <div className="dashboard-premium-meta">
-                    <div className="dashboard-premium-stat">
-                      <span className="dashboard-premium-stat-label">Si sigues asi, terminarias con</span>
-                      <strong className="dashboard-premium-stat-value" style={{ color: projectedGap >= 0 ? '#C487F6' : '#F87171' }}>
-                        {fmt(projectedGap)}
-                      </strong>
-                      <span className="dashboard-chart-note">Saldo estimado al cierre de {projectedGapLabel}</span>
-                    </div>
-                    <div className="dashboard-premium-stat">
-                      <span className="dashboard-premium-stat-label">Hoy partes con</span>
-                      <strong className="dashboard-premium-stat-value">{fmt(advancedProjection?.starting_balance ?? 0)}</strong>
-                      <span className="dashboard-chart-note">Saldo con el que arranca esta proyeccion</span>
-                    </div>
-                    <div className="dashboard-premium-stat">
-                      <span className="dashboard-premium-stat-label">Promedio de ingresos puntuales</span>
-                      <strong className="dashboard-premium-stat-value" style={{ color: '#10B981' }}>
-                        {fmt(svi)}
-                      </strong>
-                    </div>
-                    <div className="dashboard-premium-stat">
-                      <span className="dashboard-premium-stat-label">Promedio de gastos puntuales</span>
-                      <strong className="dashboard-premium-stat-value" style={{ color: '#F87171' }}>
-                        {fmt(svg)}
-                      </strong>
-                    </div>
-                    <div className="dashboard-premium-stat">
-                      <span className="dashboard-premium-stat-label">Calculado usando</span>
-                      <strong className="dashboard-premium-stat-value">
-                        {histMeses} {histMeses === 1 ? 'mes con ingresos o gastos puntuales' : 'meses con ingresos o gastos puntuales'}
-                      </strong>
-                      <span className="dashboard-chart-note">
-                        {variableProjectionApplied
-                          ? `La proyeccion usa ${analysisHistoryMonths} meses de historia para estimar tus puntuales`
-                          : `Los puntuales necesitan al menos ${minVariableHistoryMonths} meses dentro de la historia analizada`}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })()}
-
-              {(() => {
-                const histMesesAviso = advancedProjection?.history_months_used ?? 0
-                const variableProjectionApplied = advancedProjection?.variable_projection_applied ?? true
-                const minVariableHistoryMonths = advancedProjection?.min_variable_history_months ?? 3
-                const analysisHistoryMonths = advancedProjection?.analysis_history_months ?? 0
-                if (!variableProjectionApplied) return (
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 12, padding: '10px 14px', marginBottom: 14 }}>
-                    <span style={{ fontSize: 16, lineHeight: 1 }}>!</span>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#FBBF24', marginBottom: 2 }}>La base fija ya esta proyectada</div>
-                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
-                        {histMesesAviso === 0
-                          ? `Tus ingresos, gastos fijos y cuotas ya estan incluidos. Los puntuales aun no entran porque necesitas ${minVariableHistoryMonths} meses con ingresos o gastos puntuales dentro de la historia analizada (${analysisHistoryMonths} meses disponibles hoy).`
-                          : `Tus ingresos, gastos fijos y cuotas ya estan incluidos. Los puntuales aun no entran porque solo hay ${histMesesAviso} ${histMesesAviso === 1 ? 'mes' : 'meses'} con ingresos o gastos puntuales dentro de la historia analizada (${analysisHistoryMonths} meses disponibles hoy); necesitas ${minVariableHistoryMonths}.`}
-                      </div>
-                    </div>
-                  </div>
-                )
-                return null
-              })()}
-
-
-              {advancedChartEmpty ? (
-                <div className="empty-state">
-                  <p className="empty-text">Aun no hay base suficiente</p>
-                  <p className="empty-sub">Cuando registres movimientos, aqui veras tus ingresos y gastos mensuales proyectados.</p>
+            <div style={{ position: 'relative' }}>
+              {projectionLoading && chartSeries.length === 0 && (
+                <div className="loading-screen" style={{ minHeight: '280px' }}>
+                  <div className="spinner" />
                 </div>
-              ) : (
-                renderProjectionAreaChart({ interactive: showProjectionNavigator })
               )}
-            </>
+              {projectionLoading && chartSeries.length > 0 && (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(15,22,41,0.55)', borderRadius: 16, zIndex: 10 }}>
+                  <div className="spinner" />
+                </div>
+              )}
+              {chartSeries.length > 0 && renderProjectionAreaChart({ interactive: showProjectionNavigator && !projectionLoading })}
+            </div>
           )}
         </div>
       ) : (

@@ -1360,7 +1360,11 @@
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: flex-start;
+  margin-top: 20px;
+  margin-bottom: 4px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,0.06);
 }
 
 .dashboard-chart-control {
@@ -1477,32 +1481,28 @@
   cursor: grabbing;
 }
 
-.dashboard-chart-expand-btn {
+.dashboard-chart-view-all {
   display: none;
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 3;
   align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(26,37,64,0.85);
-  color: rgba(255,255,255,0.55);
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(196,135,246,0.65);
+  background: none;
+  border: none;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  padding: 4px 0;
+  white-space: nowrap;
+  transition: color 0.15s;
+  flex-shrink: 0;
 }
 
-.dashboard-chart-expand-btn:hover {
-  background: rgba(196,135,246,0.15);
+.dashboard-chart-view-all:hover {
   color: #E9D5FF;
-  border-color: rgba(196,135,246,0.30);
 }
 
 @media (min-width: 769px) {
-  .dashboard-chart-expand-btn {
+  .dashboard-chart-view-all {
     display: inline-flex;
   }
 }
@@ -2446,6 +2446,11 @@
    ══════════════════════════════════════════ */
 
 @media (max-width: 768px) {
+  /* Previene zoom automático en iOS Safari al abrir selects/inputs — evita scroll al top */
+  select, input, textarea {
+    font-size: 16px !important;
+  }
+
   /* Stat cards */
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -2609,20 +2614,35 @@
     margin-bottom: 12px;
   }
   .dashboard-chart-toolbar {
-    width: 100%;
     flex-direction: column;
     align-items: stretch;
+    gap: 8px;
+  }
+  .dashboard-chart-toolbar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
   }
   .dashboard-chart-control {
-    width: 100%;
+    flex: 1 1 0;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .dashboard-chart-control span {
+    font-size: 11px;
   }
   .dashboard-chart-toggle-group {
-    width: 100%;
+    flex: 1 1 auto;
     justify-content: flex-start;
   }
   .dashboard-chart-select {
-    flex: 1 1 auto;
+    width: 100%;
     min-width: 0;
+    padding-right: 28px;
+    font-size: 16px; /* previene zoom automático en iOS Safari */
   }
   .dashboard-chart-note {
     width: 100%;
@@ -2636,7 +2656,10 @@
     min-height: 48px;
   }
   .dashboard-premium-meta {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
+  }
+  .dashboard-premium-meta .dashboard-premium-stat:first-child {
+    grid-column: 1 / -1;
   }
   .dashboard-saldo-card {
     padding: 14px 16px;
