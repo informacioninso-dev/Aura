@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts'
-import { TrendingUp, TrendingDown, Wallet, PiggyBank, RefreshCw, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, PiggyBank, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, Maximize2, X } from 'lucide-react'
 
 import api from '../../api/client'
 import { getApiErrorMessage } from '../../api/errors'
@@ -50,7 +50,7 @@ const FUTURE_PROJECTION_OPTIONS = [
 ]
 const DASHBOARD_FUTURE_MONTHS = 12
 const DEFAULT_FREE_PROJECTION_DISPLAY_MONTHS = 6
-const MOBILE_PROJECTION_WINDOW_MONTHS = 6
+const MOBILE_PROJECTION_WINDOW_MONTHS = 12
 const DESKTOP_PROJECTION_WINDOW_MONTHS = 12
 const MOBILE_CHART_BREAKPOINT = 768
 
@@ -186,6 +186,7 @@ export default function Dashboard() {
   )
   const [projectionChartDragging, setProjectionChartDragging] = useState(false)
   const [projectionWindow, setProjectionWindow] = useState({ startIndex: 0, endIndex: 0 })
+  const [showFullChart, setShowFullChart] = useState(false)
   const projectionDebounceRef = useRef(null)
   const projectionRequestIdRef = useRef(0)
   const projectionGestureRef = useRef(null)
@@ -629,6 +630,18 @@ export default function Dashboard() {
   const latestProjectedPoint = chartSeries.filter((point) => !point.is_real).at(-1) || null
   const visibleProjectionSeries = chartSeries.slice(projectionWindow.startIndex, projectionWindow.endIndex + 1)
   const visibleCurrentMonthLabel = visibleProjectionSeries.find((point) => point.month === currentMonthKey)?.label || null
+  const isCurrentMonthVisible = visibleProjectionSeries.some((p) => p.month === currentMonthKey)
+
+  function slideProjectionPage(direction) {
+    const step = Math.max(1, projectionWindowSize - 1) // avanza 11 meses, 1 de solapamiento
+    const nextStart = projectionWindow.startIndex + direction * step
+    setProjectionWindow(clampProjectionWindow(nextStart, chartSeries.length, projectionWindowSize))
+  }
+
+  function resetToCurrentMonth() {
+    const anchorIndex = currentMonthIndex >= 0 ? currentMonthIndex : 0
+    setProjectionWindow(buildProjectionWindowAroundIndex(anchorIndex, chartSeries.length, projectionWindowSize))
+  }
 
   function resetProjectionGesture() {
     projectionGestureRef.current = null
@@ -643,6 +656,7 @@ export default function Dashboard() {
       startX: event.clientX,
       startIndex: projectionWindow.startIndex,
       width: event.currentTarget.getBoundingClientRect().width,
+      moved: false,
     }
     setProjectionChartDragging(true)
     event.currentTarget.setPointerCapture?.(event.pointerId)
@@ -655,10 +669,23 @@ export default function Dashboard() {
     const deltaX = event.clientX - gesture.startX
     if (Math.abs(deltaX) < 12) return
 
+    gesture.moved = true
     const pixelPerMonth = Math.max(24, gesture.width / Math.max(1, projectionWindowSize))
     const monthOffset = Math.round((-deltaX) / pixelPerMonth)
     const nextStartIndex = gesture.startIndex + monthOffset
     setProjectionWindow(clampProjectionWindow(nextStartIndex, chartSeries.length, projectionWindowSize))
+  }
+
+  function handleProjectionPointerUp(event) {
+    const gesture = projectionGestureRef.current
+    if (gesture && !gesture.moved && showProjectionNavigator) {
+      // tap — zona izquierda retrocede, zona derecha avanza
+      const tapX = event.clientX - event.currentTarget.getBoundingClientRect().left
+      const tapZone = tapX / gesture.width
+      if (tapZone < 0.3) slideProjectionPage(-1)
+      else if (tapZone > 0.7) slideProjectionPage(1)
+    }
+    resetProjectionGesture()
   }
 
   function shouldShowSeries(kind) {
@@ -813,18 +840,128 @@ export default function Dashboard() {
       </ResponsiveContainer>
     )
 
+    const rangeLabel = visibleProjectionSeries.length > 0
+      ? `${visibleProjectionSeries[0].label} — ${visibleProjectionSeries.at(-1).label}`
+      : null
+
+    const canGoPrev = projectionWindow.startIndex > 0
+    const canGoNext = projectionWindow.endIndex < chartSeries.length - 1
+
+    const footer = (
+      <div className="dashboard-chart-window-row">
+        <div className="dashboard-chart-window-label">
+          {!isCurrentMonthVisible && (
+            <button type="button" className="dashboard-chart-window-today" onClick={resetToCurrentMonth}>
+              Hoy
+            </button>
+          )}
+          {rangeLabel && <span>{rangeLabel}</span>}
+        </div>
+      </div>
+    )
+
+    const fullChart = (
+      <ResponsiveContainer width="100%" height={420}>
+        <AreaChart data={chartSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="gIngRealF" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
+              <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="gIngProjF" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#10B981" stopOpacity={0.10} />
+              <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="gGastoRealF" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#F87171" stopOpacity={0.25} />
+              <stop offset="95%" stopColor="#F87171" stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="gGastoProjF" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#F87171" stopOpacity={0.10} />
+              <stop offset="95%" stopColor="#F87171" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+          <XAxis dataKey="label" tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 10 }} interval="preserveStartEnd" />
+          <YAxis tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 11 }} tickFormatter={fmtAxis} width={82} />
+          {currentMonthKey && (
+            <ReferenceLine
+              x={chartSeries.find(p => p.month === currentMonthKey)?.label}
+              stroke="rgba(255,255,255,0.25)"
+              strokeDasharray="4 4"
+              label={{ value: 'Hoy', position: 'insideTopRight', fill: 'rgba(255,255,255,0.40)', fontSize: 11 }}
+            />
+          )}
+          <ReferenceLine y={0} stroke="rgba(248,113,113,0.35)" strokeDasharray="4 3" />
+          <Tooltip
+            content={renderProjectionTooltip}
+            contentStyle={{ background: 'rgba(26,37,64,0.97)', border: '1px solid rgba(196,135,246,0.2)', borderRadius: 12 }}
+            labelStyle={{ color: '#FFFFFF', marginBottom: 6, fontWeight: 700 }}
+          />
+          <Legend content={renderProjectionLegend} />
+          {shouldShowSeries('income') && (
+            <>
+              <Area connectNulls={false} type="monotone" dataKey="ing_real" stroke="#10B981" strokeWidth={2} fill="url(#gIngRealF)" dot={false} />
+              <Area connectNulls={false} type="monotone" dataKey="ing_proj" stroke="#10B981" strokeWidth={1.5} fill="url(#gIngProjF)" strokeDasharray="5 4" dot={false} />
+            </>
+          )}
+          {shouldShowSeries('expense') && (
+            <>
+              <Area connectNulls={false} type="monotone" dataKey="gasto_real" stroke="#F87171" strokeWidth={2} fill="url(#gGastoRealF)" dot={false} />
+              <Area connectNulls={false} type="monotone" dataKey="gasto_proj" stroke="#F87171" strokeWidth={1.5} fill="url(#gGastoProjF)" strokeDasharray="5 4" dot={false} />
+            </>
+          )}
+        </AreaChart>
+      </ResponsiveContainer>
+    )
+
     if (!interactive) return chart
 
     return (
-      <div
-        className={`dashboard-chart-gesture-surface ${projectionChartDragging ? 'is-dragging' : ''}`}
-        onPointerDown={handleProjectionPointerDown}
-        onPointerMove={handleProjectionPointerMove}
-        onPointerUp={resetProjectionGesture}
-        onPointerCancel={resetProjectionGesture}
-        onLostPointerCapture={resetProjectionGesture}
-      >
-        {chart}
+      <div>
+        {showFullChart && (
+          <div className="dashboard-fullchart-overlay" onClick={() => setShowFullChart(false)}>
+            <div className="dashboard-fullchart-box" onClick={e => e.stopPropagation()}>
+              <div className="dashboard-fullchart-header">
+                <span className="dashboard-fullchart-title">Proyeccion completa</span>
+                <button className="dashboard-fullchart-close" onClick={() => setShowFullChart(false)} aria-label="Cerrar">
+                  <X size={18} />
+                </button>
+              </div>
+              {fullChart}
+            </div>
+          </div>
+        )}
+        <div
+          className={`dashboard-chart-gesture-surface ${projectionChartDragging ? 'is-dragging' : ''}`}
+          tabIndex={-1}
+          onPointerDown={handleProjectionPointerDown}
+          onPointerMove={handleProjectionPointerMove}
+          onPointerUp={handleProjectionPointerUp}
+          onPointerCancel={resetProjectionGesture}
+          onLostPointerCapture={resetProjectionGesture}
+        >
+          {canGoPrev && (
+            <div className="dashboard-chart-tap-zone dashboard-chart-tap-zone--left" aria-hidden="true">
+              <ChevronLeft size={18} />
+            </div>
+          )}
+          {canGoNext && (
+            <div className="dashboard-chart-tap-zone dashboard-chart-tap-zone--right" aria-hidden="true">
+              <ChevronRight size={18} />
+            </div>
+          )}
+          <button
+            type="button"
+            className="dashboard-chart-expand-btn"
+            onClick={() => setShowFullChart(true)}
+            aria-label="Ver proyeccion completa"
+          >
+            <Maximize2 size={14} />
+          </button>
+          {chart}
+        </div>
+        {footer}
       </div>
     )
   }

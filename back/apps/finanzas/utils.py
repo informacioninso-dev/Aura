@@ -653,10 +653,15 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
 
     variable_projection_applied = history_months_used >= MIN_VARIABLE_HISTORY_MONTHS
     if projection_mode in {PROJECTION_MODE_AUTOMATICA, PROJECTION_MODE_PERSONALIZADA}:
-        smoothed_variable_ingresos = _estimate_premium_variable_component(variable_ingresos)
+        # Los ingresos puntuales solo cuentan en su mes real (caja acumulada),
+        # no se proyectan hacia adelante para evitar falsa sensación de ingresos futuros.
+        # Los gastos puntuales sí se proyectan: los imprevistos siempre van a existir.
+        smoothed_variable_ingresos = Decimal('0.00')
         smoothed_variable_gastos = _estimate_premium_variable_component(variable_gastos)
     else:
-        smoothed_variable_ingresos = _winsorized_weighted_average(variable_ingresos)
+        # Simple: igual que automática en ingresos (no proyectar puntuales),
+        # pero sin estimar gastos puntuales futuros (usuario básico, vista conservadora simple).
+        smoothed_variable_ingresos = Decimal('0.00')
         smoothed_variable_gastos = _winsorized_weighted_average(variable_gastos)
 
     if not variable_projection_applied:
