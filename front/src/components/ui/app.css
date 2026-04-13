@@ -2624,12 +2624,20 @@
     gap: 8px;
     width: 100%;
   }
+  /* Fila de selectores: Modo y Historia en fila 1, Horizonte solo en fila 2 */
+  .dashboard-chart-toolbar-row:first-child {
+    flex-wrap: wrap;
+  }
   .dashboard-chart-control {
-    flex: 1 1 0;
-    min-width: 0;
+    flex: 1 1 calc(50% - 4px);
+    min-width: calc(50% - 4px);
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
+  }
+  .dashboard-chart-control:last-child {
+    flex: 1 1 100%;
+    min-width: 100%;
   }
   .dashboard-chart-control span {
     font-size: 11px;
