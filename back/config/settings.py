@@ -135,6 +135,32 @@ else:
     }
 
 
+# Cache
+# En producción usa Redis (compartido entre workers, persistente ante reinicios).
+# En desarrollo cae a LocMemCache sin necesidad de configurar nada.
+_redis_url = os.getenv('REDIS_URL', '').strip()
+if _redis_url:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': _redis_url,
+            'OPTIONS': {
+                'socket_connect_timeout': 2,
+                'socket_timeout': 2,
+            },
+        }
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        }
+    }
+
+# TTL del cache de proyección financiera (segundos).
+FINANZAS_PROJECTION_CACHE_TTL = int(os.getenv('FINANZAS_PROJECTION_CACHE_TTL', '300'))
+
+
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
 
