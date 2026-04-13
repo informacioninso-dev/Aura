@@ -602,6 +602,20 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
             fecha__lte=history_end,
         )
     )
+    # Ingresos puntuales con fecha futura conocida (ej. décimo, utilidades)
+    ingresos_puntuales_futuros = list(
+        IngresoPuntual.objects.filter(
+            usuario=usuario,
+            fecha__gt=history_end,
+            fecha__lte=projection_end,
+        )
+    )
+    ingresos_puntuales_futuros_por_mes = {}
+    for item in ingresos_puntuales_futuros:
+        key = (item.fecha.year, item.fecha.month)
+        ingresos_puntuales_futuros_por_mes[key] = (
+            ingresos_puntuales_futuros_por_mes.get(key, Decimal('0.00')) + _money(item.monto)
+        )
     use_manual_eligibility = projection_mode == PROJECTION_MODE_PERSONALIZADA
     ingresos_puntuales_elegibles = [
         item for item in ingresos_puntuales
@@ -752,8 +766,10 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
         total_ing_fijos = _ing_fijos_mes(month_start, month_end)
         total_gastos_fijos = _gastos_fijos_mes(month_start, month_end)
         total_cuotas = _cuotas_mes(month_start, month_end)
+        key = (month_start.year, month_start.month)
+        ing_puntual_futuro = ingresos_puntuales_futuros_por_mes.get(key, Decimal('0.00'))
 
-        projected_ingresos = (total_ing_fijos + smoothed_variable_ingresos).quantize(Decimal('0.01'))
+        projected_ingresos = (total_ing_fijos + smoothed_variable_ingresos + ing_puntual_futuro).quantize(Decimal('0.01'))
         projected_gastos = (total_gastos_fijos + total_cuotas + smoothed_variable_gastos).quantize(Decimal('0.01'))
         projected_gap = (projected_ingresos - projected_gastos).quantize(Decimal('0.01'))
         opening_balance = seeded_balance if offset == 0 else closing_balance
