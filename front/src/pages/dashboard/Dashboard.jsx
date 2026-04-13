@@ -640,8 +640,16 @@ export default function Dashboard() {
 
   function preserveScroll(fn) {
     const y = window.scrollY
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${y}px`
+    document.body.style.width = '100%'
     fn()
-    requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo({ top: y, behavior: 'instant' })))
+    requestAnimationFrame(() => {
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.width = ''
+      window.scrollTo(0, y)
+    })
   }
 
   function resetProjectionGesture() {
