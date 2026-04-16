@@ -588,17 +588,20 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
             fecha_fin__gte=real_start,
         )
     )
+    # Fetch desde el mínimo entre history_start y real_start para cubrir toda la
+    # ventana visible del gráfico histórico (real_past_months puede superar history_months).
+    puntuales_start = min(history_start, real_start)
     ingresos_puntuales = list(
         IngresoPuntual.objects.filter(
             usuario=usuario,
-            fecha__gte=history_start,
+            fecha__gte=puntuales_start,
             fecha__lte=history_end,
         )
     )
     gastos_puntuales = list(
         GastoNoCorriente.objects.filter(
             usuario=usuario,
-            fecha__gte=history_start,
+            fecha__gte=puntuales_start,
             fecha__lte=history_end,
         )
     )
