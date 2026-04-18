@@ -8,8 +8,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import EmailMessage, get_connection
 from django.db import connections
-from django.db.models import Count, Q
-from django.db.models.functions import TruncDate
+from django.db.models import Count, DecimalField, Q, Sum
+from django.db.models.functions import TruncDate, TruncMonth
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.encoding import force_bytes
@@ -33,7 +33,7 @@ from .jwt_auth import (
     set_refresh_cookie,
 )
 import uuid
-from .models import AdminActionLog, EmailServerConfig, Feature, Plan, PlanFeature, PagoPayPhone
+from .models import AdminActionLog, EmailServerConfig, Feature, GastoOperativo, Plan, PlanFeature, PagoPayPhone
 from . import payphone as payphone_service
 from .plans import assign_plan_to_user, get_default_plan, sync_feature_catalog
 from .security import decrypt_secret
@@ -41,6 +41,7 @@ from .serializers import (
     AdminActionLogSerializer,
     EmailServerConfigSerializer,
     FeatureSerializer,
+    GastoOperativoSerializer,
     PasswordChangeSerializer,
     PasswordForgotSerializer,
     PasswordResetConfirmSerializer,
@@ -993,3 +994,174 @@ class ConfirmarPagoView(APIView):
         pago.status = PagoPayPhone.ERROR
         pago.save()
         return Response({'status': 'error', 'code': status_code})
+
+
+class NegocioMetricasView(APIView):
+    permission_classes = (permissions.IsAuthenticated, IsSuperAdmin)
+    throttle_classes = (throttling.ScopedRateThrottle,)
+    throttle_scope = 'superadmin_ops'
+
+    def get(self, request):
+        now = timezone.now()
+        today = now.date()
+
+        # Last 12 months range
+        months = []
+        for i in range(11, -1, -1):
+            year = (today.replace(day=1) - timedelta(days=1) * 0).replace(day=1)
+            # compute year/month going back i months
+            month_num = today.month - i
+            year_num = today.year
+            while month_num <= 0:
+                month_num += 12
+                year_num -= 1
+            months.append((year_num, month_num))
+
+        # Ingresos reales por mes (pagos aprobados)
+        ingresos_qs = (
+            PagoPayPhone.objects
+            .filter(status=PagoPayPhone.APPROVED)
+            .annotate(mes=TruncMonth('created_at'))
+            .values('mes')
+            .annotate(total=Sum('monto', output_field=DecimalField()))
+            .order_by('mes')
+        )
+        ingresos_map = {
+            (row['mes'].year, row['mes'].month): float(row['total'])
+            for row in ingresos_qs
+        }
+
+        # Pagos por plan (mes actual)
+        ingresos_por_plan = list(
+            PagoPayPhone.objects
+            .filter(
+                status=PagoPayPhone.APPROVED,
+                created_at__year=today.year,
+                created_at__month=today.month,
+            )
+            .values('plan__name')
+            .annotate(total=Sum('monto', output_field=DecimalField()))
+            .order_by('-total')
+        )
+
+        # Gastos operativos por mes
+        gastos_qs = (
+            GastoOperativo.objects
+            .annotate(mes=TruncMonth('fecha'))
+            .values('mes')
+            .annotate(total=Sum('monto', output_field=DecimalField()))
+            .order_by('mes')
+        )
+        gastos_map = {
+            (row['mes'].year, row['mes'].month): float(row['total'])
+            for row in gastos_qs
+        }
+
+        # Gastos por categoria (mes actual)
+        gastos_por_categoria = list(
+            GastoOperativo.objects
+            .filter(fecha__year=today.year, fecha__month=today.month)
+            .values('categoria')
+            .annotate(total=Sum('monto', output_field=DecimalField()))
+            .order_by('-total')
+        )
+
+        # Build monthly series
+        series = []
+        for (yr, mo) in months:
+            ing = ingresos_map.get((yr, mo), 0.0)
+            gas = gastos_map.get((yr, mo), 0.0)
+            series.append({
+                'year': yr,
+                'month': mo,
+                'label': f'{mo:02d}/{yr}',
+                'ingresos': ing,
+                'gastos': gas,
+                'margen': round(ing - gas, 2),
+            })
+
+        # KPIs del mes actual
+        mrr_actual = ingresos_map.get((today.year, today.month), 0.0)
+        gastos_mes = gastos_map.get((today.year, today.month), 0.0)
+
+        # Usuarios pagantes activos (con asignacion de plan no-default)
+        from .plans import get_default_plan as _get_default_plan
+        default_plan = _get_default_plan()
+        pagantes = (
+            User.objects
+            .filter(plan_assignments__is_active=True)
+            .exclude(plan_assignments__plan=default_plan)
+            .distinct()
+            .count()
+            if default_plan else 0
+        )
+
+        # Pagos del mes
+        pagos_mes = PagoPayPhone.objects.filter(
+            created_at__year=today.year, created_at__month=today.month
+        )
+        pagos_aprobados = pagos_mes.filter(status=PagoPayPhone.APPROVED).count()
+        pagos_fallidos = pagos_mes.filter(status__in=[PagoPayPhone.ERROR, PagoPayPhone.CANCELLED]).count()
+
+        # Pagos recientes
+        pagos_recientes = list(
+            PagoPayPhone.objects
+            .select_related('usuario', 'plan')
+            .order_by('-created_at')[:15]
+            .values('usuario__email', 'plan__name', 'monto', 'status', 'created_at', 'client_transaction_id')
+        )
+
+        return Response({
+            'kpis': {
+                'mrr_actual': mrr_actual,
+                'gastos_mes': gastos_mes,
+                'margen_mes': round(mrr_actual - gastos_mes, 2),
+                'usuarios_pagantes': pagantes,
+                'pagos_aprobados_mes': pagos_aprobados,
+                'pagos_fallidos_mes': pagos_fallidos,
+            },
+            'series_mensual': series,
+            'ingresos_por_plan': [
+                {'plan': r['plan__name'], 'total': float(r['total'])}
+                for r in ingresos_por_plan
+            ],
+            'gastos_por_categoria': [
+                {'categoria': r['categoria'], 'total': float(r['total'])}
+                for r in gastos_por_categoria
+            ],
+            'pagos_recientes': pagos_recientes,
+        })
+
+
+class GastosOperativosView(APIView):
+    permission_classes = (permissions.IsAuthenticated, IsSuperAdmin)
+    throttle_classes = (throttling.ScopedRateThrottle,)
+    throttle_scope = 'superadmin_ops'
+
+    def get(self, request):
+        gastos = GastoOperativo.objects.all()[:100]
+        return Response(GastoOperativoSerializer(gastos, many=True).data)
+
+    def post(self, request):
+        serializer = GastoOperativoSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(creado_por=request.user)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class GastoOperativoDetailView(APIView):
+    permission_classes = (permissions.IsAuthenticated, IsSuperAdmin)
+    throttle_classes = (throttling.ScopedRateThrottle,)
+    throttle_scope = 'superadmin_ops'
+
+    def patch(self, request, pk):
+        gasto = get_object_or_404(GastoOperativo, pk=pk)
+        serializer = GastoOperativoSerializer(gasto, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def delete(self, request, pk):
+        gasto = get_object_or_404(GastoOperativo, pk=pk)
+        gasto.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

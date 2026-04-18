@@ -9,6 +9,7 @@ from .models import (
     AdminActionLog,
     EmailServerConfig,
     Feature,
+    GastoOperativo,
     Plan,
     PROJECTION_MODE_CHOICES,
 )
@@ -404,3 +405,10 @@ class PlanPublicoSerializer(serializers.ModelSerializer):
         feature_map = {pf.feature_id: pf for pf in plan.feature_values.select_related('feature').all()}
         features = Feature.objects.filter(is_active=True, is_highlighted=True).order_by('name')
         return [serialize_feature_value(f, feature_map.get(f.id)) for f in features]
+
+
+class GastoOperativoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GastoOperativo
+        fields = ['id', 'concepto', 'monto', 'fecha', 'categoria', 'notas', 'created_at']
+        read_only_fields = ['id', 'created_at']

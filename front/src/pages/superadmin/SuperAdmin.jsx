@@ -52,11 +52,24 @@ function buildUserPlanDrafts(userList) {
 
 const SECTION_OPTIONS = [
   { id: 'overview', label: 'Resumen' },
+  { id: 'negocio', label: 'Negocio' },
   { id: 'plans', label: 'Planes' },
   { id: 'email', label: 'Correo' },
   { id: 'users', label: 'Usuarios' },
   { id: 'audit', label: 'Auditoria' },
 ]
+
+const GASTO_CATEGORIAS = [
+  { value: 'servidor', label: 'Servidor' },
+  { value: 'herramientas', label: 'Herramientas' },
+  { value: 'marketing', label: 'Marketing' },
+  { value: 'personal', label: 'Personal' },
+  { value: 'otro', label: 'Otro' },
+]
+
+function fmtMoney(val) {
+  return `$${Number(val || 0).toFixed(2)}`
+}
 
 export default function SuperAdmin() {
   const { user, fetchPerfil } = useAuth()
@@ -137,6 +150,33 @@ export default function SuperAdmin() {
     message: 'Mensaje de prueba enviado desde Aura.',
     use_custom_config: true,
   })
+
+  const [negocioData, setNegocioData] = useState(null)
+  const [negocioLoading, setNegocioLoading] = useState(false)
+  const [gastos, setGastos] = useState([])
+  const [gastosLoading, setGastosLoading] = useState(false)
+  const [gastoForm, setGastoForm] = useState({ concepto: '', monto: '', fecha: '', categoria: 'otro', notas: '' })
+  const [savingGasto, setSavingGasto] = useState(false)
+  const [editingGastoId, setEditingGastoId] = useState(null)
+  const [editGastoForm, setEditGastoForm] = useState({})
+
+  const loadNegocio = useCallback(async () => {
+    setNegocioLoading(true)
+    setGastosLoading(true)
+    try {
+      const [metricasRes, gastosRes] = await Promise.all([
+        api.get('/usuarios/superadmin/negocio/metricas/'),
+        api.get('/usuarios/superadmin/negocio/gastos/'),
+      ])
+      setNegocioData(metricasRes.data)
+      setGastos(gastosRes.data)
+    } catch (error) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo cargar metricas del negocio.') })
+    } finally {
+      setNegocioLoading(false)
+      setGastosLoading(false)
+    }
+  }, [])
 
   const loadDashboard = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoadingDashboard(true)
@@ -296,6 +336,10 @@ export default function SuperAdmin() {
   useEffect(() => {
     loadPlans()
   }, [loadPlans])
+
+  useEffect(() => {
+    loadNegocio()
+  }, [loadNegocio])
 
   if (!user) return null
   if (!user.is_superuser) return <Navigate to="/dashboard" replace />
@@ -652,11 +696,51 @@ export default function SuperAdmin() {
     }
   }
 
+  async function handleCrearGasto(event) {
+    event.preventDefault()
+    setSavingGasto(true)
+    try {
+      await api.post('/usuarios/superadmin/negocio/gastos/', gastoForm)
+      setGastoForm({ concepto: '', monto: '', fecha: '', categoria: 'otro', notas: '' })
+      await loadNegocio()
+    } catch (error) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo guardar el gasto.') })
+    } finally {
+      setSavingGasto(false)
+    }
+  }
+
+  async function handleEliminarGasto(id) {
+    try {
+      await api.delete(`/usuarios/superadmin/negocio/gastos/${id}/`)
+      setGastos((prev) => prev.filter((g) => g.id !== id))
+      await loadNegocio()
+    } catch (error) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo eliminar el gasto.') })
+    }
+  }
+
+  async function handleGuardarEditGasto(id) {
+    try {
+      const { data } = await api.patch(`/usuarios/superadmin/negocio/gastos/${id}/`, editGastoForm)
+      setGastos((prev) => prev.map((g) => (g.id === id ? data : g)))
+      setEditingGastoId(null)
+      await loadNegocio()
+    } catch (error) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo actualizar el gasto.') })
+    }
+  }
+
   const kpis = dashboard?.kpis || {}
   const health = dashboard?.health || {}
   const movements = dashboard?.movement_summary || {}
   const currencyDistribution = dashboard?.currency_distribution || []
   const planDistribution = dashboard?.plan_distribution || []
+  const negocioKpis = negocioData?.kpis || {}
+  const seriesMensual = negocioData?.series_mensual || []
+  const ingresosPorPlan = negocioData?.ingresos_por_plan || []
+  const gastosPorCategoria = negocioData?.gastos_por_categoria || []
+  const pagosRecientes = negocioData?.pagos_recientes || []
 
   return (
     <div>
@@ -1361,6 +1445,210 @@ export default function SuperAdmin() {
           </table>
         </div>
       </div>
+      )}
+
+      {activeSection === 'negocio' && (
+        <>
+          {negocioLoading ? (
+            <div className="loading-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>
+          ) : (
+            <>
+              <div className="stats-grid">
+                <div className="stat-card">
+                  <div className="stat-label">Ingresos del mes</div>
+                  <div className="stat-value green">{fmtMoney(negocioKpis.mrr_actual)}</div>
+                  <div className="stat-sub">Pagos aprobados: {negocioKpis.pagos_aprobados_mes || 0}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Gastos del mes</div>
+                  <div className="stat-value red">{fmtMoney(negocioKpis.gastos_mes)}</div>
+                  <div className="stat-sub">Pagos fallidos: {negocioKpis.pagos_fallidos_mes || 0}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Margen del mes</div>
+                  <div className={`stat-value ${(negocioKpis.margen_mes || 0) >= 0 ? 'green' : 'red'}`}>
+                    {fmtMoney(negocioKpis.margen_mes)}
+                  </div>
+                  <div className="stat-sub">Usuarios pagantes: {negocioKpis.usuarios_pagantes || 0}</div>
+                </div>
+              </div>
+
+              <div className="card" style={{ marginBottom: 20 }}>
+                <div className="card-header"><h2 className="card-title">Ingresos vs Gastos — ultimos 12 meses</h2></div>
+                <div className="table-wrap">
+                  <table className="table">
+                    <thead>
+                      <tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Margen</th></tr>
+                    </thead>
+                    <tbody>
+                      {seriesMensual.map((row) => (
+                        <tr key={row.label}>
+                          <td>{row.label}</td>
+                          <td style={{ color: '#22c55e' }}>{fmtMoney(row.ingresos)}</td>
+                          <td style={{ color: '#ef4444' }}>{fmtMoney(row.gastos)}</td>
+                          <td style={{ color: row.margen >= 0 ? '#22c55e' : '#ef4444', fontWeight: 600 }}>{fmtMoney(row.margen)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+                <div className="card">
+                  <div className="card-header"><h2 className="card-title">Ingresos por plan (mes actual)</h2></div>
+                  <div className="table-wrap">
+                    <table className="table">
+                      <thead><tr><th>Plan</th><th>Total</th></tr></thead>
+                      <tbody>
+                        {ingresosPorPlan.length === 0 && <tr><td colSpan={2} style={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>Sin ingresos este mes</td></tr>}
+                        {ingresosPorPlan.map((row) => (
+                          <tr key={row.plan}><td>{row.plan}</td><td>{fmtMoney(row.total)}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div className="card">
+                  <div className="card-header"><h2 className="card-title">Gastos por categoria (mes actual)</h2></div>
+                  <div className="table-wrap">
+                    <table className="table">
+                      <thead><tr><th>Categoria</th><th>Total</th></tr></thead>
+                      <tbody>
+                        {gastosPorCategoria.length === 0 && <tr><td colSpan={2} style={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>Sin gastos este mes</td></tr>}
+                        {gastosPorCategoria.map((row) => (
+                          <tr key={row.categoria}><td style={{ textTransform: 'capitalize' }}>{row.categoria}</td><td>{fmtMoney(row.total)}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <div className="card" style={{ marginBottom: 20 }}>
+                <div className="card-header"><h2 className="card-title">Pagos recientes</h2></div>
+                <div className="table-wrap">
+                  <table className="table">
+                    <thead>
+                      <tr><th>Usuario</th><th>Plan</th><th>Monto</th><th>Estado</th><th>Fecha</th></tr>
+                    </thead>
+                    <tbody>
+                      {pagosRecientes.length === 0 && <tr><td colSpan={5} style={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>Sin pagos registrados</td></tr>}
+                      {pagosRecientes.map((p) => (
+                        <tr key={p.client_transaction_id}>
+                          <td>{p.usuario__email}</td>
+                          <td>{p.plan__name}</td>
+                          <td>{fmtMoney(p.monto)}</td>
+                          <td>
+                            <span className={`badge ${p.status === 'approved' ? 'badge-green' : p.status === 'pending' ? 'badge-lila' : 'badge-red'}`}>
+                              {p.status}
+                            </span>
+                          </td>
+                          <td>{formatDateTime(p.created_at)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="card-header"><h2 className="card-title">Gastos operativos</h2></div>
+
+                <form onSubmit={handleCrearGasto} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '0 0 16px' }}>
+                  <input
+                    className="form-modal-input"
+                    placeholder="Concepto"
+                    value={gastoForm.concepto}
+                    onChange={(e) => setGastoForm((f) => ({ ...f, concepto: e.target.value }))}
+                    required
+                    style={{ flex: '2 1 160px' }}
+                  />
+                  <input
+                    className="form-modal-input"
+                    type="number"
+                    placeholder="Monto"
+                    value={gastoForm.monto}
+                    onChange={(e) => setGastoForm((f) => ({ ...f, monto: e.target.value }))}
+                    required
+                    min="0"
+                    step="0.01"
+                    style={{ flex: '1 1 100px' }}
+                  />
+                  <input
+                    className="form-modal-input"
+                    type="date"
+                    value={gastoForm.fecha}
+                    onChange={(e) => setGastoForm((f) => ({ ...f, fecha: e.target.value }))}
+                    required
+                    style={{ flex: '1 1 130px' }}
+                  />
+                  <select
+                    className="form-modal-select"
+                    value={gastoForm.categoria}
+                    onChange={(e) => setGastoForm((f) => ({ ...f, categoria: e.target.value }))}
+                    style={{ flex: '1 1 120px' }}
+                  >
+                    {GASTO_CATEGORIAS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  </select>
+                  <input
+                    className="form-modal-input"
+                    placeholder="Notas (opcional)"
+                    value={gastoForm.notas}
+                    onChange={(e) => setGastoForm((f) => ({ ...f, notas: e.target.value }))}
+                    style={{ flex: '2 1 160px' }}
+                  />
+                  <button type="submit" className="btn-primary" disabled={savingGasto} style={{ flex: '0 0 auto' }}>
+                    {savingGasto ? 'Guardando...' : '+ Agregar'}
+                  </button>
+                </form>
+
+                <div className="table-wrap">
+                  <table className="table">
+                    <thead>
+                      <tr><th>Fecha</th><th>Concepto</th><th>Categoria</th><th>Monto</th><th>Notas</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                      {gastosLoading && <tr><td colSpan={6} style={{ textAlign: 'center' }}>Cargando...</td></tr>}
+                      {!gastosLoading && gastos.length === 0 && (
+                        <tr><td colSpan={6} style={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>Sin gastos registrados</td></tr>
+                      )}
+                      {gastos.map((g) => editingGastoId === g.id ? (
+                        <tr key={g.id}>
+                          <td><input type="date" className="form-modal-input" value={editGastoForm.fecha || ''} onChange={(e) => setEditGastoForm((f) => ({ ...f, fecha: e.target.value }))} style={{ width: 130 }} /></td>
+                          <td><input className="form-modal-input" value={editGastoForm.concepto || ''} onChange={(e) => setEditGastoForm((f) => ({ ...f, concepto: e.target.value }))} /></td>
+                          <td>
+                            <select className="form-modal-select" value={editGastoForm.categoria || 'otro'} onChange={(e) => setEditGastoForm((f) => ({ ...f, categoria: e.target.value }))}>
+                              {GASTO_CATEGORIAS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                            </select>
+                          </td>
+                          <td><input type="number" className="form-modal-input" value={editGastoForm.monto || ''} onChange={(e) => setEditGastoForm((f) => ({ ...f, monto: e.target.value }))} step="0.01" style={{ width: 90 }} /></td>
+                          <td><input className="form-modal-input" value={editGastoForm.notas || ''} onChange={(e) => setEditGastoForm((f) => ({ ...f, notas: e.target.value }))} /></td>
+                          <td style={{ display: 'flex', gap: 6 }}>
+                            <button type="button" className="btn-primary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => handleGuardarEditGasto(g.id)}>Guardar</button>
+                            <button type="button" className="btn-modal-cancel" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => setEditingGastoId(null)}>Cancelar</button>
+                          </td>
+                        </tr>
+                      ) : (
+                        <tr key={g.id}>
+                          <td>{g.fecha}</td>
+                          <td>{g.concepto}</td>
+                          <td style={{ textTransform: 'capitalize' }}>{g.categoria}</td>
+                          <td>{fmtMoney(g.monto)}</td>
+                          <td>{g.notas || '-'}</td>
+                          <td style={{ display: 'flex', gap: 6 }}>
+                            <button type="button" className="btn-modal-cancel" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => { setEditingGastoId(g.id); setEditGastoForm({ concepto: g.concepto, monto: g.monto, fecha: g.fecha, categoria: g.categoria, notas: g.notas }) }}>Editar</button>
+                            <button type="button" className="btn-modal-cancel" style={{ padding: '4px 10px', fontSize: 12, color: '#ef4444' }} onClick={() => handleEliminarGasto(g.id)}>Eliminar</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </>
       )}
 
       {activeSection === 'audit' && (

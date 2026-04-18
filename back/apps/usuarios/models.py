@@ -244,3 +244,35 @@ class PagoPayPhone(models.Model):
 
     def __str__(self):
         return f'{self.usuario.email} - {self.plan.name} - {self.status}'
+
+
+class GastoOperativo(models.Model):
+    CATEGORIA_CHOICES = [
+        ('servidor', 'Servidor'),
+        ('herramientas', 'Herramientas'),
+        ('marketing', 'Marketing'),
+        ('personal', 'Personal'),
+        ('otro', 'Otro'),
+    ]
+
+    concepto = models.CharField(max_length=200)
+    monto = models.DecimalField(max_digits=10, decimal_places=2)
+    fecha = models.DateField()
+    categoria = models.CharField(max_length=20, choices=CATEGORIA_CHOICES, default='otro')
+    notas = models.CharField(max_length=500, blank=True)
+    creado_por = models.ForeignKey(
+        Usuario, on_delete=models.SET_NULL, null=True, related_name='gastos_operativos'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-fecha', '-created_at']
+        verbose_name = 'Gasto operativo'
+        verbose_name_plural = 'Gastos operativos'
+        indexes = [
+            models.Index(fields=['fecha'], name='gasto_op_fecha_idx'),
+        ]
+
+    def __str__(self):
+        return f'{self.fecha} - {self.concepto} ({self.monto})'
