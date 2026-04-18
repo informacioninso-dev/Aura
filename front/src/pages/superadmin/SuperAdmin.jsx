@@ -130,6 +130,9 @@ export default function SuperAdmin() {
   const [planFeatureDrafts, setPlanFeatureDrafts] = useState({})
   const [savingPlanFeatureId, setSavingPlanFeatureId] = useState(null)
   const [userPlanDrafts, setUserPlanDrafts] = useState({})
+  const [userPlanTipoDrafts, setUserPlanTipoDrafts] = useState({})
+  const [userPlanEndsAtDrafts, setUserPlanEndsAtDrafts] = useState({})
+  const [userPlanNotesDrafts, setUserPlanNotesDrafts] = useState({})
   const [savingUserPlanId, setSavingUserPlanId] = useState(null)
   const [emailConfigForm, setEmailConfigForm] = useState({
     active: false,
@@ -600,9 +603,14 @@ export default function SuperAdmin() {
     setSavingUserPlanId(target.id)
     setFeedback({ type: '', message: '' })
     try {
-      await api.post(`/usuarios/superadmin/usuarios/${target.id}/plan/`, {
-        plan_id: planId,
-      })
+      const payload = { plan_id: planId }
+      const tipo = userPlanTipoDrafts[target.id]
+      if (tipo) payload.tipo = tipo
+      const endsAt = userPlanEndsAtDrafts[target.id]
+      if (endsAt) payload.ends_at = new Date(endsAt).toISOString()
+      const notes = userPlanNotesDrafts[target.id]
+      if (notes) payload.notes = notes
+      await api.post(`/usuarios/superadmin/usuarios/${target.id}/plan/`, payload)
       setFeedback({ type: 'success', message: `Plan actualizado para ${target.email}.` })
       await Promise.all([loadUsers(), loadAudit(), loadDashboard({ silent: true })])
       if (target.id === user.id) {
@@ -1382,20 +1390,58 @@ export default function SuperAdmin() {
                   <td>{item.username || '-'}</td>
                   <td>
                     <div className="superadmin-user-plan-stack">
-                      <span className={`badge ${item.plan?.slug === 'pro' ? 'badge-lila' : 'badge-gray'}`}>
-                        {item.plan?.name || 'Sin plan'}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span className={`badge ${item.plan?.slug === 'pro' ? 'badge-lila' : 'badge-gray'}`}>
+                          {item.plan?.name || 'Sin plan'}
+                        </span>
+                        {item.plan?.assignment_tipo && item.plan.assignment_tipo !== 'pago' && (
+                          <span className="badge badge-yellow" style={{ fontSize: 10 }}>
+                            {item.plan.assignment_tipo}
+                          </span>
+                        )}
+                        {item.plan?.assignment_ends_at && (
+                          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+                            vence {new Date(item.plan.assignment_ends_at).toLocaleDateString('es')}
+                          </span>
+                        )}
+                      </div>
                       <div className="superadmin-user-plan-controls">
                         <select
                           className="form-modal-select superadmin-user-plan-select"
                           value={userPlanDrafts[item.id] || ''}
                           onChange={(event) => updateUserPlanDraft(item.id, event.target.value)}
                         >
-                          <option value="">Seleccionar</option>
+                          <option value="">Plan</option>
                           {plans.filter((plan) => plan.is_active).map((plan) => (
                             <option key={plan.id} value={plan.id}>{plan.name}</option>
                           ))}
                         </select>
+                        <select
+                          className="form-modal-select"
+                          style={{ width: 110 }}
+                          value={userPlanTipoDrafts[item.id] || 'pago'}
+                          onChange={(e) => setUserPlanTipoDrafts((d) => ({ ...d, [item.id]: e.target.value }))}
+                        >
+                          <option value="pago">Pago</option>
+                          <option value="asesor">Asesor</option>
+                          <option value="cortesia">Cortesia</option>
+                          <option value="prueba">Prueba</option>
+                        </select>
+                        <input
+                          type="date"
+                          className="form-modal-input"
+                          style={{ width: 130 }}
+                          placeholder="Vence (opcional)"
+                          value={userPlanEndsAtDrafts[item.id] || ''}
+                          onChange={(e) => setUserPlanEndsAtDrafts((d) => ({ ...d, [item.id]: e.target.value }))}
+                        />
+                        <input
+                          className="form-modal-input"
+                          style={{ width: 120 }}
+                          placeholder="Notas"
+                          value={userPlanNotesDrafts[item.id] || ''}
+                          onChange={(e) => setUserPlanNotesDrafts((d) => ({ ...d, [item.id]: e.target.value }))}
+                        />
                         <button
                           type="button"
                           className="btn-modal-cancel superadmin-inline-button"
@@ -1469,7 +1515,7 @@ export default function SuperAdmin() {
                   <div className={`stat-value ${(negocioKpis.margen_mes || 0) >= 0 ? 'green' : 'red'}`}>
                     {fmtMoney(negocioKpis.margen_mes)}
                   </div>
-                  <div className="stat-sub">Usuarios pagantes: {negocioKpis.usuarios_pagantes || 0}</div>
+                  <div className="stat-sub">Pagantes: {negocioKpis.usuarios_pagantes || 0} | Manuales: {negocioKpis.usuarios_manual || 0}</div>
                 </div>
               </div>
 

@@ -178,6 +178,17 @@ class PlanFeature(models.Model):
 
 
 class UserPlanAssignment(models.Model):
+    TIPO_PAGO = 'pago'
+    TIPO_ASESOR = 'asesor'
+    TIPO_CORTESIA = 'cortesia'
+    TIPO_PRUEBA = 'prueba'
+    TIPO_CHOICES = [
+        (TIPO_PAGO, 'Pago'),
+        (TIPO_ASESOR, 'Asesor comercial'),
+        (TIPO_CORTESIA, 'Cortesia'),
+        (TIPO_PRUEBA, 'Prueba'),
+    ]
+
     user = models.ForeignKey(
         Usuario,
         on_delete=models.CASCADE,
@@ -195,6 +206,7 @@ class UserPlanAssignment(models.Model):
         on_delete=models.SET_NULL,
         related_name='managed_plan_assignments',
     )
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default=TIPO_PAGO)
     starts_at = models.DateTimeField(default=timezone.now)
     ends_at = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)

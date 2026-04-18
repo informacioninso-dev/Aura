@@ -666,11 +666,15 @@ class SuperAdminUserPlanView(APIView):
 
         plan = get_object_or_404(Plan, pk=serializer.validated_data['plan_id'], is_active=True)
         notes = serializer.validated_data.get('notes', '')
+        tipo = serializer.validated_data.get('tipo', 'pago')
+        ends_at = serializer.validated_data.get('ends_at', None)
         assign_plan_to_user(
             user=target,
             plan=plan,
             assigned_by=request.user,
             notes=notes,
+            tipo=tipo,
+            ends_at=ends_at,
         )
 
         _admin_log(
@@ -681,6 +685,7 @@ class SuperAdminUserPlanView(APIView):
             details={
                 'plan_id': plan.id,
                 'plan_slug': plan.slug,
+                'tipo': tipo,
                 'notes': notes,
             },
         )
@@ -1084,17 +1089,18 @@ class NegocioMetricasView(APIView):
         mrr_actual = ingresos_map.get((today.year, today.month), 0.0)
         gastos_mes = gastos_map.get((today.year, today.month), 0.0)
 
-        # Usuarios pagantes activos (con asignacion de plan no-default)
+        # Usuarios con plan activo no-default, desglosado por tipo
+        from .models import UserPlanAssignment as _UPA
         from .plans import get_default_plan as _get_default_plan
         default_plan = _get_default_plan()
-        pagantes = (
-            User.objects
-            .filter(plan_assignments__is_active=True)
-            .exclude(plan_assignments__plan=default_plan)
-            .distinct()
-            .count()
-            if default_plan else 0
+        _active_non_default = (
+            _UPA.objects.filter(is_active=True).exclude(plan=default_plan)
+            if default_plan
+            else _UPA.objects.filter(is_active=True)
         )
+        pagantes_pago = _active_non_default.filter(tipo='pago').values('user').distinct().count()
+        pagantes_manual = _active_non_default.exclude(tipo='pago').values('user').distinct().count()
+        pagantes = pagantes_pago
 
         # Pagos del mes
         pagos_mes = PagoPayPhone.objects.filter(
@@ -1117,6 +1123,7 @@ class NegocioMetricasView(APIView):
                 'gastos_mes': gastos_mes,
                 'margen_mes': round(mrr_actual - gastos_mes, 2),
                 'usuarios_pagantes': pagantes,
+                'usuarios_manual': pagantes_manual,
                 'pagos_aprobados_mes': pagos_aprobados,
                 'pagos_fallidos_mes': pagos_fallidos,
             },

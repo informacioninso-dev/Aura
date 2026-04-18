@@ -118,6 +118,8 @@ class SuperAdminUserSerializer(serializers.ModelSerializer):
             'is_default': plan.is_default,
             'assignment_id': assignment.id if assignment else None,
             'assignment_note': assignment.notes if assignment else '',
+            'assignment_tipo': assignment.tipo if assignment else 'pago',
+            'assignment_ends_at': assignment.ends_at.isoformat() if assignment and assignment.ends_at else None,
         }
 
     def get_feature_access(self, obj):
@@ -232,6 +234,12 @@ class PlanSerializer(serializers.ModelSerializer):
 
 class PlanAssignmentSerializer(serializers.Serializer):
     plan_id = serializers.IntegerField()
+    tipo = serializers.ChoiceField(
+        choices=['pago', 'asesor', 'cortesia', 'prueba'],
+        required=False,
+        default='pago',
+    )
+    ends_at = serializers.DateTimeField(required=False, allow_null=True)
     notes = serializers.CharField(required=False, allow_blank=True, max_length=255)
 
     def validate_plan_id(self, value):
