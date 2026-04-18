@@ -555,6 +555,8 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
     real_start = _restar_meses(current_month, real_past_months)
     history_start = _restar_meses(current_month, history_months)
     history_end = current_month - datetime.timedelta(days=1)
+    current_month_end = _ultimo_dia_mes(current_month.year, current_month.month)
+    next_month = _sumar_meses_fecha(current_month, 1)
     projection_end = _ultimo_dia_mes(*_sumar_meses_fecha(current_month, months - 1).timetuple()[:2])
     asegurar_saldos_historicos(usuario, history_end)
     saldos_historicos = {
@@ -595,21 +597,21 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
         IngresoPuntual.objects.filter(
             usuario=usuario,
             fecha__gte=puntuales_start,
-            fecha__lte=history_end,
+            fecha__lte=current_month_end,
         )
     )
     gastos_puntuales = list(
         GastoNoCorriente.objects.filter(
             usuario=usuario,
             fecha__gte=puntuales_start,
-            fecha__lte=history_end,
+            fecha__lte=current_month_end,
         )
     )
     # Ingresos puntuales con fecha futura conocida (ej. décimo, utilidades)
     ingresos_puntuales_futuros = list(
         IngresoPuntual.objects.filter(
             usuario=usuario,
-            fecha__gt=history_end,
+            fecha__gt=current_month_end,
             fecha__lte=projection_end,
         )
     )
@@ -717,9 +719,9 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
     cumulative_cash_position = seeded_balance
     series = []
 
-    # ── Meses reales (histórico) ──────────────────────────────────────────────
+    # ── Meses reales (histórico, incluye mes en curso) ───────────────────────
     cursor = real_start
-    while cursor < current_month:
+    while cursor < next_month:
         month_start = cursor
         month_end = _ultimo_dia_mes(month_start.year, month_start.month)
         key = (month_start.year, month_start.month)
@@ -757,13 +759,14 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
             'cumulative_balance': float(cumulative_balance),
             'cumulative_cash_position': float(cumulative_cash_position),
             'is_real': True,
+            'is_current': month_start == current_month,
         })
 
         cursor = _sumar_meses_fecha(cursor, 1)
 
-    # ── Meses proyectados (futuro) ────────────────────────────────────────────
+    # ── Meses proyectados (futuro, desde el mes siguiente al actual) ─────────
     for offset in range(months):
-        month_start = _sumar_meses_fecha(current_month, offset)
+        month_start = _sumar_meses_fecha(next_month, offset)
         month_end = _ultimo_dia_mes(month_start.year, month_start.month)
 
         total_ing_fijos = _ing_fijos_mes(month_start, month_end)
