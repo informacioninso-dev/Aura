@@ -126,6 +126,8 @@ class Plan(models.Model):
     slug = models.SlugField(max_length=80, unique=True)
     name = models.CharField(max_length=120)
     description = models.TextField(blank=True)
+    precio_mensual = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    duracion_meses = models.PositiveIntegerField(default=1)
     is_active = models.BooleanField(default=True)
     is_default = models.BooleanField(default=False)
     sort_order = models.PositiveIntegerField(default=100)
@@ -211,3 +213,34 @@ class UserPlanAssignment(models.Model):
 
     def __str__(self):
         return f'{self.user.email} -> {self.plan.name}'
+
+
+class PagoPayPhone(models.Model):
+    PENDING = 'pending'
+    APPROVED = 'approved'
+    CANCELLED = 'cancelled'
+    ERROR = 'error'
+    STATUS_CHOICES = [
+        (PENDING, 'Pendiente'),
+        (APPROVED, 'Aprobado'),
+        (CANCELLED, 'Cancelado'),
+        (ERROR, 'Error'),
+    ]
+
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='pagos_payphone')
+    plan = models.ForeignKey(Plan, on_delete=models.PROTECT, related_name='pagos')
+    monto = models.DecimalField(max_digits=10, decimal_places=2)
+    client_transaction_id = models.CharField(max_length=64, unique=True)
+    payphone_id = models.CharField(max_length=64, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=PENDING)
+    payphone_response = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Pago PayPhone'
+        verbose_name_plural = 'Pagos PayPhone'
+
+    def __str__(self):
+        return f'{self.usuario.email} - {self.plan.name} - {self.status}'

@@ -1,10 +1,13 @@
 from django.urls import path
 from .views import (
+    ConfirmarPagoView,
+    IniciarPagoView,
     LoginTokenObtainPairView,
     PasswordForgotView,
     PasswordChangeView,
     PasswordResetConfirmView,
     PerfilView,
+    PlanesView,
     RefreshCookieTokenView,
     SuperAdminAuditView,
     SuperAdminDashboardView,
@@ -43,4 +46,7 @@ urlpatterns = [
     path('superadmin/planes/<int:plan_id>/features/', SuperAdminPlanFeaturesView.as_view(), name='superadmin_plan_features'),
     path('superadmin/email/config/', SuperAdminEmailConfigView.as_view(), name='superadmin_email_config'),
     path('superadmin/email/test/', SuperAdminEmailTestView.as_view(), name='superadmin_email_test'),
+    path('planes/', PlanesView.as_view(), name='planes'),
+    path('pago/iniciar/', IniciarPagoView.as_view(), name='iniciar_pago'),
+    path('pago/confirmar/', ConfirmarPagoView.as_view(), name='confirmar_pago'),
 ]

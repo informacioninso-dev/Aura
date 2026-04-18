@@ -391,3 +391,16 @@ class PasswordChangeSerializer(serializers.Serializer):
             raise serializers.ValidationError({'new_password': 'La nueva contraseña debe ser distinta a la actual.'})
 
         return attrs
+
+
+class PlanPublicoSerializer(serializers.ModelSerializer):
+    features = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Plan
+        fields = ['id', 'slug', 'name', 'description', 'precio_mensual', 'duracion_meses', 'is_default', 'sort_order', 'features']
+
+    def get_features(self, plan):
+        feature_map = {pf.feature_id: pf for pf in plan.feature_values.select_related('feature').all()}
+        features = Feature.objects.filter(is_active=True, is_highlighted=True).order_by('name')
+        return [serialize_feature_value(f, feature_map.get(f.id)) for f in features]

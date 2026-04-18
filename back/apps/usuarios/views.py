@@ -32,7 +32,9 @@ from .jwt_auth import (
     invalidate_user_tokens,
     set_refresh_cookie,
 )
-from .models import AdminActionLog, EmailServerConfig, Feature, Plan, PlanFeature
+import uuid
+from .models import AdminActionLog, EmailServerConfig, Feature, Plan, PlanFeature, PagoPayPhone
+from . import payphone as payphone_service
 from .plans import assign_plan_to_user, get_default_plan, sync_feature_catalog
 from .security import decrypt_secret
 from .serializers import (
@@ -883,3 +885,111 @@ class SuperAdminEmailTestView(APIView):
             {'detail': 'Correo de prueba enviado correctamente.', 'source': source},
             status=status.HTTP_200_OK,
         )
+
+
+# ── PayPhone ─────────────────────────────────────────────────────────────────
+
+class PlanesView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request):
+        planes = Plan.objects.filter(is_active=True).prefetch_related('feature_values__feature').order_by('sort_order', 'precio_mensual')
+        from .serializers import PlanPublicoSerializer
+        return Response(PlanPublicoSerializer(planes, many=True).data)
+
+
+class IniciarPagoView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request):
+        plan_id = request.data.get('plan_id')
+        if not plan_id:
+            return Response({'detail': 'plan_id requerido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        plan = get_object_or_404(Plan, id=plan_id, is_active=True)
+
+        if plan.precio_mensual <= 0:
+            return Response({'detail': 'Este plan no requiere pago.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        client_transaction_id = str(uuid.uuid4())
+        monto = plan.precio_mensual
+        amount_cents = int(monto * 100)
+
+        pago = PagoPayPhone.objects.create(
+            usuario=request.user,
+            plan=plan,
+            monto=monto,
+            client_transaction_id=client_transaction_id,
+        )
+
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'https://aura.binnso.com').rstrip('/')
+        try:
+            result = payphone_service.crear_cobro(
+                amount_cents=amount_cents,
+                client_transaction_id=client_transaction_id,
+                response_url=f'{frontend_url}/pago/resultado',
+                cancellation_url=f'{frontend_url}/planes',
+                reference=f'Aura - {plan.name}',
+            )
+        except Exception as exc:
+            pago.status = PagoPayPhone.ERROR
+            pago.payphone_response = {'error': str(exc)}
+            pago.save()
+            return Response({'detail': 'Error al conectar con PayPhone.'}, status=status.HTTP_502_BAD_GATEWAY)
+
+        pago.payphone_id = result.get('paymentId', '')
+        pago.payphone_response = result
+        pago.save()
+
+        return Response({
+            'pay_url': result['payWithUrl'],
+            'client_transaction_id': client_transaction_id,
+        })
+
+
+class ConfirmarPagoView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request):
+        payphone_id = request.data.get('id')
+        client_transaction_id = request.data.get('clientTransactionId')
+
+        if not payphone_id or not client_transaction_id:
+            return Response({'detail': 'id y clientTransactionId requeridos.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        pago = get_object_or_404(PagoPayPhone, client_transaction_id=client_transaction_id, usuario=request.user)
+
+        if pago.status == PagoPayPhone.APPROVED:
+            return Response({'status': 'approved', 'plan': pago.plan.name})
+
+        try:
+            result = payphone_service.confirmar_cobro(
+                payphone_id=payphone_id,
+                client_transaction_id=client_transaction_id,
+            )
+        except Exception as exc:
+            return Response({'detail': f'Error al verificar el pago: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
+
+        pago.payphone_response = result
+        status_code = result.get('statusCode')
+
+        if status_code == 3:
+            pago.status = PagoPayPhone.APPROVED
+            pago.save()
+            ends_at = timezone.now() + timedelta(days=30 * pago.plan.duracion_meses)
+            assign_plan_to_user(
+                user=pago.usuario,
+                plan=pago.plan,
+                notes=f'PayPhone {client_transaction_id}',
+                ends_at=ends_at,
+            )
+            return Response({'status': 'approved', 'plan': pago.plan.name})
+
+        if status_code == 2:
+            pago.status = PagoPayPhone.CANCELLED
+            pago.save()
+            return Response({'status': 'cancelled'})
+
+        pago.status = PagoPayPhone.ERROR
+        pago.save()
+        return Response({'status': 'error', 'code': status_code})

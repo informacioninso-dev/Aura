@@ -6,6 +6,7 @@ import {
   LogOut,
   Rat,
   ShieldCheck,
+  Sparkles,
   Tags,
   Upload,
   UserRound,
@@ -85,6 +86,7 @@ export default function Sidebar({ isOpen, onClose }) {
         <NavItem to="/presupuesto" icon={Tags} label="Categorias" onClick={handleNavClick} />
         <NavItem to="/simulador" icon={Calculator} label="Simulador" onClick={handleNavClick} />
         <NavItem to="/importar" icon={Upload} label="Importar historial" onClick={handleNavClick} />
+        <NavItem to="/planes" icon={Sparkles} label="Planes" onClick={handleNavClick} />
 
         {user?.is_superuser && (
           <>

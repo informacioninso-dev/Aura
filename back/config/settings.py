@@ -160,6 +160,10 @@ else:
 # TTL del cache de proyección financiera (segundos).
 FINANZAS_PROJECTION_CACHE_TTL = int(os.getenv('FINANZAS_PROJECTION_CACHE_TTL', '300'))
 
+# PayPhone
+PAYPHONE_TOKEN = os.getenv('PAYPHONE_TOKEN', '')
+PAYPHONE_APP_ID = os.getenv('PAYPHONE_APP_ID', '')
+
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators

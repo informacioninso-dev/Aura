@@ -179,7 +179,7 @@ def get_user_projection_mode(user):
     return mode
 
 
-def assign_plan_to_user(*, user, plan, assigned_by=None, notes=''):
+def assign_plan_to_user(*, user, plan, assigned_by=None, notes='', ends_at=None):
     now = timezone.now()
     current_assignments = UserPlanAssignment.objects.filter(user=user, is_active=True).order_by('-starts_at', '-pk')
     current = current_assignments.first()
@@ -191,7 +191,7 @@ def assign_plan_to_user(*, user, plan, assigned_by=None, notes=''):
         current.assigned_by = assigned_by
         current.notes = notes
         current.starts_at = now
-        current.ends_at = None
+        current.ends_at = ends_at
         current.is_active = True
         current.save()
         return current
@@ -202,6 +202,7 @@ def assign_plan_to_user(*, user, plan, assigned_by=None, notes=''):
         assigned_by=assigned_by,
         notes=notes,
         starts_at=now,
+        ends_at=ends_at,
         is_active=True,
     )
 

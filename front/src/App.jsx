@@ -19,6 +19,8 @@ const Perfil = lazy(() => import('./pages/perfil/Perfil'))
 const Presupuesto = lazy(() => import('./pages/presupuesto/Presupuesto'))
 const Importar = lazy(() => import('./pages/importar/Importar'))
 const SuperAdmin = lazy(() => import('./pages/superadmin/SuperAdmin'))
+const Planes = lazy(() => import('./pages/planes/Planes'))
+const PagoResultado = lazy(() => import('./pages/pago/PagoResultado'))
 
 function AppBootFallback() {
   return (
@@ -73,8 +75,10 @@ export default function App() {
               <Route path="/presupuesto" element={<Presupuesto />} />
               <Route path="/importar" element={<Importar />} />
               <Route path="/perfil" element={<Perfil />} />
+              <Route path="/planes" element={<Planes />} />
               <Route path="/superadmin" element={<SuperAdmin />} />
             </Route>
+            <Route path="/pago/resultado" element={<PagoResultado />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
