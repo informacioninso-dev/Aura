@@ -54,8 +54,8 @@ function AppBootFallback() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <BrowserRouter>
+      <AuthProvider>
         <Suspense fallback={<AppBootFallback />}>
           <Routes>
             <Route path="/" element={<Home />} />
@@ -85,7 +85,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
-      </BrowserRouter>
-    </AuthProvider>
+      </AuthProvider>
+    </BrowserRouter>
   )
 }

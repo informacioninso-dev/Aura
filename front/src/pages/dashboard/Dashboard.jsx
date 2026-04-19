@@ -181,13 +181,11 @@ export default function Dashboard() {
   const [isCompactProjectionChart, setIsCompactProjectionChart] = useState(
     () => typeof window !== 'undefined' && window.innerWidth < MOBILE_CHART_BREAKPOINT,
   )
-  const [projectionChartDragging, setProjectionChartDragging] = useState(false)
   const [projectionWindow, setProjectionWindow] = useState({ startIndex: 0, endIndex: 0 })
   const [showFullChart, setShowFullChart] = useState(false)
   const projectionDebounceRef = useRef(null)
   const projectionRequestIdRef = useRef(0)
   const loadProjectionChartRef = useRef(null)
-  const projectionGestureRef = useRef(null)
 
   const advancedProjectionEnabled = Boolean(user?.feature_access?.advanced_projection_enabled)
   const projectionDisplayMonths = Math.max(2, normalizePositiveInt(
@@ -672,50 +670,6 @@ export default function Dashboard() {
     requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo({ top: y, behavior: 'instant' })))
   }
 
-  function resetProjectionGesture() {
-    projectionGestureRef.current = null
-    setProjectionChartDragging(false)
-  }
-
-  function handleProjectionPointerDown(event) {
-    if (!showProjectionNavigator) return
-    if (event.pointerType === 'mouse' && event.button !== 0) return
-
-    projectionGestureRef.current = {
-      startX: event.clientX,
-      startIndex: projectionWindow.startIndex,
-      width: event.currentTarget.getBoundingClientRect().width,
-      moved: false,
-    }
-    setProjectionChartDragging(true)
-    event.currentTarget.setPointerCapture?.(event.pointerId)
-  }
-
-  function handleProjectionPointerMove(event) {
-    const gesture = projectionGestureRef.current
-    if (!gesture || !showProjectionNavigator) return
-
-    const deltaX = event.clientX - gesture.startX
-    if (Math.abs(deltaX) < 12) return
-
-    gesture.moved = true
-    const pixelPerMonth = Math.max(24, gesture.width / Math.max(1, projectionWindowSize))
-    const monthOffset = Math.round((-deltaX) / pixelPerMonth)
-    const nextStartIndex = gesture.startIndex + monthOffset
-    setProjectionWindow(clampProjectionWindow(nextStartIndex, chartSeries.length, projectionWindowSize))
-  }
-
-  function handleProjectionPointerUp(event) {
-    const gesture = projectionGestureRef.current
-    if (gesture && !gesture.moved && showProjectionNavigator && event.pointerType === 'touch') {
-      const tapX = event.clientX - event.currentTarget.getBoundingClientRect().left
-      const tapZone = tapX / gesture.width
-      if (tapZone < 0.3) slideProjectionPage(-1)
-      else if (tapZone > 0.7) slideProjectionPage(1)
-    }
-    resetProjectionGesture()
-  }
-
   function shouldShowSeries(kind) {
     return seriesFocus === 'all' || seriesFocus === kind
   }
@@ -978,17 +932,7 @@ export default function Dashboard() {
             </div>
           </div>
         )}
-        <div
-          className={`dashboard-chart-gesture-surface ${projectionChartDragging ? 'is-dragging' : ''}`}
-          tabIndex={-1}
-          onPointerDown={handleProjectionPointerDown}
-          onPointerMove={handleProjectionPointerMove}
-          onPointerUp={handleProjectionPointerUp}
-          onPointerCancel={resetProjectionGesture}
-          onLostPointerCapture={resetProjectionGesture}
-        >
-          {chart}
-        </div>
+        {chart}
         {footer}
       </div>
     )

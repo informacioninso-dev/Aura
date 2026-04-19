@@ -72,7 +72,7 @@ const pricingPlans = [
     badge: 'Mas popular',
     features: [
       'Todo lo del plan Gratis',
-      'Proyeccion acumulada hasta 10 años',
+      'Proyeccion acumulada hasta 10 anos',
       'Modos de proyeccion avanzados',
       'Historial ampliado hasta 24 meses',
       'Lo que me deben',
@@ -111,7 +111,7 @@ export default function Home() {
 
   return (
     <div className="home">
-      <nav className="nav">
+      <nav className="nav" aria-label="Principal">
         <div className="nav-inner">
           <Link to={logoTarget} className="nav-logo">
             <BrandMark className="nav-logo-icon" />
@@ -127,243 +127,245 @@ export default function Home() {
         </div>
       </nav>
 
-      <div className="hero-wrap">
-        <div className="hero">
-          <div className="hero-copy">
-            <div className="hero-badge">
-              <span className="hero-badge-dot" />
-              Gratis y sin tarjeta
+      <main className="home-main">
+        <div className="hero-wrap">
+          <div className="hero">
+            <div className="hero-copy">
+              <div className="hero-badge">
+                <span className="hero-badge-dot" />
+                Gratis y sin tarjeta
+              </div>
+              <h1>
+                Ganaste bien este mes.
+                <br />
+                <span className="gradient">Por que no te queda nada?</span>
+              </h1>
+              <p className="hero-desc">
+                Aura te muestra en segundos a donde se fue tu plata, que viene el mes que entra y si puedes tomar esa cuota sin quedar ajustado.
+              </p>
+              <div className="hero-actions">
+                <Link to={heroPrimaryTarget} className="btn-primary">
+                  {heroPrimaryLabel} <ArrowRight size={16} />
+                </Link>
+                <Link to={heroSecondaryTarget} className="btn-secondary-link">
+                  {heroSecondaryLabel}
+                </Link>
+              </div>
+              <p className="hero-note">
+                Sin planillas. Sin sumar a mano. Sin abrir el banco a medianoche.
+              </p>
+              <div className="hero-proof-list">
+                {heroProofs.map((item) => (
+                  <span key={item} className="hero-proof-chip">{item}</span>
+                ))}
+              </div>
             </div>
-            <h1>
-              Ganaste bien este mes.
-              <br />
-              <span className="gradient">¿Por que no te queda nada?</span>
-            </h1>
-            <p className="hero-desc">
-              Aura te muestra en segundos a donde se fue tu plata, que viene el mes que entra y si puedes tomar esa cuota sin quedar ajustado.
-            </p>
-            <div className="hero-actions">
-              <Link to={heroPrimaryTarget} className="btn-primary">
-                {heroPrimaryLabel} <ArrowRight size={16} />
-              </Link>
-              <Link to={heroSecondaryTarget} className="btn-secondary-link">
-                {heroSecondaryLabel}
-              </Link>
+
+            <div className="mockup">
+              <div className="mockup-bar">
+                <div className="dot dot-r" />
+                <div className="dot dot-y" />
+                <div className="dot dot-g" />
+                <div className="mockup-url">
+                  <span>app.aura.cl/dashboard</span>
+                </div>
+              </div>
+              <div className="mockup-body">
+                <div className="mockup-highlight">
+                  <div>
+                    <div className="mockup-highlight-label">Hoy te quedan</div>
+                    <div className="mockup-highlight-value">$1.400.000</div>
+                    <div className="mockup-highlight-sub">Despues de fijos, cuotas y extras del mes</div>
+                  </div>
+                  <span className="mockup-highlight-badge">Saldo sano</span>
+                </div>
+                <div className="mockup-stat-grid">
+                  {heroStats.map((stat) => (
+                    <div key={stat.label} className={`mockup-stat-card is-${stat.tone}`}>
+                      <div className="mockup-stat-label">{stat.label}</div>
+                      <div className="mockup-stat-value">{stat.value}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mockup-panel-grid">
+                  <div className="mockup-panel">
+                    <div className="mockup-panel-title">Asi se arma tu mes</div>
+                    <div className="mockup-breakdown">
+                      {heroBreakdown.map((item) => (
+                        <div key={item.label} className="mockup-flow-row">
+                          <span>{item.label}</span>
+                          <strong className={`mockup-flow-value is-${item.tone}`}>{item.value}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="mockup-panel">
+                    <div className="mockup-panel-title">Proximo trimestre</div>
+                    <div className="mockup-projection-list">
+                      {heroProjectionRows.map((row) => (
+                        <div key={row.month} className="mockup-projection-row">
+                          <span className="mockup-projection-month">{row.month}</span>
+                          <strong className={`mockup-projection-value is-${row.trend}`}>{row.value}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="mockup-insight">
+                  <div className="mockup-insight-title">Antes de tomar una cuota nueva</div>
+                  <p className="mockup-insight-copy">
+                    Simula el impacto y mira si tu flujo sigue sano sin dejarte corto al cierre del mes.
+                  </p>
+                  <div className="mockup-insight-chip-row">
+                    <span className="mockup-insight-chip">Proyeccion</span>
+                    <span className="mockup-insight-chip">Simulador</span>
+                    <span className="mockup-insight-chip">Presupuesto</span>
+                  </div>
+                </div>
+                <div className="mockup-footer-note">
+                  Hecho para revisar rapido desde celular, tablet o laptop.
+                </div>
+              </div>
             </div>
-            <p className="hero-note">
-              Sin planillas. Sin sumar a mano. Sin abrir el banco a medianoche.
-            </p>
-            <div className="hero-proof-list">
-              {heroProofs.map((item) => (
-                <span key={item} className="hero-proof-chip">{item}</span>
+          </div>
+        </div>
+
+        <section>
+          <div className="section">
+            <div className="section-head">
+              <div className="section-label">Lo resuelve rapido</div>
+              <h2 className="section-title">Menos vueltas. Mas claridad.</h2>
+              <p className="section-desc">
+                Lo importante aparece primero para que decidas rapido.
+              </p>
+            </div>
+            <div className="features-grid">
+              {features.map((feature) => (
+                <div key={feature.title} className="feature-card">
+                  <div className="feature-icon">
+                    <feature.icon size={22} strokeWidth={2.2} />
+                  </div>
+                  <h3 className="feature-title">{feature.title}</h3>
+                  <p className="feature-desc">{feature.desc}</p>
+                </div>
               ))}
             </div>
           </div>
+        </section>
 
-          <div className="mockup">
-            <div className="mockup-bar">
-              <div className="dot dot-r" />
-              <div className="dot dot-y" />
-              <div className="dot dot-g" />
-              <div className="mockup-url">
-                <span>app.aura.cl/dashboard</span>
-              </div>
+        <div className="sim-strip">
+          <div className="sim-inner">
+            <div>
+              <div className="sim-badge">Prestamos</div>
+              <h2 className="sim-title">Si un pago a cuotas te ahoga, lo ves antes.</h2>
+              <p className="sim-desc">
+                Prueba montos, tasas y plazos antes de comprometerte.
+              </p>
+              <Link to={simulatorCtaTarget} className="btn-lila">
+                {simulatorCtaLabel} <ArrowRight size={16} />
+              </Link>
             </div>
-            <div className="mockup-body">
-              <div className="mockup-highlight">
+
+            <div className="sim-card">
+              {simRows.map(({ label, value }) => (
+                <div key={label} className="sim-row">
+                  <span className="sim-row-label">{label}</span>
+                  <span className="sim-row-value">{value}</span>
+                </div>
+              ))}
+              <div className="sim-result">
+                <div className="sim-result-icon">
+                  <Check size={16} strokeWidth={3} />
+                </div>
                 <div>
-                  <div className="mockup-highlight-label">Hoy te quedan</div>
-                  <div className="mockup-highlight-value">$1.400.000</div>
-                  <div className="mockup-highlight-sub">Despues de fijos, cuotas y extras del mes</div>
-                </div>
-                <span className="mockup-highlight-badge">Saldo sano</span>
-              </div>
-              <div className="mockup-stat-grid">
-                {heroStats.map((stat) => (
-                  <div key={stat.label} className={`mockup-stat-card is-${stat.tone}`}>
-                    <div className="mockup-stat-label">{stat.label}</div>
-                    <div className="mockup-stat-value">{stat.value}</div>
+                  <div className="sim-result-text">Si te da</div>
+                  <div className="sim-result-sub">
+                    Tu flujo sigue positivo cada mes.
                   </div>
-                ))}
-              </div>
-              <div className="mockup-panel-grid">
-                <div className="mockup-panel">
-                  <div className="mockup-panel-title">Asi se arma tu mes</div>
-                  <div className="mockup-breakdown">
-                    {heroBreakdown.map((item) => (
-                      <div key={item.label} className="mockup-flow-row">
-                        <span>{item.label}</span>
-                        <strong className={`mockup-flow-value is-${item.tone}`}>{item.value}</strong>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="mockup-panel">
-                  <div className="mockup-panel-title">Proximo trimestre</div>
-                  <div className="mockup-projection-list">
-                    {heroProjectionRows.map((row) => (
-                      <div key={row.month} className="mockup-projection-row">
-                        <span className="mockup-projection-month">{row.month}</span>
-                        <strong className={`mockup-projection-value is-${row.trend}`}>{row.value}</strong>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="mockup-insight">
-                <div className="mockup-insight-title">Antes de tomar una cuota nueva</div>
-                <p className="mockup-insight-copy">
-                  Simula el impacto y mira si tu flujo sigue sano sin dejarte corto al cierre del mes.
-                </p>
-                <div className="mockup-insight-chip-row">
-                  <span className="mockup-insight-chip">Proyeccion</span>
-                  <span className="mockup-insight-chip">Simulador</span>
-                  <span className="mockup-insight-chip">Presupuesto</span>
-                </div>
-              </div>
-              <div className="mockup-footer-note">
-                Hecho para revisar rapido desde celular, tablet o laptop.
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <section>
-        <div className="section">
-          <div className="section-head">
-            <div className="section-label">Lo resuelve rapido</div>
-            <h2 className="section-title">Menos vueltas. Mas claridad.</h2>
-            <p className="section-desc">
-              Lo importante aparece primero para que decidas rapido.
-            </p>
-          </div>
-          <div className="features-grid">
-            {features.map((feature) => (
-              <div key={feature.title} className="feature-card">
-                <div className="feature-icon">
-                  <feature.icon size={22} strokeWidth={2.2} />
-                </div>
-                <h3 className="feature-title">{feature.title}</h3>
-                <p className="feature-desc">{feature.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <div className="sim-strip">
-        <div className="sim-inner">
-          <div>
-            <div className="sim-badge">Prestamos</div>
-            <h2 className="sim-title">Si un pago a cuotas te ahoga, lo ves antes.</h2>
-            <p className="sim-desc">
-              Prueba montos, tasas y plazos antes de comprometerte.
-            </p>
-            <Link to={simulatorCtaTarget} className="btn-lila">
-              {simulatorCtaLabel} <ArrowRight size={16} />
-            </Link>
-          </div>
-
-          <div className="sim-card">
-            {simRows.map(({ label, value }) => (
-              <div key={label} className="sim-row">
-                <span className="sim-row-label">{label}</span>
-                <span className="sim-row-value">{value}</span>
-              </div>
-            ))}
-            <div className="sim-result">
-              <div className="sim-result-icon">
-                <Check size={16} strokeWidth={3} />
-              </div>
-              <div>
-                <div className="sim-result-text">Si te da</div>
-                <div className="sim-result-sub">
-                  Tu flujo sigue positivo cada mes.
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <section className="pricing-section">
-        <div className="pricing-inner">
-          <div className="section-head">
-            <div className="section-label">Planes</div>
-            <h2 className="section-title">Simple y sin sorpresas.</h2>
-            <p className="section-desc">Empieza gratis y sube cuando necesites ver mas lejos.</p>
-          </div>
-          <div className="pricing-grid">
-            {pricingPlans.map((plan) => (
-              <div key={plan.name} className={`pricing-card${plan.featured ? ' is-featured' : ''}`}>
-                {plan.badge && <div className="pricing-card-badge">{plan.badge}</div>}
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                    {plan.featured && <Zap size={16} color="#C487F6" />}
-                    <div className="pricing-card-name">{plan.name}</div>
+        <section className="pricing-section">
+          <div className="pricing-inner">
+            <div className="section-head">
+              <div className="section-label">Planes</div>
+              <h2 className="section-title">Simple y sin sorpresas.</h2>
+              <p className="section-desc">Empieza gratis y sube cuando necesites ver mas lejos.</p>
+            </div>
+            <div className="pricing-grid">
+              {pricingPlans.map((plan) => (
+                <div key={plan.name} className={`pricing-card${plan.featured ? ' is-featured' : ''}`}>
+                  {plan.badge && <div className="pricing-card-badge">{plan.badge}</div>}
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      {plan.featured && <Zap size={16} color="#C487F6" />}
+                      <div className="pricing-card-name">{plan.name}</div>
+                    </div>
+                    <div className="pricing-card-desc">{plan.desc}</div>
                   </div>
-                  <div className="pricing-card-desc">{plan.desc}</div>
+                  <div className="pricing-card-price">
+                    {plan.price ? (
+                      <>
+                        <span className="pricing-price-currency">$</span>
+                        <span className="pricing-price-amount">{plan.price}</span>
+                        <span className="pricing-price-period">/ mes</span>
+                      </>
+                    ) : (
+                      <span className="pricing-price-amount">Gratis</span>
+                    )}
+                  </div>
+                  <ul className="pricing-features">
+                    {plan.features.map((feature) => (
+                      <li key={feature} className="pricing-feature">
+                        <CheckCircle2 size={14} className="pricing-feature-icon" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="pricing-cta">
+                    <Link
+                      to={isLoggedIn ? '/planes' : '/registro'}
+                      className={plan.ctaStyle === 'primary' ? 'btn-primary' : 'btn-dark'}
+                      style={{ width: '100%', justifyContent: 'center', display: 'flex' }}
+                    >
+                      {plan.cta}
+                    </Link>
+                  </div>
                 </div>
-                <div className="pricing-card-price">
-                  {plan.price ? (
-                    <>
-                      <span className="pricing-price-currency">$</span>
-                      <span className="pricing-price-amount">{plan.price}</span>
-                      <span className="pricing-price-period">/ mes</span>
-                    </>
-                  ) : (
-                    <span className="pricing-price-amount">Gratis</span>
-                  )}
-                </div>
-                <ul className="pricing-features">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="pricing-feature">
-                      <CheckCircle2 size={14} className="pricing-feature-icon" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-                <div className="pricing-cta">
-                  <Link
-                    to={isLoggedIn ? '/planes' : '/registro'}
-                    className={plan.ctaStyle === 'primary' ? 'btn-primary' : 'btn-dark'}
-                    style={{ width: '100%', justifyContent: 'center', display: 'flex' }}
-                  >
-                    {plan.cta}
-                  </Link>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <div className="cta-section">
-        <div className="cta-box">
-          <BrandMark className="cta-logo" />
-          <h2 className="cta-title">Empieza en minutos.</h2>
-          <p className="cta-desc">
-            Crea tu cuenta y entiende tu panorama sin enredarte.
-          </p>
-          <Link
-            to={footerPrimaryTarget}
-            className="btn-primary"
-            style={{ fontSize: 16, padding: '15px 32px' }}
-          >
-            {footerPrimaryLabel} <ArrowRight size={16} />
-          </Link>
-          <p className="cta-sub">
-            {isLoggedIn ? 'Acceso rapido:' : 'Ya tienes cuenta?'}{' '}
+        <div className="cta-section">
+          <div className="cta-box">
+            <BrandMark className="cta-logo" />
+            <h2 className="cta-title">Empieza en minutos.</h2>
+            <p className="cta-desc">
+              Crea tu cuenta y entiende tu panorama sin enredarte.
+            </p>
             <Link
-              to={footerSecondaryTarget}
-              style={{ color: '#C487F6', textDecoration: 'none', fontWeight: 600 }}
+              to={footerPrimaryTarget}
+              className="btn-primary"
+              style={{ fontSize: 16, padding: '15px 32px' }}
             >
-              {footerSecondaryLabel}
+              {footerPrimaryLabel} <ArrowRight size={16} />
             </Link>
-          </p>
+            <p className="cta-sub">
+              {isLoggedIn ? 'Acceso rapido:' : 'Ya tienes cuenta?'}{' '}
+              <Link
+                to={footerSecondaryTarget}
+                style={{ color: '#E9D5FF', textDecoration: 'none', fontWeight: 700 }}
+              >
+                {footerSecondaryLabel}
+              </Link>
+            </p>
+          </div>
         </div>
-      </div>
+      </main>
 
       <footer className="footer">
         <div className="footer-inner">

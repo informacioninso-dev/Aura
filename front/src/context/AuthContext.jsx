@@ -1,11 +1,32 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { clearAuthTokens, setAccessToken } from '../api/authStorage'
 import api, { refreshAccessToken } from '../api/client'
 import AuthContext from './auth-context'
 
+const PUBLIC_PATHS = new Set([
+  '/',
+  '/login',
+  '/registro',
+  '/forgot-password',
+  '/reset-password',
+])
+
+function isPublicPath(pathname) {
+  return PUBLIC_PATHS.has(pathname)
+}
+
 export function AuthProvider({ children }) {
+  const location = useLocation()
   const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [checkingAuth, setCheckingAuth] = useState(false)
+  const [lastProtectedPathChecked, setLastProtectedPathChecked] = useState(null)
+  const publicPath = isPublicPath(location.pathname)
+  const shouldBootstrapProtectedRoute =
+    !publicPath &&
+    !user &&
+    lastProtectedPathChecked !== location.pathname
+  const loading = checkingAuth || shouldBootstrapProtectedRoute
 
   const fetchPerfil = useCallback(async () => {
     try {
@@ -15,28 +36,43 @@ export function AuthProvider({ children }) {
       clearAuthTokens()
       setUser(null)
     } finally {
-      setLoading(false)
+      setCheckingAuth(false)
     }
   }, [])
 
   useEffect(() => {
+    if (!shouldBootstrapProtectedRoute) return
+
+    let cancelled = false
+
     async function bootstrapAuth() {
+      setCheckingAuth(true)
       try {
         await refreshAccessToken()
+        if (cancelled) return
         await fetchPerfil()
       } catch {
+        if (cancelled) return
         clearAuthTokens()
         setUser(null)
-        setLoading(false)
+        setCheckingAuth(false)
+      } finally {
+        if (!cancelled) {
+          setLastProtectedPathChecked(location.pathname)
+        }
       }
     }
 
     void bootstrapAuth()
-  }, [fetchPerfil])
+    return () => {
+      cancelled = true
+    }
+  }, [fetchPerfil, location.pathname, shouldBootstrapProtectedRoute])
 
   async function login(email, password) {
     const { data } = await api.post('/usuarios/login/', { email, password })
     setAccessToken(data.access)
+    setLastProtectedPathChecked(null)
     await fetchPerfil()
   }
 
@@ -72,6 +108,7 @@ export function AuthProvider({ children }) {
     } finally {
       clearAuthTokens()
       setUser(null)
+      setCheckingAuth(false)
     }
   }
 

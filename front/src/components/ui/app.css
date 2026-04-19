@@ -1676,28 +1676,6 @@
   color: rgba(255,255,255,0.40);
 }
 
-.dashboard-chart-gesture-surface {
-  position: relative;
-  touch-action: pan-y;
-  cursor: grab;
-  user-select: none;
-  outline: none;
-  border: none;
-}
-
-.dashboard-chart-gesture-surface:focus,
-.dashboard-chart-gesture-surface:focus-visible,
-.dashboard-chart-gesture-surface *,
-.dashboard-chart-gesture-surface *:focus,
-.dashboard-chart-gesture-surface *:focus-visible {
-  outline: none !important;
-  box-shadow: none !important;
-}
-
-.dashboard-chart-gesture-surface.is-dragging {
-  cursor: grabbing;
-}
-
 .dashboard-chart-view-all {
   display: none;
   align-items: center;
@@ -1776,37 +1754,6 @@
 .dashboard-fullchart-close:hover {
   background: rgba(248,113,113,0.15);
   color: #F87171;
-}
-
-.dashboard-chart-tap-zone {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 28%;
-  display: flex;
-  align-items: center;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s;
-  z-index: 2;
-  color: rgba(255,255,255,0.55);
-}
-
-.dashboard-chart-gesture-surface:hover .dashboard-chart-tap-zone,
-.dashboard-chart-gesture-surface:active .dashboard-chart-tap-zone {
-  opacity: 1;
-}
-
-.dashboard-chart-tap-zone--left {
-  left: 0;
-  justify-content: flex-start;
-  padding-left: 10px;
-}
-
-.dashboard-chart-tap-zone--right {
-  right: 0;
-  justify-content: flex-end;
-  padding-right: 10px;
 }
 
 .dashboard-chart-window-row {

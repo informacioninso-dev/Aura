@@ -1,0 +1,24 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /login
+Disallow: /registro
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /dashboard
+Disallow: /ingresos
+Disallow: /ingresos-puntuales
+Disallow: /gastos
+Disallow: /gastos-corrientes
+Disallow: /gastos-no-corrientes
+Disallow: /diferidos
+Disallow: /simulador
+Disallow: /presupuesto
+Disallow: /importar
+Disallow: /perfil
+Disallow: /planes
+Disallow: /superadmin
+Disallow: /pago/resultado
+
+Sitemap: https://aura.binnso.com/sitemap.xml
