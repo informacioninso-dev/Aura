@@ -1,4 +1,4 @@
-import { ArrowRight, BarChart3, Calculator, Check, Wallet } from 'lucide-react'
+import { ArrowRight, BarChart3, Calculator, Check, CheckCircle2, Wallet, Zap } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import BrandMark from '../../components/brand/BrandMark'
@@ -45,6 +45,41 @@ const heroProjectionRows = [
   { month: 'Abr', value: '$1.120.000', trend: 'up' },
   { month: 'May', value: '$980.000', trend: 'down' },
   { month: 'Jun', value: '$1.260.000', trend: 'up' },
+]
+
+const pricingPlans = [
+  {
+    name: 'Gratis',
+    desc: 'Para empezar a ordenar tus finanzas hoy.',
+    price: null,
+    featured: false,
+    badge: null,
+    features: [
+      'Dashboard de ingresos y gastos',
+      'Gastos a cuotas',
+      'Simulador de creditos',
+      'Proyeccion de 6 meses',
+      'Hasta 2.000 filas por importacion',
+    ],
+    cta: 'Crear cuenta gratis',
+    ctaStyle: 'secondary',
+  },
+  {
+    name: 'Pro',
+    desc: 'Para quien quiere ver mas lejos y decidir mejor.',
+    price: '9.90',
+    featured: true,
+    badge: 'Mas popular',
+    features: [
+      'Todo lo del plan Gratis',
+      'Proyeccion acumulada hasta 10 años',
+      'Modos de proyeccion avanzados',
+      'Historial ampliado hasta 24 meses',
+      'Lo que me deben',
+    ],
+    cta: 'Comenzar con Pro',
+    ctaStyle: 'primary',
+  },
 ]
 
 const simRows = [
@@ -251,6 +286,58 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      <section className="pricing-section">
+        <div className="pricing-inner">
+          <div className="section-head">
+            <div className="section-label">Planes</div>
+            <h2 className="section-title">Simple y sin sorpresas.</h2>
+            <p className="section-desc">Empieza gratis y sube cuando necesites ver mas lejos.</p>
+          </div>
+          <div className="pricing-grid">
+            {pricingPlans.map((plan) => (
+              <div key={plan.name} className={`pricing-card${plan.featured ? ' is-featured' : ''}`}>
+                {plan.badge && <div className="pricing-card-badge">{plan.badge}</div>}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    {plan.featured && <Zap size={16} color="#C487F6" />}
+                    <div className="pricing-card-name">{plan.name}</div>
+                  </div>
+                  <div className="pricing-card-desc">{plan.desc}</div>
+                </div>
+                <div className="pricing-card-price">
+                  {plan.price ? (
+                    <>
+                      <span className="pricing-price-currency">$</span>
+                      <span className="pricing-price-amount">{plan.price}</span>
+                      <span className="pricing-price-period">/ mes</span>
+                    </>
+                  ) : (
+                    <span className="pricing-price-amount">Gratis</span>
+                  )}
+                </div>
+                <ul className="pricing-features">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="pricing-feature">
+                      <CheckCircle2 size={14} className="pricing-feature-icon" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                <div className="pricing-cta">
+                  <Link
+                    to={isLoggedIn ? '/planes' : '/registro'}
+                    className={plan.ctaStyle === 'primary' ? 'btn-primary' : 'btn-dark'}
+                    style={{ width: '100%', justifyContent: 'center', display: 'flex' }}
+                  >
+                    {plan.cta}
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       <div className="cta-section">
         <div className="cta-box">

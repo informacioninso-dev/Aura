@@ -630,7 +630,7 @@ export default function Dashboard() {
   const isCurrentMonthVisible = visibleProjectionSeries.some((p) => p.month === currentMonthKey)
 
   function slideProjectionPage(direction) {
-    const step = Math.max(1, projectionWindowSize - 1) // avanza 11 meses, 1 de solapamiento
+    const step = Math.max(1, Math.round(projectionWindowSize / 4))
     const nextStart = projectionWindow.startIndex + direction * step
     setProjectionWindow(clampProjectionWindow(nextStart, chartSeries.length, projectionWindowSize))
   }
