@@ -51,6 +51,8 @@ export default function GastosNoCorrientes({ embedded = false }) {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [feedback, setFeedback] = useState({ type: '', message: '' })
   const [query, setQuery] = useState('')
+  const [sortField, setSortField] = useState('fecha')
+  const [sortDir, setSortDir] = useState('desc')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [selectedIds, setSelectedIds] = useState(new Set())
@@ -155,6 +157,12 @@ export default function GastosNoCorrientes({ embedded = false }) {
       || (item.notas || '').toLowerCase().includes(q)
       || String(item.monto).toLowerCase().includes(q)
     )
+  }).sort((a, b) => {
+    const av = sortField === 'monto' ? parseFloat(a[sortField]) : (a[sortField] || '')
+    const bv = sortField === 'monto' ? parseFloat(b[sortField]) : (b[sortField] || '')
+    if (av < bv) return sortDir === 'asc' ? -1 : 1
+    if (av > bv) return sortDir === 'asc' ? 1 : -1
+    return 0
   })
 
   const pageCount = Math.max(1, Math.ceil(filteredItems.length / pageSize))
@@ -291,6 +299,15 @@ export default function GastosNoCorrientes({ embedded = false }) {
               onPageSizeChange={(n) => { setPageSize(n); setPage(1) }}
               totalItems={items.length}
               filteredItems={filteredItems.length}
+              sortField={sortField}
+              sortDir={sortDir}
+              onSortChange={(f, d) => { setSortField(f); setSortDir(d); setPage(1) }}
+              sortOptions={[
+                { value: 'descripcion', label: 'Nombre' },
+                { value: 'monto', label: 'Valor' },
+                { value: 'categoria', label: 'Categoria' },
+                { value: 'fecha', label: 'Fecha' },
+              ]}
             />
 
             {selectedIds.size > 0 && (

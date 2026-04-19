@@ -63,6 +63,8 @@ export default function LoQueMeDeben() {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [sortField, setSortField] = useState('fecha')
+  const [sortDir, setSortDir] = useState('desc')
   const [feedback, setFeedback] = useState({ type: '', message: '' })
   const [form, setForm] = useState(buildEmptyForm())
 
@@ -152,7 +154,14 @@ export default function LoQueMeDeben() {
     item.persona.toLowerCase().includes(normalizedQuery)
     || item.concepto.toLowerCase().includes(normalizedQuery)
     || (item.notas || '').toLowerCase().includes(normalizedQuery)
-  )), [items, normalizedQuery])
+  )).sort((a, b) => {
+    const numFields = ['monto_total', 'monto_cobrado', 'saldo_pendiente']
+    const av = numFields.includes(sortField) ? parseFloat(a[sortField] || 0) : (a[sortField] || '')
+    const bv = numFields.includes(sortField) ? parseFloat(b[sortField] || 0) : (b[sortField] || '')
+    if (av < bv) return sortDir === 'asc' ? -1 : 1
+    if (av > bv) return sortDir === 'asc' ? 1 : -1
+    return 0
+  }), [items, normalizedQuery, sortField, sortDir])
 
   const totalPendiente = filtered.reduce((sum, item) => sum + Number(item.saldo_pendiente || 0), 0)
   const totalCobrado = filtered.reduce((sum, item) => sum + Number(item.monto_cobrado || 0), 0)
@@ -222,6 +231,15 @@ export default function LoQueMeDeben() {
               onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
               totalItems={items.length}
               filteredItems={filtered.length}
+              sortField={sortField}
+              sortDir={sortDir}
+              onSortChange={(f, d) => { setSortField(f); setSortDir(d); setPage(1) }}
+              sortOptions={[
+                { value: 'persona', label: 'Persona' },
+                { value: 'monto_total', label: 'Total' },
+                { value: 'saldo_pendiente', label: 'Pendiente' },
+                { value: 'fecha', label: 'Fecha' },
+              ]}
             />
 
             <div className="table-wrap">

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Plus, Pencil, Trash2, Check, X } from 'lucide-react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import { Plus, Pencil, Trash2, Check, X, ChevronLeft, ChevronRight } from 'lucide-react'
 
 import api from '../../api/client'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
@@ -7,6 +7,16 @@ import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import Modal from '../../components/ui/Modal'
 import { formatAmount } from '../../utils/formatters'
 import '../../components/ui/app.css'
+
+const MESES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+
+function startOfMonth(date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1)
+}
+
+function addMonths(date, n) {
+  return new Date(date.getFullYear(), date.getMonth() + n, 1)
+}
 
 const FREQ = {
   diario: 30,
@@ -67,12 +77,13 @@ export default function Presupuesto() {
   const [showAllSummary, setShowAllSummary] = useState(false)
   const [showAllIcons, setShowAllIcons] = useState(false)
   const [feedback, setFeedback] = useState({ type: '', message: '' })
+  const [selectedMonth, setSelectedMonth] = useState(() => startOfMonth(new Date()))
 
   useEffect(() => {
-    cargarTodo()
-  }, [])
+    cargarTodo(selectedMonth)
+  }, [selectedMonth])
 
-  async function cargarTodo() {
+  async function cargarTodo(monthDate) {
     const [cats, gc, gnc, dif] = await Promise.all([
       api.get('/finanzas/categorias/'),
       api.get('/finanzas/gastos-corrientes/'),
@@ -81,9 +92,8 @@ export default function Presupuesto() {
     ])
     setCategorias(cats.data)
 
-    const hoy = new Date()
-    const mes = hoy.getMonth()
-    const anio = hoy.getFullYear()
+    const mes = monthDate.getMonth()
+    const anio = monthDate.getFullYear()
     const totales = {}
 
     gc.data.filter((g) => g.activo).forEach((g) => {
@@ -119,10 +129,10 @@ export default function Presupuesto() {
     setShowAllIcons(false)
   }
 
-  function closeBudgetEditor() {
+  const closeBudgetEditor = useCallback(() => {
     setEditPresup(null)
     setValorPresup('')
-  }
+  }, [])
 
   function openNew() {
     setForm(EMPTY_FORM)
@@ -131,7 +141,7 @@ export default function Presupuesto() {
     setModal(true)
   }
 
-  function openEdit(cat) {
+  const openEdit = useCallback((cat) => {
     setForm({
       nombre: cat.nombre,
       icono: cat.icono,
@@ -140,7 +150,7 @@ export default function Presupuesto() {
     setEditId(cat.id)
     setShowAllIcons(false)
     setModal(true)
-  }
+  }, [])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -159,9 +169,9 @@ export default function Presupuesto() {
     }
   }
 
-  function openDeleteConfirm(id) {
+  const openDeleteConfirm = useCallback((id) => {
     if (!deletingId) setConfirmDeleteId(id)
-  }
+  }, [deletingId])
 
   async function handleDelete() {
     const id = confirmDeleteId
@@ -177,7 +187,7 @@ export default function Presupuesto() {
     }
   }
 
-  async function guardarPresupuesto(cat) {
+  const guardarPresupuesto = useCallback(async (cat) => {
     if (savingBudgetId === cat.id) return
     const rawValue = String(valorPresup || '').trim().replace(',', '.')
     const limite = parseFloat(rawValue)
@@ -197,9 +207,9 @@ export default function Presupuesto() {
     } finally {
       setSavingBudgetId(null)
     }
-  }
+  }, [valorPresup, closeBudgetEditor])
 
-  async function quitarPresupuesto(cat) {
+  const quitarPresupuesto = useCallback(async (cat) => {
     if (savingBudgetId === cat.id) return
     setSavingBudgetId(cat.id)
     setFeedback({ type: '', message: '' })
@@ -213,7 +223,7 @@ export default function Presupuesto() {
     } finally {
       setSavingBudgetId(null)
     }
-  }
+  }, [closeBudgetEditor])
 
   const categoriasOrdenadas = useMemo(() => sortCategoriasPorUso(categorias, gastos), [categorias, gastos])
 
@@ -225,6 +235,8 @@ export default function Presupuesto() {
 
   const conLimite = categoriasFiltradas.filter((cat) => cat.limite_mensual !== null && cat.limite_mensual !== undefined)
   const sinLimite = categoriasFiltradas.filter((cat) => cat.limite_mensual === null || cat.limite_mensual === undefined)
+  const sinLimiteConGasto = sinLimite.filter((cat) => (gastos[cat.nombre] || 0) > 0)
+  const sinLimiteSinGasto = sinLimite.filter((cat) => !(gastos[cat.nombre] || 0) > 0)
 
   const resumenCategorias = useMemo(() => (
     categoriasOrdenadas
@@ -241,6 +253,10 @@ export default function Presupuesto() {
   const visibleIcons = showAllIcons ? ICONOS_SUGERIDOS : ICONOS_SUGERIDOS.slice(0, ICON_PREVIEW_COUNT)
   const categoriasConMovimiento = resumenCategorias.length
 
+  const handlePrevMonth = useCallback(() => setSelectedMonth((m) => addMonths(m, -1)), [])
+  const handleNextMonth = useCallback(() => setSelectedMonth((m) => addMonths(m, 1)), [])
+  const handleQueryChange = useCallback((e) => setQuery(e.target.value), [])
+
   return (
     <div>
       <div className="page-header page-header-actions">
@@ -256,26 +272,47 @@ export default function Presupuesto() {
 
       <FeedbackAlert type={feedback.type || 'error'} message={feedback.message} />
 
+      <div className="presupuesto-month-bar">
+        <button
+          type="button"
+          className="dashboard-cat-month-btn"
+          onClick={handlePrevMonth}
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <span className="presupuesto-month-label">
+          {MESES_FULL[selectedMonth.getMonth()]} {selectedMonth.getFullYear()}
+        </span>
+        <button
+          type="button"
+          className="dashboard-cat-month-btn"
+          onClick={handleNextMonth}
+          disabled={addMonths(selectedMonth, 1) > startOfMonth(new Date())}
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+
       <div className="stats-grid" style={{ marginBottom: 20 }}>
         <div className="stat-card">
           <div className="stat-label">Categorias</div>
           <div className="stat-value">{categorias.length}</div>
-          <div className="stat-sub">Las que ya tienes creadas.</div>
+          <div className="stat-sub">Creadas en total.</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Con limite</div>
           <div className="stat-value">{categorias.filter((cat) => cat.limite_mensual != null).length}</div>
-          <div className="stat-sub">Categorias con presupuesto activo.</div>
+          <div className="stat-sub">Con presupuesto activo.</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Activas este mes</div>
+          <div className="stat-label">Activas</div>
           <div className="stat-value">{categoriasConMovimiento}</div>
-          <div className="stat-sub">Categorias con gasto registrado.</div>
+          <div className="stat-sub">Con gasto en el mes.</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Gastado categorizado</div>
+          <div className="stat-label">Gastado</div>
           <div className="stat-value">${formatAmount(totalGastadoMes)}</div>
-          <div className="stat-sub">Total del mes actual por categoria.</div>
+          <div className="stat-sub">Total categorizado.</div>
         </div>
       </div>
 
@@ -292,34 +329,34 @@ export default function Presupuesto() {
               className="form-modal-input"
               placeholder="Buscar categoria..."
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={handleQueryChange}
             />
           </div>
         </div>
       </div>
 
-      {resumenCategorias.length > 0 && (
-        <div className="card" style={{ marginBottom: 24 }}>
-          <div className="card-header">
-            <div>
-              <h2 className="card-title">Resumen de gastos por categoria</h2>
-              <p className="category-toolbar-copy" style={{ marginTop: 4 }}>
-                Este mes ves primero las categorias que mas pesan en tu gasto.
-              </p>
-            </div>
-            {resumenCategorias.length > SUMMARY_PREVIEW_COUNT && (
-              <button
-                type="button"
-                className="btn-modal-cancel"
-                onClick={() => setShowAllSummary((value) => !value)}
-                style={{ flex: '0 0 auto', minWidth: 116, padding: '10px 16px' }}
-              >
-                {showAllSummary ? 'Ver menos' : 'Ver todas'}
-              </button>
-            )}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div className="card-header">
+          <div>
+            <h2 className="card-title">Resumen por categoria</h2>
+            <p className="category-toolbar-copy" style={{ marginTop: 4 }}>
+              Lo que mas pesa en {MESES_FULL[selectedMonth.getMonth()]} {selectedMonth.getFullYear()}.
+            </p>
           </div>
+          {resumenCategorias.length > SUMMARY_PREVIEW_COUNT && (
+            <button
+              type="button"
+              className="btn-modal-cancel"
+              onClick={() => setShowAllSummary((value) => !value)}
+              style={{ flex: '0 0 auto', minWidth: 116, padding: '10px 16px' }}
+            >
+              {showAllSummary ? 'Ver menos' : 'Ver todas'}
+            </button>
+          )}
+        </div>
 
-          <div className="category-summary-list">
+        {resumenCategorias.length > 0 ? (
+          <div className="category-summary-list" style={{ marginTop: 16 }}>
             {visibleResumen.map((cat) => (
               <ResumenCategoriaRow
                 key={cat.id}
@@ -328,14 +365,16 @@ export default function Presupuesto() {
               />
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginTop: 16, textAlign: 'center' }}>
+            Sin gastos registrados en {MESES_FULL[selectedMonth.getMonth()]} {selectedMonth.getFullYear()}.
+          </p>
+        )}
+      </div>
 
       {conLimite.length > 0 && (
         <>
-          <p style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-            Con limite mensual
-          </p>
+          <p className="presupuesto-section-label">Con limite mensual</p>
           <div className="budget-card-grid" style={{ marginBottom: 28 }}>
             {conLimite.map((cat) => (
               <TarjetaCategoria
@@ -359,13 +398,11 @@ export default function Presupuesto() {
         </>
       )}
 
-      {sinLimite.length > 0 && (
+      {sinLimiteConGasto.length > 0 && (
         <>
-          <p style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-            Sin limite definido
-          </p>
-          <div className="budget-card-grid">
-            {sinLimite.map((cat) => (
+          <p className="presupuesto-section-label">Sin limite · con gasto</p>
+          <div className="budget-card-grid" style={{ marginBottom: 28 }}>
+            {sinLimiteConGasto.map((cat) => (
               <TarjetaCategoria
                 key={cat.id}
                 cat={cat}
@@ -380,6 +417,30 @@ export default function Presupuesto() {
                 savingBudgetId={savingBudgetId}
                 guardarPresupuesto={guardarPresupuesto}
                 quitarPresupuesto={quitarPresupuesto}
+                closeBudgetEditor={closeBudgetEditor}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {sinLimiteSinGasto.length > 0 && (
+        <>
+          <p className="presupuesto-section-label">Sin movimiento este mes</p>
+          <div className="card" style={{ padding: '4px 8px' }}>
+            {sinLimiteSinGasto.map((cat) => (
+              <FilaCategoria
+                key={cat.id}
+                cat={cat}
+                openEdit={openEdit}
+                handleDelete={openDeleteConfirm}
+                deletingId={deletingId}
+                editPresup={editPresup}
+                setEditPresup={setEditPresup}
+                valorPresup={valorPresup}
+                setValorPresup={setValorPresup}
+                savingBudgetId={savingBudgetId}
+                guardarPresupuesto={guardarPresupuesto}
                 closeBudgetEditor={closeBudgetEditor}
               />
             ))}
@@ -474,7 +535,7 @@ export default function Presupuesto() {
   )
 }
 
-function ResumenCategoriaRow({ cat, totalGastadoMes }) {
+const ResumenCategoriaRow = memo(function ResumenCategoriaRow({ cat, totalGastadoMes }) {
   const limite = cat.limite_mensual != null ? toMoneyNumber(cat.limite_mensual) : null
   const usoLimite = limite ? Math.round((cat.gasto / limite) * 100) : null
   const porcentajeMes = percentOf(cat.gasto, totalGastadoMes)
@@ -511,9 +572,9 @@ function ResumenCategoriaRow({ cat, totalGastadoMes }) {
       </div>
     </div>
   )
-}
+})
 
-function TarjetaCategoria({
+const TarjetaCategoria = memo(function TarjetaCategoria({
   cat,
   gasto,
   openEdit,
@@ -647,4 +708,71 @@ function TarjetaCategoria({
       )}
     </div>
   )
-}
+})
+
+const FilaCategoria = memo(function FilaCategoria({
+  cat,
+  openEdit,
+  handleDelete,
+  deletingId,
+  editPresup,
+  setEditPresup,
+  valorPresup,
+  setValorPresup,
+  savingBudgetId,
+  guardarPresupuesto,
+  closeBudgetEditor,
+}) {
+  const isSavingBudget = savingBudgetId === cat.id
+  const isEditing = editPresup === cat.id
+
+  return (
+    <div className="presupuesto-fila">
+      <div className="presupuesto-fila-meta">
+        <span style={{ fontSize: 20, lineHeight: 1 }}>{cat.icono}</span>
+        <span className="presupuesto-fila-nombre">{cat.nombre}</span>
+      </div>
+
+      <div className="presupuesto-fila-actions">
+        {isEditing ? (
+          <form
+            className="presupuesto-fila-edit"
+            onSubmit={(e) => { e.preventDefault(); guardarPresupuesto(cat) }}
+          >
+            <input
+              className="form-modal-input"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Limite mensual"
+              value={valorPresup}
+              onChange={(e) => setValorPresup(e.target.value)}
+              inputMode="decimal"
+              autoFocus
+              disabled={isSavingBudget}
+              className="presupuesto-fila-edit-input"
+              style={{ padding: '6px 10px', fontSize: 13 }}
+              onKeyDown={(e) => { if (e.key === 'Escape') closeBudgetEditor() }}
+            />
+            <button type="submit" className="budget-inline-button budget-inline-button-primary" disabled={isSavingBudget} style={{ padding: '6px 10px' }}>
+              <Check size={13} /> {isSavingBudget ? '...' : 'Guardar'}
+            </button>
+            <button type="button" className="budget-inline-button budget-inline-button-secondary" onClick={closeBudgetEditor} disabled={isSavingBudget} style={{ padding: '6px 10px' }}>
+              Cancelar
+            </button>
+          </form>
+        ) : (
+          <button
+            type="button"
+            className="presupuesto-fila-add-btn"
+            onClick={() => { setEditPresup(cat.id); setValorPresup('') }}
+          >
+            + Limite
+          </button>
+        )}
+        <button className="btn-icon edit" onClick={() => openEdit(cat)}><Pencil size={13} /></button>
+        <button className="btn-icon danger" disabled={deletingId === cat.id} onClick={() => handleDelete(cat.id)}><Trash2 size={13} /></button>
+      </div>
+    </div>
+  )
+})

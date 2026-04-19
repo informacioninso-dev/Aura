@@ -113,8 +113,8 @@
   height: 420px;
   background: radial-gradient(
     ellipse,
-    rgba(196, 135, 246, 0.38) 0%,
-    rgba(16, 185, 129, 0.2) 45%,
+    rgba(196, 135, 246, 0.55) 0%,
+    rgba(16, 185, 129, 0.28) 45%,
     transparent 70%
   );
   pointer-events: none;
@@ -650,7 +650,7 @@
   border-radius: 22px;
   padding: 26px;
   background: rgba(26, 37, 64, 0.7);
-  border: 1px solid rgba(196, 135, 246, 0.18);
+  border: 1px solid rgba(196, 135, 246, 0.28);
   backdrop-filter: blur(12px);
   transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
   position: relative;
@@ -1247,8 +1247,9 @@
 }
 
 .pricing-card.is-featured {
-  background: linear-gradient(135deg, rgba(196,135,246,0.12), rgba(15,22,41,0.95));
-  border-color: rgba(196, 135, 246, 0.4);
+  background: linear-gradient(135deg, rgba(196,135,246,0.16), rgba(15,22,41,0.95));
+  border-color: rgba(196, 135, 246, 0.55);
+  box-shadow: 0 0 48px rgba(196, 135, 246, 0.22), 0 20px 56px rgba(0, 0, 0, 0.4);
 }
 
 .pricing-card-badge {

@@ -58,6 +58,8 @@ export default function GastosCorrientes({ embedded = false }) {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [sortField, setSortField] = useState('fecha_inicio')
+  const [sortDir, setSortDir] = useState('desc')
 
   // — modal crear/editar —
   const [modal, setModal] = useState(false)
@@ -266,6 +268,12 @@ export default function GastosCorrientes({ embedded = false }) {
       || item.frecuencia.toLowerCase().includes(q)
       || String(item.monto).toLowerCase().includes(q)
     )
+  }).sort((a, b) => {
+    const av = sortField === 'monto' ? parseFloat(a[sortField]) : (a[sortField] || '')
+    const bv = sortField === 'monto' ? parseFloat(b[sortField]) : (b[sortField] || '')
+    if (av < bv) return sortDir === 'asc' ? -1 : 1
+    if (av > bv) return sortDir === 'asc' ? 1 : -1
+    return 0
   })
 
   const pageCount = Math.max(1, Math.ceil(filteredItems.length / pageSize))
@@ -378,6 +386,15 @@ export default function GastosCorrientes({ embedded = false }) {
               onPageSizeChange={(n) => { setPageSize(n); setPage(1) }}
               totalItems={items.length}
               filteredItems={filteredItems.length}
+              sortField={sortField}
+              sortDir={sortDir}
+              onSortChange={(f, d) => { setSortField(f); setSortDir(d); setPage(1) }}
+              sortOptions={[
+                { value: 'descripcion', label: 'Nombre' },
+                { value: 'monto', label: 'Valor' },
+                { value: 'categoria', label: 'Categoria' },
+                { value: 'fecha_inicio', label: 'Fecha' },
+              ]}
             />
 
             {selectedIds.size > 0 && (

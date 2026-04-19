@@ -33,9 +33,9 @@ from .jwt_auth import (
     set_refresh_cookie,
 )
 import uuid
-from .models import AdminActionLog, EmailServerConfig, Feature, GastoOperativo, Plan, PlanFeature, PagoPayPhone
+from .models import AdminActionLog, EmailServerConfig, Feature, GastoOperativo, Plan, PlanFeature, PagoPayPhone, UserPlanAssignment
 from . import payphone as payphone_service
-from .plans import assign_plan_to_user, get_default_plan, sync_feature_catalog
+from .plans import assign_plan_to_user, get_active_plan_assignment, get_default_plan, sync_feature_catalog
 from .security import decrypt_secret
 from .serializers import (
     AdminActionLogSerializer,
@@ -999,6 +999,40 @@ class ConfirmarPagoView(APIView):
         pago.status = PagoPayPhone.ERROR
         pago.save()
         return Response({'status': 'error', 'code': status_code})
+
+
+class CancelarSuscripcionView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request):
+        assignment = get_active_plan_assignment(request.user)
+        if not assignment:
+            return Response({'detail': 'No tenes una suscripcion activa.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if assignment.plan.is_default:
+            return Response({'detail': 'Ya estas en el plan gratuito.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if assignment.tipo != UserPlanAssignment.TIPO_PAGO:
+            return Response({'detail': 'Esta suscripcion es manual y no requiere cancelacion.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if assignment.cancel_at_period_end:
+            return Response({'detail': 'La cancelacion ya estaba programada.', 'ends_at': assignment.ends_at}, status=status.HTTP_200_OK)
+
+        assignment.cancel_at_period_end = True
+        assignment.save(update_fields=['cancel_at_period_end', 'updated_at'])
+
+        _admin_log(
+            actor=request.user,
+            action='suscripcion_cancelada',
+            request=request,
+            target_user=request.user,
+            details={'plan': assignment.plan.name, 'ends_at': str(assignment.ends_at)},
+        )
+
+        return Response({
+            'detail': 'Suscripcion cancelada. Tu plan Pro se mantiene hasta el fin del periodo.',
+            'ends_at': assignment.ends_at,
+        })
 
 
 class NegocioMetricasView(APIView):

@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2 } from 'lucide-react'
 import api from '../../api/client'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import DateQuickActions from '../../components/ui/DateQuickActions'
+import ListControls from '../../components/ui/ListControls'
 import Modal from '../../components/ui/Modal'
 import { useCategorias } from '../../hooks/useCategorias'
 import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../../utils/dateBounds'
@@ -38,6 +39,11 @@ export default function Diferidos() {
   const [loading, setLoading] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
+  const [query, setQuery]     = useState('')
+  const [page, setPage]       = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [sortField, setSortField] = useState('fecha_inicio')
+  const [sortDir, setSortDir] = useState('desc')
   const { categorias }        = useCategorias()
 
   useEffect(() => { fetchItems() }, [])
@@ -118,6 +124,25 @@ export default function Diferidos() {
     .filter((i) => i.activo && i.fecha_inicio <= hoy && i.fecha_fin >= hoy)
     .reduce((s, i) => s + parseFloat(i.cuota_mensual), 0)
 
+  const filteredItems = items.filter((item) => {
+    const q = query.trim().toLowerCase()
+    if (!q) return true
+    return (
+      item.descripcion.toLowerCase().includes(q)
+      || (item.categoria || '').toLowerCase().includes(q)
+      || String(item.cuota_mensual).includes(q)
+    )
+  }).sort((a, b) => {
+    const av = sortField === 'cuota_mensual' || sortField === 'monto_total' ? parseFloat(a[sortField]) : (a[sortField] || '')
+    const bv = sortField === 'cuota_mensual' || sortField === 'monto_total' ? parseFloat(b[sortField]) : (b[sortField] || '')
+    if (av < bv) return sortDir === 'asc' ? -1 : 1
+    if (av > bv) return sortDir === 'asc' ? 1 : -1
+    return 0
+  })
+  const pageCount = Math.max(1, Math.ceil(filteredItems.length / pageSize))
+  const safePage = Math.min(page, pageCount)
+  const paginatedItems = filteredItems.slice((safePage - 1) * pageSize, safePage * pageSize)
+
   function progreso(item) {
     const ini  = parseLocalDate(item.fecha_inicio)
     const fin  = parseLocalDate(item.fecha_fin)
@@ -151,8 +176,33 @@ export default function Diferidos() {
           </div>
         </div>
       ) : (
-        <div className="diferidos-grid-responsive">
-          {items.map(item => {
+        <>
+          <div className="card" style={{ padding: 0, marginBottom: 16 }}>
+            <ListControls
+              query={query}
+              onQueryChange={(v) => { setQuery(v); setPage(1) }}
+              placeholder="Buscar por descripcion o categoria..."
+              page={safePage}
+              pageCount={pageCount}
+              onPrevPage={() => setPage((p) => Math.max(1, p - 1))}
+              onNextPage={() => setPage((p) => Math.min(pageCount, p + 1))}
+              pageSize={pageSize}
+              onPageSizeChange={(n) => { setPageSize(n); setPage(1) }}
+              totalItems={items.length}
+              filteredItems={filteredItems.length}
+              sortField={sortField}
+              sortDir={sortDir}
+              onSortChange={(f, d) => { setSortField(f); setSortDir(d); setPage(1) }}
+              sortOptions={[
+                { value: 'descripcion', label: 'Nombre' },
+                { value: 'cuota_mensual', label: 'Cuota' },
+                { value: 'monto_total', label: 'Total' },
+                { value: 'fecha_inicio', label: 'Fecha' },
+              ]}
+            />
+          </div>
+          <div className="diferidos-grid-responsive">
+          {paginatedItems.map(item => {
             const pct = progreso(item)
             return (
               <div key={item.id} className="card" style={{ padding: 20 }}>
@@ -202,6 +252,7 @@ export default function Diferidos() {
             )
           })}
         </div>
+        </>
       )}
 
       <Modal open={modal} onClose={() => setModal(false)} title={editId ? 'Editar gasto a cuotas' : '+ Nuevo gasto a cuotas'}>

@@ -5,7 +5,7 @@ export default function BrandMark({ className = '' }) {
 
   return (
     <span className={classes} aria-hidden="true">
-      <img src="/logo.png" alt="" className="brand-mark-image" />
+      <img src="/logo.webp" alt="" className="brand-mark-image" />
     </span>
   )
 }

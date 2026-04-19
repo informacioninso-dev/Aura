@@ -45,7 +45,7 @@ function buildPlanFeatureDrafts(planList) {
 function buildUserPlanDrafts(userList) {
   const next = {}
   userList.forEach((item) => {
-    next[item.id] = item.plan?.id || ''
+    next[item.id] = item.plan?.id ? String(item.plan.id) : ''
   })
   return next
 }
@@ -84,6 +84,7 @@ export default function SuperAdmin() {
   const [temporaryPasswordInfo, setTemporaryPasswordInfo] = useState(null)
   const [activeSection, setActiveSection] = useState('overview')
   const [expandedPlanId, setExpandedPlanId] = useState(null)
+  const [expandedUserPlanId, setExpandedUserPlanId] = useState(null)
 
   const [dashboard, setDashboard] = useState(null)
   const [loadingDashboard, setLoadingDashboard] = useState(true)
@@ -358,6 +359,7 @@ export default function SuperAdmin() {
         loadEmailConfig(),
         loadFeatures(),
         loadPlans(),
+        loadNegocio(),
       ])
     } catch {
       // already handled in each request
@@ -516,10 +518,7 @@ export default function SuperAdmin() {
   }
 
   function updateUserPlanDraft(userId, planId) {
-    setUserPlanDrafts((prev) => ({
-      ...prev,
-      [userId]: planId,
-    }))
+    setUserPlanDrafts((prev) => ({ ...prev, [userId]: String(planId) }))
   }
 
   async function createPlan() {
@@ -612,6 +611,9 @@ export default function SuperAdmin() {
       if (notes) payload.notes = notes
       await api.post(`/usuarios/superadmin/usuarios/${target.id}/plan/`, payload)
       setFeedback({ type: 'success', message: `Plan actualizado para ${target.email}.` })
+      setUserPlanTipoDrafts((d) => { const n = { ...d }; delete n[target.id]; return n })
+      setUserPlanEndsAtDrafts((d) => { const n = { ...d }; delete n[target.id]; return n })
+      setUserPlanNotesDrafts((d) => { const n = { ...d }; delete n[target.id]; return n })
       await Promise.all([loadUsers(), loadAudit(), loadDashboard({ silent: true })])
       if (target.id === user.id) {
         await fetchPerfil()
@@ -886,107 +888,130 @@ export default function SuperAdmin() {
       )}
 
       {activeSection === 'plans' && (
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title">Planes y funciones destacadas</h2>
-        </div>
+        <>
+          {/* Capacidades por plan — sección principal */}
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div className="card-header">
+              <h2 className="card-title">Capacidades por plan</h2>
+              <button
+                type="button"
+                className="btn-modal-cancel"
+                style={{ flex: '0 0 auto' }}
+                onClick={() => setExpandedPlanId((id) => id === 'new' ? null : 'new')}
+              >
+                {expandedPlanId === 'new' ? 'Cancelar' : '+ Nuevo plan'}
+              </button>
+            </div>
 
-        <div className="superadmin-note">
-          Aqui configuras el plan, eliges sus capacidades y luego lo asignas manualmente a cada usuario.
-          La edicion de features vive por plan para que el panel se mantenga compacto y rapido de entender.
-        </div>
-
-        <div className="superadmin-plans-grid">
-          <div className="superadmin-column">
-            <div className="superadmin-panel">
-              <div className="card-title" style={{ marginBottom: 12 }}>Nuevo plan</div>
-              <div className="form-modal-group">
-                <label className="form-modal-label">Slug</label>
-                <input
-                  className="form-modal-input"
-                  value={planForm.slug}
-                  onChange={(event) => updatePlanForm('slug', event.target.value)}
-                  placeholder="enterprise"
-                />
-              </div>
-              <div className="form-modal-group">
-                <label className="form-modal-label">Nombre</label>
-                <input
-                  className="form-modal-input"
-                  value={planForm.name}
-                  onChange={(event) => updatePlanForm('name', event.target.value)}
-                  placeholder="Enterprise"
-                />
-              </div>
-              <div className="form-modal-group">
-                <label className="form-modal-label">Descripcion</label>
-                <textarea
-                  className="form-modal-input"
-                  value={planForm.description}
-                  onChange={(event) => updatePlanForm('description', event.target.value)}
-                  rows={3}
-                  placeholder="Define el alcance de este plan."
-                />
-              </div>
-              <div className="form-modal-row">
-                <div className="form-modal-group">
-                  <label className="form-modal-label">Orden</label>
-                  <input
-                    className="form-modal-input"
-                    type="number"
-                    value={planForm.sort_order}
-                    onChange={(event) => updatePlanForm('sort_order', event.target.value)}
-                  />
+            {/* Formulario nuevo plan — colapsable */}
+            {expandedPlanId === 'new' && (
+              <div className="superadmin-panel" style={{ marginBottom: 20 }}>
+                <div className="form-modal-row">
+                  <div className="form-modal-group">
+                    <label className="form-modal-label">Slug</label>
+                    <input className="form-modal-input" value={planForm.slug} onChange={(e) => updatePlanForm('slug', e.target.value)} placeholder="enterprise" />
+                  </div>
+                  <div className="form-modal-group">
+                    <label className="form-modal-label">Nombre</label>
+                    <input className="form-modal-input" value={planForm.name} onChange={(e) => updatePlanForm('name', e.target.value)} placeholder="Enterprise" />
+                  </div>
+                  <div className="form-modal-group">
+                    <label className="form-modal-label">Orden</label>
+                    <input className="form-modal-input" type="number" value={planForm.sort_order} onChange={(e) => updatePlanForm('sort_order', e.target.value)} style={{ maxWidth: 90 }} />
+                  </div>
                 </div>
-              </div>
-              <div className="form-modal-row">
-                <label className="form-modal-check" style={{ marginBottom: 0 }}>
-                  <input
-                    type="checkbox"
-                    checked={planForm.is_active}
-                    onChange={(event) => updatePlanForm('is_active', event.target.checked)}
-                  />
-                  <span>Activo</span>
-                </label>
-                <label className="form-modal-check" style={{ marginBottom: 0 }}>
-                  <input
-                    type="checkbox"
-                    checked={planForm.is_default}
-                    onChange={(event) => updatePlanForm('is_default', event.target.checked)}
-                  />
-                  <span>Plan por defecto</span>
-                </label>
-              </div>
-              <div className="form-modal-actions">
+                <div className="form-modal-group">
+                  <label className="form-modal-label">Descripcion</label>
+                  <input className="form-modal-input" value={planForm.description} onChange={(e) => updatePlanForm('description', e.target.value)} placeholder="Define el alcance de este plan." />
+                </div>
+                <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
+                  <label className="form-modal-check" style={{ marginBottom: 0 }}>
+                    <input type="checkbox" checked={planForm.is_active} onChange={(e) => updatePlanForm('is_active', e.target.checked)} />
+                    <span>Activo</span>
+                  </label>
+                  <label className="form-modal-check" style={{ marginBottom: 0 }}>
+                    <input type="checkbox" checked={planForm.is_default} onChange={(e) => updatePlanForm('is_default', e.target.checked)} />
+                    <span>Plan por defecto</span>
+                  </label>
+                </div>
                 <button type="button" className="btn-modal-save" onClick={createPlan} disabled={creatingPlan}>
                   {creatingPlan ? 'Creando...' : 'Crear plan'}
                 </button>
               </div>
+            )}
+
+            <div className="superadmin-plan-list">
+              {!plansLoading && plans.length === 0 && (
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>No hay planes configurados todavia.</div>
+              )}
+              {plans.map((plan) => (
+                <div key={plan.id} className="superadmin-plan-card">
+                  <div className="superadmin-plan-head" style={{ marginBottom: expandedPlanId === plan.id ? 12 : 0 }}>
+                    <div className="superadmin-plan-summary">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <strong style={{ fontSize: 16 }}>{plan.name}</strong>
+                        <span className="badge badge-gray">{plan.slug}</span>
+                        {plan.is_default && <span className="badge badge-lila">Default</span>}
+                        <span className={`badge ${plan.is_active ? 'badge-green' : 'badge-red'}`}>{plan.is_active ? 'Activo' : 'Inactivo'}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 6 }}>{plan.description || 'Sin descripcion.'}</div>
+                    </div>
+                    <div className="superadmin-plan-actions">
+                      <button type="button" className="btn-modal-cancel" onClick={() => setExpandedPlanId((current) => current === plan.id ? null : plan.id)}>
+                        {expandedPlanId === plan.id ? 'Ocultar' : 'Editar capacidades'}
+                      </button>
+                      {expandedPlanId === plan.id && (
+                        <button type="button" className="btn-modal-save" onClick={() => savePlanFeatures(plan)} disabled={savingPlanFeatureId === plan.id}>
+                          {savingPlanFeatureId === plan.id ? 'Guardando...' : 'Guardar'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {expandedPlanId === plan.id && (
+                    <div className="superadmin-plan-feature-list">
+                      {(plan.features || []).map((feature) => (
+                        <div key={`${plan.id}-${feature.feature_id}`} className="superadmin-plan-feature-row">
+                          <div>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                              <span style={{ fontWeight: 700, fontSize: 13 }}>{feature.name}</span>
+                              <span className="badge badge-gray">{feature.value_type}</span>
+                            </div>
+                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>{feature.description || feature.code}</div>
+                          </div>
+                          {feature.value_type === 'bool' ? (
+                            <label className="form-modal-check" style={{ marginBottom: 0 }}>
+                              <input type="checkbox" checked={Boolean(planFeatureDrafts[plan.id]?.[feature.feature_id])} onChange={(e) => updatePlanFeatureDraft(plan.id, feature.feature_id, e.target.checked)} />
+                              <span>Habilitada</span>
+                            </label>
+                          ) : (
+                            <input className="form-modal-input" type={feature.value_type === 'int' ? 'number' : 'text'} value={planFeatureDrafts[plan.id]?.[feature.feature_id] ?? ''} onChange={(e) => updatePlanFeatureDraft(plan.id, feature.feature_id, e.target.value)} placeholder={feature.value_type === 'int' ? '0' : 'Valor'} />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
 
-          <div className="superadmin-column">
-            <div className="superadmin-panel">
-              <div className="card-title" style={{ marginBottom: 12 }}>Catalogo de features</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>
-                Las features se definen por codigo y aqui solo se muestran para poder incluirlas dentro de los planes.
-              </div>
-              <div className="superadmin-feature-catalog">
+          {/* Catálogo de features — colapsable, secundario */}
+          <div className="card">
+            <div className="card-header" style={{ cursor: 'pointer' }} onClick={() => setExpandedPlanId((id) => id === 'features' ? null : 'features')}>
+              <h2 className="card-title">Catalogo de features</h2>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.40)' }}>{expandedPlanId === 'features' ? 'Ocultar' : 'Ver features disponibles'}</span>
+            </div>
+            {expandedPlanId === 'features' && (
+              <div className="superadmin-feature-catalog" style={{ marginTop: 12 }}>
                 {!featuresLoading && features.length === 0 && (
-                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
-                    No hay features registradas todavia.
-                  </span>
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>No hay features registradas todavia.</span>
                 )}
                 {features.map((feature) => (
-                  <div
-                    key={feature.id}
-                    className="superadmin-feature-card"
-                  >
+                  <div key={feature.id} className="superadmin-feature-card">
                     <div className="superadmin-feature-card-head">
                       <strong style={{ fontSize: 13 }}>{feature.name}</strong>
-                      <span className={`badge ${feature.is_active ? 'badge-green' : 'badge-gray'}`}>
-                        {feature.is_active ? 'Activa' : 'Inactiva'}
-                      </span>
+                      <span className={`badge ${feature.is_active ? 'badge-green' : 'badge-gray'}`}>{feature.is_active ? 'Activa' : 'Inactiva'}</span>
                       {feature.is_highlighted && <span className="badge badge-lila">Destacada</span>}
                     </div>
                     <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 4 }}>{feature.code}</div>
@@ -994,102 +1019,9 @@ export default function SuperAdmin() {
                   </div>
                 ))}
               </div>
-            </div>
-
-            <div className="superadmin-panel">
-              <div className="card-title" style={{ marginBottom: 12 }}>Capacidades por plan</div>
-              <div className="superadmin-plan-list">
-                {!plansLoading && plans.length === 0 && (
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
-                    No hay planes configurados todavia.
-                  </div>
-                )}
-                {plans.map((plan) => (
-                  <div
-                    key={plan.id}
-                    className="superadmin-plan-card"
-                  >
-                    <div className="superadmin-plan-head" style={{ marginBottom: expandedPlanId === plan.id ? 12 : 0 }}>
-                      <div className="superadmin-plan-summary">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                          <strong style={{ fontSize: 16 }}>{plan.name}</strong>
-                          <span className="badge badge-gray">{plan.slug}</span>
-                          {plan.is_default && <span className="badge badge-lila">Default</span>}
-                          <span className={`badge ${plan.is_active ? 'badge-green' : 'badge-red'}`}>
-                            {plan.is_active ? 'Activo' : 'Inactivo'}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 6 }}>
-                          {plan.description || 'Sin descripcion.'}
-                        </div>
-                      </div>
-                      <div className="superadmin-plan-actions">
-                        <button
-                          type="button"
-                          className="btn-modal-cancel"
-                          onClick={() => setExpandedPlanId((current) => current === plan.id ? null : plan.id)}
-                        >
-                          {expandedPlanId === plan.id ? 'Ocultar detalle' : 'Editar capacidades'}
-                        </button>
-                        {expandedPlanId === plan.id && (
-                          <button
-                            type="button"
-                            className="btn-modal-save"
-                            onClick={() => savePlanFeatures(plan)}
-                            disabled={savingPlanFeatureId === plan.id}
-                          >
-                            {savingPlanFeatureId === plan.id ? 'Guardando...' : 'Guardar'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {expandedPlanId === plan.id && (
-                    <div className="superadmin-plan-feature-list">
-                      {(plan.features || []).map((feature) => (
-                        <div
-                          key={`${plan.id}-${feature.feature_id}`}
-                          className="superadmin-plan-feature-row"
-                        >
-                          <div>
-                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                              <span style={{ fontWeight: 700, fontSize: 13 }}>{feature.name}</span>
-                              <span className="badge badge-gray">{feature.value_type}</span>
-                            </div>
-                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>
-                              {feature.description || feature.code}
-                            </div>
-                          </div>
-
-                          {feature.value_type === 'bool' ? (
-                            <label className="form-modal-check" style={{ marginBottom: 0 }}>
-                              <input
-                                type="checkbox"
-                                checked={Boolean(planFeatureDrafts[plan.id]?.[feature.feature_id])}
-                                onChange={(event) => updatePlanFeatureDraft(plan.id, feature.feature_id, event.target.checked)}
-                              />
-                              <span>Habilitada</span>
-                            </label>
-                          ) : (
-                            <input
-                              className="form-modal-input"
-                              type={feature.value_type === 'int' ? 'number' : 'text'}
-                              value={planFeatureDrafts[plan.id]?.[feature.feature_id] ?? ''}
-                              onChange={(event) => updatePlanFeatureDraft(plan.id, feature.feature_id, event.target.value)}
-                              placeholder={feature.value_type === 'int' ? '0' : 'Valor de la feature'}
-                            />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+            )}
           </div>
-        </div>
-      </div>
+        </>
       )}
 
       {activeSection === 'email' && (
@@ -1375,6 +1307,9 @@ export default function SuperAdmin() {
               </tr>
             </thead>
             <tbody>
+              {usersLoading && (
+                <tr><td colSpan={8} style={{ textAlign: 'center', padding: 24, color: 'rgba(255,255,255,0.35)' }}>Cargando...</td></tr>
+              )}
               {!usersLoading && users.length === 0 && (
                 <tr>
                   <td colSpan={8}>
@@ -1389,29 +1324,37 @@ export default function SuperAdmin() {
                   <td>{item.email}</td>
                   <td>{item.username || '-'}</td>
                   <td>
-                    <div className="superadmin-user-plan-stack">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <span className={`badge ${item.plan?.slug === 'pro' ? 'badge-lila' : 'badge-gray'}`}>
-                          {item.plan?.name || 'Sin plan'}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <span className={`badge ${item.plan?.slug === 'pro' ? 'badge-lila' : 'badge-gray'}`}>
+                        {item.plan?.name || 'Sin plan'}
+                      </span>
+                      {item.plan?.assignment_tipo && item.plan.assignment_tipo !== 'pago' && (
+                        <span className="badge badge-yellow" style={{ fontSize: 10 }}>
+                          {item.plan.assignment_tipo}
                         </span>
-                        {item.plan?.assignment_tipo && item.plan.assignment_tipo !== 'pago' && (
-                          <span className="badge badge-yellow" style={{ fontSize: 10 }}>
-                            {item.plan.assignment_tipo}
-                          </span>
-                        )}
-                        {item.plan?.assignment_ends_at && (
-                          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
-                            vence {new Date(item.plan.assignment_ends_at).toLocaleDateString('es')}
-                          </span>
-                        )}
-                      </div>
-                      <div className="superadmin-user-plan-controls">
+                      )}
+                      {item.plan?.assignment_ends_at && (
+                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+                          vence {new Date(item.plan.assignment_ends_at).toLocaleDateString('es')}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        className="btn-modal-cancel superadmin-inline-button"
+                        style={{ padding: '3px 10px', fontSize: 11 }}
+                        onClick={() => setExpandedUserPlanId((id) => id === item.id ? null : item.id)}
+                      >
+                        {expandedUserPlanId === item.id ? 'Cancelar' : 'Cambiar'}
+                      </button>
+                    </div>
+                    {expandedUserPlanId === item.id && (
+                      <div className="superadmin-user-plan-controls" style={{ marginTop: 8 }}>
                         <select
                           className="form-modal-select superadmin-user-plan-select"
                           value={userPlanDrafts[item.id] || ''}
                           onChange={(event) => updateUserPlanDraft(item.id, event.target.value)}
                         >
-                          <option value="">Plan</option>
+                          <option value="">— Seleccionar plan —</option>
                           {plans.filter((plan) => plan.is_active).map((plan) => (
                             <option key={plan.id} value={plan.id}>{plan.name}</option>
                           ))}
@@ -1444,17 +1387,14 @@ export default function SuperAdmin() {
                         />
                         <button
                           type="button"
-                          className="btn-modal-cancel superadmin-inline-button"
-                          onClick={() => saveUserPlan(item)}
+                          className="btn-modal-save superadmin-inline-button"
+                          onClick={() => { saveUserPlan(item); setExpandedUserPlanId(null) }}
                           disabled={savingUserPlanId === item.id || !userPlanDrafts[item.id]}
                         >
                           {savingUserPlanId === item.id ? 'Guardando...' : 'Asignar'}
                         </button>
                       </div>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
-                        Import max rows: {item.feature_access?.import_max_rows ?? '-'}
-                      </span>
-                    </div>
+                    )}
                   </td>
                   <td>
                     <span className={`badge ${item.is_active ? 'badge-green' : 'badge-red'}`}>
@@ -1540,7 +1480,7 @@ export default function SuperAdmin() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+              <div className="superadmin-negocio-split" style={{ marginBottom: 20 }}>
                 <div className="card">
                   <div className="card-header"><h2 className="card-title">Ingresos por plan (mes actual)</h2></div>
                   <div className="table-wrap">
@@ -1757,6 +1697,9 @@ export default function SuperAdmin() {
               </tr>
             </thead>
             <tbody>
+              {auditLoading && (
+                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: 'rgba(255,255,255,0.35)' }}>Cargando...</td></tr>
+              )}
               {!auditLoading && auditItems.length === 0 && (
                 <tr>
                   <td colSpan={5}>

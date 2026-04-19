@@ -29,6 +29,32 @@ export default function Perfil() {
   const [passOk, setPassOk] = useState('')
   const [passError, setPassError] = useState('')
 
+  const [cancelLoading, setCancelLoading] = useState(false)
+  const [cancelOk, setCancelOk] = useState('')
+  const [cancelError, setCancelError] = useState('')
+  const [confirmCancel, setConfirmCancel] = useState(false)
+
+  const isPro = user?.plan?.slug !== undefined && !user.plan.is_default
+  const endsAt = user?.plan?.assignment_ends_at
+  const cancelAtPeriodEnd = user?.plan?.cancel_at_period_end
+  const esPago = user?.plan?.assignment_tipo === 'pago'
+
+  async function handleCancelarSuscripcion() {
+    setCancelLoading(true)
+    setCancelError('')
+    setCancelOk('')
+    try {
+      await api.post('/usuarios/suscripcion/cancelar/')
+      await fetchPerfil()
+      setCancelOk('Suscripcion cancelada. Tu plan Pro se mantiene hasta el fin del periodo.')
+      setConfirmCancel(false)
+    } catch (err) {
+      setCancelError(getApiErrorMessage(err, 'No se pudo cancelar la suscripcion.'))
+    } finally {
+      setCancelLoading(false)
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     if (loading) return
@@ -182,6 +208,74 @@ export default function Perfil() {
           </button>
         </form>
       </div>
+
+      {isPro && esPago && (
+        <div className="card" style={{ marginTop: 18 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Suscripcion</h3>
+
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', marginBottom: 16 }}>
+            {cancelAtPeriodEnd ? (
+              <>
+                Tu suscripcion esta <span style={{ color: '#FBBF24', fontWeight: 600 }}>cancelada</span>.
+                {endsAt && (
+                  <> Tu plan Pro se mantiene hasta el <strong style={{ color: '#fff' }}>{new Date(endsAt).toLocaleDateString('es', { day: '2-digit', month: 'long', year: 'numeric' })}</strong>, luego vuelve a Free.</>
+                )}
+              </>
+            ) : (
+              <>
+                Plan <strong style={{ color: '#C487F6' }}>Pro</strong> activo.
+                {endsAt && (
+                  <> Proximo cobro: <strong style={{ color: '#fff' }}>{new Date(endsAt).toLocaleDateString('es', { day: '2-digit', month: 'long', year: 'numeric' })}</strong>.</>
+                )}
+              </>
+            )}
+          </div>
+
+          <FeedbackAlert type="success" message={cancelOk} />
+          <FeedbackAlert type="error" message={cancelError} />
+
+          {!cancelAtPeriodEnd && (
+            <>
+              {!confirmCancel ? (
+                <button
+                  type="button"
+                  className="btn-modal-cancel"
+                  style={{ width: '100%', padding: '12px 0', color: '#F87171', borderColor: 'rgba(248,113,113,0.30)' }}
+                  onClick={() => setConfirmCancel(true)}
+                >
+                  Cancelar suscripcion
+                </button>
+              ) : (
+                <div style={{ background: 'rgba(248,113,113,0.07)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 12, padding: '14px 16px' }}>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', marginBottom: 14 }}>
+                    Vas a cancelar tu suscripcion Pro. Seguiras teniendo acceso hasta el fin del periodo actual y luego pasas a Free automaticamente.
+                  </p>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                      type="button"
+                      className="btn-modal-cancel"
+                      style={{ flex: 1, color: '#F87171', borderColor: 'rgba(248,113,113,0.35)' }}
+                      disabled={cancelLoading}
+                      onClick={handleCancelarSuscripcion}
+                    >
+                      {cancelLoading ? 'Cancelando...' : 'Si, cancelar'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-modal-cancel"
+                      style={{ flex: 1 }}
+                      disabled={cancelLoading}
+                      onClick={() => setConfirmCancel(false)}
+                    >
+                      Volver
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }

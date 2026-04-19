@@ -120,6 +120,7 @@ class SuperAdminUserSerializer(serializers.ModelSerializer):
             'assignment_note': assignment.notes if assignment else '',
             'assignment_tipo': assignment.tipo if assignment else 'pago',
             'assignment_ends_at': assignment.ends_at.isoformat() if assignment and assignment.ends_at else None,
+            'cancel_at_period_end': assignment.cancel_at_period_end if assignment else False,
         }
 
     def get_feature_access(self, obj):

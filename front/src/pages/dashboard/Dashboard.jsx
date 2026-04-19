@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts'
-import { TrendingUp, TrendingDown, Wallet, PiggyBank, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, PiggyBank, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, X, LayoutList, Tag } from 'lucide-react'
 
 import api from '../../api/client'
 import { getApiErrorMessage } from '../../api/errors'
@@ -175,6 +175,8 @@ export default function Dashboard() {
   const [futureMonths, setFutureMonths] = useState(12)
   const [seriesFocus, setSeriesFocus] = useState('all')
   const [activeSummaryDetail, setActiveSummaryDetail] = useState(null)
+  const [detailSort, setDetailSort] = useState('amount-desc')
+  const [showCategoryView, setShowCategoryView] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState(() => startOfMonth(new Date()))
   const [isCompactProjectionChart, setIsCompactProjectionChart] = useState(
     () => typeof window !== 'undefined' && window.innerWidth < MOBILE_CHART_BREAKPOINT,
@@ -322,6 +324,7 @@ export default function Dashboard() {
 
   function toggleSummaryDetail(kind) {
     setActiveSummaryDetail((current) => (current === kind ? null : kind))
+    setShowCategoryView(false)
   }
 
   async function handleProjectionModeChange(nextMode) {
@@ -457,6 +460,15 @@ export default function Dashboard() {
   const totalGastos = totalGC + totalGNC + totalDif
   const balance = totalIng - totalGastos
 
+  function applySortDetail(items) {
+    return [...items].sort((a, b) => {
+      if (detailSort === 'amount-asc') return a.amount - b.amount
+      if (detailSort === 'date-desc') return (b.date || '').localeCompare(a.date || '')
+      if (detailSort === 'date-asc') return (a.date || '').localeCompare(b.date || '')
+      return b.amount - a.amount
+    })
+  }
+
   const incomeDetailSections = [
     {
       id: 'income-fixed',
@@ -464,14 +476,13 @@ export default function Dashboard() {
       tone: 'income',
       total: totalIngFijos,
       emptyLabel: `No tienes ingresos fijos activos en ${monthReferenceText}.`,
-      items: fixedIncomesThisMonth
-        .map((item) => ({
-          id: `income-fixed-${item.id}`,
-          label: item.descripcion,
-          meta: `${getFrequencyLabel(item.frecuencia)} - impacto mensual`,
-          amount: mensualizado(item.monto, item.frecuencia),
-        }))
-        .sort((a, b) => b.amount - a.amount),
+      items: applySortDetail(fixedIncomesThisMonth.map((item) => ({
+        id: `income-fixed-${item.id}`,
+        label: item.descripcion,
+        meta: `${getFrequencyLabel(item.frecuencia)} - impacto mensual`,
+        amount: mensualizado(item.monto, item.frecuencia),
+        date: item.fecha_inicio || '',
+      }))),
     },
     {
       id: 'income-punctual',
@@ -479,14 +490,13 @@ export default function Dashboard() {
       tone: 'income',
       total: totalIngPuntuales,
       emptyLabel: `No tienes ingresos puntuales guardados en ${monthReferenceText}.`,
-      items: punctualIncomesThisMonth
-        .map((item) => ({
-          id: `income-punctual-${item.id}`,
-          label: item.descripcion,
-          meta: `Puntual - ${item.fecha}`,
-          amount: Number(item.monto),
-        }))
-        .sort((a, b) => b.amount - a.amount),
+      items: applySortDetail(punctualIncomesThisMonth.map((item) => ({
+        id: `income-punctual-${item.id}`,
+        label: item.descripcion,
+        meta: `Puntual - ${item.fecha}`,
+        amount: Number(item.monto),
+        date: item.fecha || '',
+      }))),
     },
   ]
 
@@ -497,14 +507,13 @@ export default function Dashboard() {
       tone: 'expense',
       total: totalGC,
       emptyLabel: `No tienes gastos fijos activos en ${monthReferenceText}.`,
-      items: fixedExpensesThisMonth
-        .map((item) => ({
-          id: `expense-fixed-${item.id}`,
-          label: item.descripcion,
-          meta: `${item.categoria || 'Sin categoria'} - ${getFrequencyLabel(item.frecuencia)}`,
-          amount: mensualizado(item.monto, item.frecuencia),
-        }))
-        .sort((a, b) => b.amount - a.amount),
+      items: applySortDetail(fixedExpensesThisMonth.map((item) => ({
+        id: `expense-fixed-${item.id}`,
+        label: item.descripcion,
+        meta: `${item.categoria || 'Sin categoria'} - ${getFrequencyLabel(item.frecuencia)}`,
+        amount: mensualizado(item.monto, item.frecuencia),
+        date: item.fecha_inicio || '',
+      }))),
     },
     {
       id: 'expense-installment',
@@ -512,14 +521,13 @@ export default function Dashboard() {
       tone: 'expense',
       total: totalDif,
       emptyLabel: `No tienes cuotas activas en ${monthReferenceText}.`,
-      items: installmentsThisMonth
-        .map((item) => ({
-          id: `expense-installment-${item.id}`,
-          label: item.descripcion,
-          meta: `${item.categoria || 'Sin categoria'} - cuota mensual`,
-          amount: Number(item.cuota_mensual),
-        }))
-        .sort((a, b) => b.amount - a.amount),
+      items: applySortDetail(installmentsThisMonth.map((item) => ({
+        id: `expense-installment-${item.id}`,
+        label: item.descripcion,
+        meta: `${item.categoria || 'Sin categoria'} - cuota mensual`,
+        amount: Number(item.cuota_mensual),
+        date: item.fecha_inicio || '',
+      }))),
     },
     {
       id: 'expense-punctual',
@@ -527,16 +535,34 @@ export default function Dashboard() {
       tone: 'expense',
       total: totalGNC,
       emptyLabel: `No tienes gastos puntuales guardados en ${monthReferenceText}.`,
-      items: punctualExpensesThisMonth
-        .map((item) => ({
-          id: `expense-punctual-${item.id}`,
-          label: item.descripcion,
-          meta: `${item.categoria || 'Sin categoria'} - ${item.fecha}`,
-          amount: Number(item.monto),
-        }))
-        .sort((a, b) => b.amount - a.amount),
+      items: applySortDetail(punctualExpensesThisMonth.map((item) => ({
+        id: `expense-punctual-${item.id}`,
+        label: item.descripcion,
+        meta: `${item.categoria || 'Sin categoria'} - ${item.fecha}`,
+        amount: Number(item.monto),
+        date: item.fecha || '',
+      }))),
     },
   ]
+
+  const expenseCategoryMap = useMemo(() => {
+    const map = {}
+    fixedExpensesThisMonth.forEach((item) => {
+      const cat = item.categoria || 'Sin categoria'
+      map[cat] = (map[cat] || 0) + mensualizado(item.monto, item.frecuencia)
+    })
+    punctualExpensesThisMonth.forEach((item) => {
+      const cat = item.categoria || 'Sin categoria'
+      map[cat] = (map[cat] || 0) + Number(item.monto)
+    })
+    installmentsThisMonth.forEach((item) => {
+      const cat = item.categoria || 'Sin categoria'
+      map[cat] = (map[cat] || 0) + Number(item.cuota_mensual)
+    })
+    return Object.entries(map)
+      .map(([cat, total]) => ({ cat, total }))
+      .sort((a, b) => b.total - a.total)
+  }, [fixedExpensesThisMonth, punctualExpensesThisMonth, installmentsThisMonth])
 
   const activeSummarySections = activeSummaryDetail === 'income' ? incomeDetailSections : expenseDetailSections
   const activeSummaryTitle = activeSummaryDetail === 'income'
@@ -1120,17 +1146,83 @@ export default function Dashboard() {
             </button>
           </div>
 
-          <div className="dashboard-summary-detail-grid">
-            {activeSummarySections.map((section) => (
-              <section key={section.id} className="dashboard-summary-detail-section">
-                <div className="dashboard-summary-detail-section-head">
-                  <span className="dashboard-summary-detail-section-title">{section.title}</span>
-                  <strong className={`dashboard-summary-detail-section-total ${section.tone}`}>
-                    {fmt(section.total)}
-                  </strong>
-                </div>
+          <div className="dashboard-detail-controls">
+            <div className="dashboard-detail-sort-group">
+              {[
+                { field: 'amount', label: 'Valor' },
+                { field: 'date', label: 'Fecha' },
+              ].map(({ field, label }) => {
+                const isAsc = detailSort === `${field}-asc`
+                const isDesc = detailSort === `${field}-desc`
+                const active = isAsc || isDesc
+                return (
+                  <button
+                    key={field}
+                    type="button"
+                    className={`dashboard-detail-sort-btn ${active ? 'active' : ''}`}
+                    onClick={() => setDetailSort(active && isDesc ? `${field}-asc` : `${field}-desc`)}
+                  >
+                    {label}{active && <span>{isDesc ? ' ↓' : ' ↑'}</span>}
+                  </button>
+                )
+              })}
+            </div>
+            {activeSummaryDetail === 'expense' && (
+              <button
+                type="button"
+                className={`dashboard-detail-sort-btn dashboard-detail-cat-btn ${showCategoryView ? 'active' : ''}`}
+                onClick={() => setShowCategoryView((v) => !v)}
+              >
+                <Tag size={12} />
+                Por categorias
+              </button>
+            )}
+          </div>
 
-                {section.items.length ? (
+          {showCategoryView && activeSummaryDetail === 'expense' ? (
+            <div className="dashboard-summary-detail-grid">
+              <section className="dashboard-summary-detail-section" style={{ gridColumn: '1 / -1' }}>
+                <div className="dashboard-summary-detail-section-head">
+                  <span className="dashboard-summary-detail-section-title">
+                    <LayoutList size={13} style={{ display: 'inline', marginRight: 6, verticalAlign: 'middle' }} />
+                    Gastos por categoria — {selectedMonthLabel}
+                  </span>
+                  <strong className="dashboard-summary-detail-section-total expense">{fmt(totalGastos)}</strong>
+                </div>
+                {expenseCategoryMap.length ? (
+                  <div className="dashboard-summary-detail-list">
+                    {expenseCategoryMap.map(({ cat, total }) => {
+                      const share = formatDetailShare(total, totalGastos)
+                      return (
+                        <div key={cat} className="dashboard-summary-detail-item">
+                          <div className="dashboard-summary-detail-item-copy">
+                            <span className="dashboard-summary-detail-item-label">{cat}</span>
+                          </div>
+                          <div className="dashboard-summary-detail-item-trailing">
+                            <span className="dashboard-summary-detail-item-amount expense">{fmt(total)}</span>
+                            {share && <span className="dashboard-summary-detail-item-share expense">({share})</span>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className="dashboard-summary-detail-empty">No hay gastos en {monthReferenceText}.</p>
+                )}
+              </section>
+            </div>
+          ) : (
+            <div className="dashboard-summary-detail-grid">
+              {activeSummarySections.map((section) => (
+                <section key={section.id} className="dashboard-summary-detail-section">
+                  <div className="dashboard-summary-detail-section-head">
+                    <span className="dashboard-summary-detail-section-title">{section.title}</span>
+                    <strong className={`dashboard-summary-detail-section-total ${section.tone}`}>
+                      {fmt(section.total)}
+                    </strong>
+                  </div>
+
+                  {section.items.length ? (
                     <div className="dashboard-summary-detail-list">
                       {section.items.map((item) => {
                         const share = formatDetailShare(item.amount, section.total)
@@ -1154,12 +1246,13 @@ export default function Dashboard() {
                         )
                       })}
                     </div>
-                ) : (
-                  <p className="dashboard-summary-detail-empty">{section.emptyLabel}</p>
-                )}
-              </section>
-            ))}
-          </div>
+                  ) : (
+                    <p className="dashboard-summary-detail-empty">{section.emptyLabel}</p>
+                  )}
+                </section>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

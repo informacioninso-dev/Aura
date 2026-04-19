@@ -5,6 +5,7 @@ import { AuthProvider } from './context/AuthContext'
 import Home from './pages/home/Home'
 
 const AppLayout = lazy(() => import('./components/layout/AppLayout'))
+const SuperAdminLayout = lazy(() => import('./components/layout/SuperAdminLayout'))
 const Login = lazy(() => import('./pages/auth/Login'))
 const Registro = lazy(() => import('./pages/auth/Registro'))
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'))
@@ -76,6 +77,8 @@ export default function App() {
               <Route path="/importar" element={<Importar />} />
               <Route path="/perfil" element={<Perfil />} />
               <Route path="/planes" element={<Planes />} />
+            </Route>
+            <Route element={<SuperAdminLayout />}>
               <Route path="/superadmin" element={<SuperAdmin />} />
             </Route>
             <Route path="/pago/resultado" element={<PagoResultado />} />

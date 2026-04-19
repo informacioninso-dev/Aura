@@ -19,6 +19,7 @@ export default function AppLayout() {
   }
 
   if (!user) return <Navigate to="/login" replace />
+  if (user.is_superuser) return <Navigate to="/superadmin" replace />
 
   return (
     <div className="app-shell">

@@ -783,29 +783,138 @@
 
 .list-controls {
   display: flex;
-  gap: 10px;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  padding: 14px 20px 8px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 20px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.list-controls-search-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.list-controls-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(255,255,255,0.35);
+  pointer-events: none;
 }
 
 .list-controls-search {
   width: 100%;
-  max-width: 280px;
+  padding-left: 34px !important;
 }
 
-.list-controls-meta {
+.list-controls-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.list-controls-sort {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.list-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.09);
+  color: rgba(255,255,255,0.52);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.list-sort-btn:hover {
+  background: rgba(255,255,255,0.09);
+  color: rgba(255,255,255,0.80);
+}
+
+.list-sort-btn.active {
+  background: rgba(196,135,246,0.14);
+  border-color: rgba(196,135,246,0.32);
+  color: #DDB6F8;
+}
+
+.list-sort-arrow {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.list-controls-right {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.list-controls-count {
+  font-size: 12px;
+  color: rgba(255,255,255,0.38);
+}
+
+.list-controls-pagesize {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.09);
+  color: rgba(255,255,255,0.65);
+  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.list-controls-pager {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 3px;
+}
+
+.list-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: rgba(255,255,255,0.55);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.list-nav-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}
+
+.list-nav-btn:disabled {
+  opacity: 0.28;
+  cursor: default;
 }
 
 .list-controls-page {
   font-size: 12px;
   color: rgba(255,255,255,0.45);
-  min-width: 68px;
+  min-width: 36px;
   text-align: center;
 }
 
@@ -1278,6 +1387,114 @@
   margin: 0;
   font-size: 13px;
   color: rgba(255,255,255,0.46);
+}
+
+.dashboard-cat-month-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dashboard-cat-month-switcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.presupuesto-month-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 0 18px;
+}
+
+.presupuesto-month-label {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  min-width: 160px;
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+.dashboard-cat-month-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.65);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.dashboard-cat-month-btn:hover:not(:disabled) {
+  background: rgba(196,135,246,0.14);
+  border-color: rgba(196,135,246,0.40);
+  color: #C487F6;
+}
+.dashboard-cat-month-btn:disabled {
+  opacity: 0.28;
+  cursor: default;
+}
+
+.dashboard-cat-month-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  min-width: 130px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.dashboard-detail-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0 4px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.dashboard-detail-sort-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+
+.dashboard-detail-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.10);
+  color: rgba(255,255,255,0.52);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.dashboard-detail-sort-btn:hover {
+  background: rgba(255,255,255,0.09);
+  color: rgba(255,255,255,0.80);
+}
+
+.dashboard-detail-sort-btn.active {
+  background: rgba(196,135,246,0.14);
+  border-color: rgba(196,135,246,0.35);
+  color: #DDB6F8;
+}
+
+.dashboard-detail-cat-btn {
+  margin-left: auto;
 }
 
 @media (min-width: 900px) {
@@ -1964,6 +2181,80 @@
   gap: 14px;
 }
 
+.presupuesto-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.30);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+
+.presupuesto-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.presupuesto-fila:last-child {
+  border-bottom: none;
+}
+
+.presupuesto-fila-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.presupuesto-fila-nombre {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.80);
+  text-transform: capitalize;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.presupuesto-fila-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.presupuesto-fila-add-btn {
+  font-size: 12px;
+  font-weight: 600;
+  color: #C487F6;
+  background: rgba(196,135,246,0.08);
+  border: 1px dashed rgba(196,135,246,0.30);
+  border-radius: 8px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.presupuesto-fila-add-btn:hover {
+  background: rgba(196,135,246,0.16);
+  border-color: rgba(196,135,246,0.55);
+}
+
+.presupuesto-fila-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.presupuesto-fila-edit-input {
+  width: 120px;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
 .category-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(220px, 320px);
@@ -2146,6 +2437,12 @@
   border: 1px solid rgba(255,255,255,0.08);
   font-size: 12px;
   color: rgba(255,255,255,0.55);
+}
+
+.superadmin-negocio-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
 }
 
 .superadmin-plans-grid {
@@ -2508,14 +2805,14 @@
 
   /* List controls */
   .list-controls {
-    padding: 14px 16px 10px;
+    padding: 12px 14px 10px;
   }
-  .list-controls-search {
-    max-width: none;
+  .list-controls-bar {
+    flex-wrap: wrap;
+    gap: 8px;
   }
-  .list-controls-meta {
-    width: 100%;
-    justify-content: space-between;
+  .list-controls-right {
+    margin-left: 0;
   }
 
   /* Form actions */
@@ -2766,6 +3063,9 @@
     width: 100%;
     text-align: center;
   }
+  .superadmin-negocio-split {
+    grid-template-columns: 1fr;
+  }
   .superadmin-plans-grid {
     grid-template-columns: 1fr;
   }
@@ -2824,8 +3124,15 @@
   .budget-card-grid {
     grid-template-columns: 1fr;
   }
+  .budget-card-grid .card {
+    padding: 14px;
+  }
   .category-toolbar {
     grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .category-toolbar-copy {
+    font-size: 12px;
   }
   .budget-card-head {
     align-items: flex-start;
@@ -2850,6 +3157,21 @@
   .budget-inline-button {
     flex: 1 1 calc(50% - 4px);
     min-height: 40px;
+  }
+  .presupuesto-month-label {
+    min-width: 120px;
+    font-size: 15px;
+  }
+  .presupuesto-fila {
+    padding: 10px 8px;
+  }
+  .presupuesto-fila-edit {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .presupuesto-fila-edit input {
+    width: 100%;
+    max-width: 100%;
   }
 
   /* Sim result */
@@ -2914,7 +3236,7 @@
   .finance-panel-kpi {
     font-size: 12px;
   }
-  .list-controls-meta {
+  .list-controls-bottom {
     justify-content: center;
   }
   .dashboard-card-subtitle {
@@ -2932,5 +3254,26 @@
   }
   .superadmin-tabs {
     grid-template-columns: 1fr;
+  }
+
+  /* Presupuesto month bar — very small screens */
+  .presupuesto-month-bar {
+    gap: 8px;
+    padding: 6px 0 14px;
+  }
+  .presupuesto-month-label {
+    min-width: 100px;
+    font-size: 14px;
+  }
+  .dashboard-cat-month-btn {
+    width: 32px;
+    height: 32px;
+  }
+  .presupuesto-fila-actions {
+    gap: 6px;
+  }
+  .presupuesto-fila-add-btn {
+    font-size: 11px;
+    padding: 5px 8px;
   }
 }
