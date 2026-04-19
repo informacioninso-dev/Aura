@@ -8,43 +8,43 @@ import './Home.css'
 const features = [
   {
     icon: BarChart3,
-    title: 'Flujo claro',
-    desc: 'Ve lo que ganas, tus gastos y lo que queda sin sacar Excel.',
+    title: 'Ves a donde va tu plata',
+    desc: 'Sin Excel, sin hojas de calculo, sin adivinar. El mes se arma solo en segundos.',
   },
   {
     icon: Wallet,
-    title: 'Todo en orden',
-    desc: 'Registra ingresos, gastos y compras a cuotas en segundos.',
+    title: 'Sin sorpresas a fin de mes',
+    desc: 'Cuotas, suscripciones y gastos fijos en un solo lugar. Sin abrir el banco a las 11pm a ver si alcanza.',
   },
   {
     icon: Calculator,
-    title: 'Simula antes',
-    desc: 'Prueba una cuota y mira si tu mes la aguanta.',
+    title: 'Simula antes de endeudarte',
+    desc: 'Prueba montos, plazos y tasas. Si el mes no aguanta la cuota, Aura te lo dice antes.',
   },
 ]
 
 const heroProofs = [
-  'Registra en segundos',
-  'Proyeccion clara del proximo mes',
-  'Simula antes de endeudarte',
+  'Sin tarjeta de credito',
+  'Listo en 2 minutos',
+  'Funciona en celular',
 ]
 
 const heroStats = [
-  { label: 'Hoy te quedan', value: '$1.400.000', tone: 'positive' },
-  { label: 'Cuotas activas', value: '$220.000', tone: 'accent' },
-  { label: 'Proximo corte', value: '12 dias', tone: 'neutral' },
+  { label: 'Hoy te quedan', value: '$380.000', tone: 'positive' },
+  { label: 'Cuotas activas', value: '$95.000', tone: 'accent' },
+  { label: 'Proximo corte', value: '8 dias', tone: 'neutral' },
 ]
 
 const heroBreakdown = [
-  { label: 'Ingresos fijos', value: '$3.500.000', tone: 'positive' },
-  { label: 'Gastos del mes', value: '$2.100.000', tone: 'negative' },
-  { label: 'Extras estimados', value: '$320.000', tone: 'neutral' },
+  { label: 'Ingresos del mes', value: '$850.000', tone: 'positive' },
+  { label: 'Gastos fijos', value: '$310.000', tone: 'negative' },
+  { label: 'Cuotas y creditos', value: '$160.000', tone: 'neutral' },
 ]
 
 const heroProjectionRows = [
-  { month: 'Abr', value: '$1.120.000', trend: 'up' },
-  { month: 'May', value: '$980.000', trend: 'down' },
-  { month: 'Jun', value: '$1.260.000', trend: 'up' },
+  { month: 'May', value: '$420.000', trend: 'up' },
+  { month: 'Jun', value: '$310.000', trend: 'down' },
+  { month: 'Jul', value: '$490.000', trend: 'up' },
 ]
 
 const pricingPlans = [
@@ -67,7 +67,7 @@ const pricingPlans = [
   {
     name: 'Pro',
     desc: 'Para quien quiere ver mas lejos y decidir mejor.',
-    price: '9.90',
+    price: '2.99',
     featured: true,
     badge: 'Mas popular',
     features: [
@@ -135,12 +135,12 @@ export default function Home() {
               Gratis y sin tarjeta
             </div>
             <h1>
-              Sabe cuanto te queda hoy
+              Ganaste bien este mes.
               <br />
-              <span className="gradient">y como se ve tu proximo mes.</span>
+              <span className="gradient">¿Por que no te queda nada?</span>
             </h1>
             <p className="hero-desc">
-              Aura ordena ingresos, gastos, cuotas y extras para que tomes decisiones rapidas sin planillas ni enredos.
+              Aura te muestra en segundos a donde se fue tu plata, que viene el mes que entra y si puedes tomar esa cuota sin quedar ajustado.
             </p>
             <div className="hero-actions">
               <Link to={heroPrimaryTarget} className="btn-primary">
@@ -151,7 +151,7 @@ export default function Home() {
               </Link>
             </div>
             <p className="hero-note">
-              Gastos, pagos a cuotas y flujo de caja en un solo lugar.
+              Sin planillas. Sin sumar a mano. Sin abrir el banco a medianoche.
             </p>
             <div className="hero-proof-list">
               {heroProofs.map((item) => (
