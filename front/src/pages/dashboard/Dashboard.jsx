@@ -681,8 +681,7 @@ export default function Dashboard() {
 
   function handleProjectionPointerUp(event) {
     const gesture = projectionGestureRef.current
-    if (gesture && !gesture.moved && showProjectionNavigator) {
-      // tap — zona izquierda retrocede, zona derecha avanza
+    if (gesture && !gesture.moved && showProjectionNavigator && event.pointerType === 'touch') {
       const tapX = event.clientX - event.currentTarget.getBoundingClientRect().left
       const tapZone = tapX / gesture.width
       if (tapZone < 0.3) slideProjectionPage(-1)
