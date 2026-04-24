@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 
 import { getApiErrorMessage } from '../../api/errors'
@@ -73,8 +74,8 @@ export default function Login() {
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                 />
-                <button type="button" className="form-eye-btn" onClick={() => setShowPass((v) => !v)}>
-                  {showPass ? 'Ocultar' : 'Ver'}
+                <button type="button" className="form-eye-btn" onClick={() => setShowPass((v) => !v)} aria-label={showPass ? 'Ocultar clave' : 'Mostrar clave'}>
+                  {showPass ? <EyeOff size={16} strokeWidth={2} /> : <Eye size={16} strokeWidth={2} />}
                 </button>
               </div>
               <div style={{ marginTop: 8, textAlign: 'right' }}>
