@@ -219,7 +219,15 @@ class Diferido(models.Model):
 
 
 class CuentaPorCobrar(models.Model):
+    DIRECCION_ME_DEBEN = 'me_deben'
+    DIRECCION_DEBO = 'debo'
+    DIRECCION_CHOICES = [
+        (DIRECCION_ME_DEBEN, 'Me deben'),
+        (DIRECCION_DEBO, 'Debo'),
+    ]
+
     usuario            = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cuentas_por_cobrar')
+    direccion          = models.CharField(max_length=16, choices=DIRECCION_CHOICES, default=DIRECCION_ME_DEBEN)
     persona            = models.CharField(max_length=120)
     concepto           = models.CharField(max_length=200)
     monto_total        = models.DecimalField(max_digits=12, decimal_places=2)
@@ -232,11 +240,12 @@ class CuentaPorCobrar(models.Model):
 
     class Meta:
         ordering = ['-fecha_prestamo', '-creado_en']
-        verbose_name = 'Cuenta por cobrar'
-        verbose_name_plural = 'Cuentas por cobrar'
+        verbose_name = 'Cuenta con personas'
+        verbose_name_plural = 'Cuentas con personas'
         indexes = [
             models.Index(fields=['usuario', 'fecha_prestamo'], name='cxc_usr_fecha_idx'),
             models.Index(fields=['usuario', 'fecha_recordatorio'], name='cxc_usr_record_idx'),
+            models.Index(fields=['usuario', 'direccion', 'fecha_prestamo'], name='cxc_usr_dir_fecha_idx'),
         ]
 
     @property

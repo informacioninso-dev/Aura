@@ -21,7 +21,7 @@ const FINANCE_NAV_ITEMS = [
   { to: '/ingresos', icon: ArrowDownCircle, label: 'Lo que ganas' },
   { to: '/gastos', icon: ArrowUpCircle, label: 'Lo que gastas' },
   { to: '/diferidos', icon: CreditCard, label: 'Gastos a cuotas' },
-  { to: '/lo-que-me-deben', icon: Rat, label: 'Lo que me deben' },
+  { to: '/cuentas-personas', icon: Rat, label: 'Cuentas con personas' },
 ]
 
 function NavItem({ to, icon, label, onClick }) {

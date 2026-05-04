@@ -248,6 +248,13 @@ class CuentaPorCobrarViewSet(BaseFinanzasViewSet):
     queryset = CuentaPorCobrar.objects.all()
     serializer_class = CuentaPorCobrarSerializer
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        direccion = self.request.query_params.get('direccion')
+        if direccion in {CuentaPorCobrar.DIRECCION_ME_DEBEN, CuentaPorCobrar.DIRECCION_DEBO}:
+            qs = qs.filter(direccion=direccion)
+        return qs
+
 
 def _parse_anio_mes(anio_raw, mes_raw):
     try:

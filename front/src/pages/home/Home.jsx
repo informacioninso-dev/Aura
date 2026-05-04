@@ -75,7 +75,7 @@ const pricingPlans = [
       'Proyeccion acumulada hasta 10 anos',
       'Modos de proyeccion avanzados',
       'Historial ampliado hasta 24 meses',
-      'Lo que me deben',
+      'Cuentas con personas',
     ],
     cta: 'Comenzar con Pro',
     ctaStyle: 'primary',

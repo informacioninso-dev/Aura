@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Pencil, Plus, Rat, Trash2 } from 'lucide-react'
 
 import api from '../../api/client'
@@ -12,6 +12,65 @@ import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../../utils/dateBounds'
 import { formatAmount } from '../../utils/formatters'
 import '../../components/ui/app.css'
 
+const DIRECTION_CONFIG = {
+  me_deben: {
+    panelKicker: 'Me deben',
+    headerTitle: 'Lo que me deben',
+    headerSubtitle: 'Prestamos, vueltas y pendientes que otras personas tienen contigo.',
+    panelKpiLabel: 'Pendiente por cobrar',
+    panelAccent: '#C487F6',
+    fetchError: 'No pudimos cargar lo que te deben.',
+    pendingLabel: 'Te deben hoy',
+    pendingValueClass: 'lila',
+    pendingSub: 'Lo que todavia no te han pagado.',
+    settledLabel: 'Ya te devolvieron',
+    settledValueClass: 'green',
+    settledSub: 'Abonos y pagos que ya recibiste.',
+    openCasesSub: 'Deudas que siguen pendientes.',
+    peopleSub: 'Cuantas personas te deben algo.',
+    emptyText: 'Todavia no registras deudas a tu favor',
+    emptySub: 'Aqui puedes anotar prestamos, favores o dinero pendiente por cobrar.',
+    createTitle: '+ Nueva cuenta a tu favor',
+    editTitle: 'Editar cuenta a tu favor',
+    quickHint: 'Carga rapida: quien te debe, por que y cuanto.',
+    idleHint: 'Si no cambias nada, queda con fecha de hoy y sin recordatorio.',
+    personaLabel: 'Quien te debe?',
+    personaPlaceholder: 'Ej: Mama, Juan, companera de trabajo...',
+    conceptoLabel: 'Por que te debe?',
+    conceptoPlaceholder: 'Ej: prestamo, almuerzo, pasajes, regalo...',
+    paidLabel: 'Ya te pagaron',
+    paidColumn: 'Te ha pagado',
+  },
+  debo: {
+    panelKicker: 'Debo',
+    headerTitle: 'Lo que debo',
+    headerSubtitle: 'Vueltas, prestamos y pendientes que tienes con personas conocidas.',
+    panelKpiLabel: 'Pendiente por pagar',
+    panelAccent: '#F87171',
+    fetchError: 'No pudimos cargar lo que debes.',
+    pendingLabel: 'Debo hoy',
+    pendingValueClass: 'red',
+    pendingSub: 'Lo que todavia te falta por pagar.',
+    settledLabel: 'Ya pague',
+    settledValueClass: 'green',
+    settledSub: 'Abonos y pagos que ya salieron.',
+    openCasesSub: 'Deudas que aun no cierras.',
+    peopleSub: 'Cuantas personas esperan un pago tuyo.',
+    emptyText: 'Todavia no registras deudas pendientes',
+    emptySub: 'Aqui puedes anotar prestamos, vueltas o dinero que debes a personas conocidas.',
+    createTitle: '+ Nueva cuenta pendiente',
+    editTitle: 'Editar cuenta pendiente',
+    quickHint: 'Carga rapida: a quien debes, por que y cuanto.',
+    idleHint: 'Si no cambias nada, queda con fecha de hoy y sin recordatorio.',
+    personaLabel: 'A quien le debes?',
+    personaPlaceholder: 'Ej: Papa, amiga, vecino...',
+    conceptoLabel: 'Por que le debes?',
+    conceptoPlaceholder: 'Ej: prestamo, almuerzo, pasajes, regalo...',
+    paidLabel: 'Ya pagaste',
+    paidColumn: 'Ya pagaste',
+  },
+}
+
 function getTodayDate() {
   const now = new Date()
   const y = now.getFullYear()
@@ -20,8 +79,13 @@ function getTodayDate() {
   return `${y}-${m}-${d}`
 }
 
-function buildEmptyForm() {
+function getDirectionConfig(direction) {
+  return DIRECTION_CONFIG[direction] || DIRECTION_CONFIG.me_deben
+}
+
+function buildEmptyForm(direction = 'me_deben') {
   return {
+    direccion: direction,
     persona: '',
     concepto: '',
     monto_total: '',
@@ -44,15 +108,17 @@ function getBadgeLabel(estado) {
   return 'Pendiente'
 }
 
-function normalizePayload(form) {
+function normalizePayload(form, direction) {
   return {
     ...form,
+    direccion: form.direccion || direction,
     fecha_recordatorio: form.fecha_recordatorio || null,
     notas: form.notas?.trim() || '',
   }
 }
 
-export default function LoQueMeDeben() {
+export default function CuentasPersonasPanel({ embedded = false, direction = 'me_deben' }) {
+  const config = getDirectionConfig(direction)
   const [items, setItems] = useState([])
   const [modal, setModal] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -63,26 +129,26 @@ export default function LoQueMeDeben() {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const [sortField, setSortField] = useState('fecha')
+  const [sortField, setSortField] = useState('fecha_prestamo')
   const [sortDir, setSortDir] = useState('desc')
   const [feedback, setFeedback] = useState({ type: '', message: '' })
-  const [form, setForm] = useState(buildEmptyForm())
+  const [form, setForm] = useState(buildEmptyForm(direction))
+
+  const fetchItems = useCallback(async () => {
+    try {
+      const { data } = await api.get('/finanzas/cuentas-por-cobrar/', { params: { direccion: direction } })
+      setItems(data)
+    } catch (err) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, config.fetchError) })
+    }
+  }, [config.fetchError, direction])
 
   useEffect(() => {
     void fetchItems()
-  }, [])
-
-  async function fetchItems() {
-    try {
-      const { data } = await api.get('/finanzas/cuentas-por-cobrar/')
-      setItems(data)
-    } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos cargar lo que te deben.') })
-    }
-  }
+  }, [fetchItems])
 
   function openNew() {
-    setForm(buildEmptyForm())
+    setForm(buildEmptyForm(direction))
     setEditId(null)
     setShowAdvanced(false)
     setModal(true)
@@ -90,6 +156,7 @@ export default function LoQueMeDeben() {
 
   function openEdit(item) {
     setForm({
+      direccion: item.direccion || direction,
       persona: item.persona,
       concepto: item.concepto,
       monto_total: item.monto_total,
@@ -108,7 +175,7 @@ export default function LoQueMeDeben() {
     if (loading) return
     setLoading(true)
     setFeedback({ type: '', message: '' })
-    const payload = normalizePayload(form)
+    const payload = normalizePayload(form, direction)
 
     try {
       if (editId) await api.put(`/finanzas/cuentas-por-cobrar/${editId}/`, payload)
@@ -117,10 +184,10 @@ export default function LoQueMeDeben() {
       await fetchItems()
       setFeedback({
         type: 'success',
-        message: editId ? 'Deuda actualizada correctamente.' : 'Deuda registrada correctamente.',
+        message: editId ? 'Cuenta actualizada correctamente.' : 'Cuenta registrada correctamente.',
       })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo guardar esta deuda.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo guardar esta cuenta.') })
     } finally {
       setLoading(false)
     }
@@ -141,9 +208,9 @@ export default function LoQueMeDeben() {
     try {
       await api.delete(`/finanzas/cuentas-por-cobrar/${id}/`)
       await fetchItems()
-      setFeedback({ type: 'success', message: 'Deuda eliminada correctamente.' })
+      setFeedback({ type: 'success', message: 'Cuenta eliminada correctamente.' })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo eliminar esta deuda.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo eliminar esta cuenta.') })
     } finally {
       setDeletingId(null)
     }
@@ -174,37 +241,54 @@ export default function LoQueMeDeben() {
   const paginated = filtered.slice(start, start + pageSize)
 
   return (
-    <div className="finance-shell">
-      <div className="page-header page-header-actions">
-        <div className="page-header-main">
-          <h1 className="page-title">Lo que me deben</h1>
-          <p className="page-subtitle">Prestamos, vueltas y pendientes que otras personas tienen contigo.</p>
+    <div className={`cuentas-personas-panel is-${direction}`}>
+      {embedded ? (
+        <div className="finance-panel-header">
+          <div className="finance-panel-copy">
+            <h2 className="finance-panel-kicker">{config.panelKicker}</h2>
+            <p className="finance-panel-kpi">
+              {config.panelKpiLabel}:&nbsp;
+              <span style={{ color: config.panelAccent, fontWeight: 700 }}>
+                ${formatAmount(totalPendiente)}
+              </span>
+            </p>
+          </div>
+          <button className="btn-add page-primary-action" onClick={openNew}>
+            <Plus size={16} /> Agregar
+          </button>
         </div>
-        <button className="btn-add page-primary-action" onClick={openNew}>
-          <Plus size={16} /> Agregar
-        </button>
-      </div>
+      ) : (
+        <div className="page-header page-header-actions">
+          <div className="page-header-main">
+            <h1 className="page-title">{config.headerTitle}</h1>
+            <p className="page-subtitle">{config.headerSubtitle}</p>
+          </div>
+          <button className="btn-add page-primary-action" onClick={openNew}>
+            <Plus size={16} /> Agregar
+          </button>
+        </div>
+      )}
 
-      <div className="stats-grid">
+      <div className="stats-grid cobros-stats-grid">
         <div className="stat-card">
-          <div className="stat-label">Te deben hoy</div>
-          <div className="stat-value lila">${formatAmount(totalPendiente)}</div>
-          <div className="stat-sub">Lo que todavia no te han pagado.</div>
+          <div className="stat-label">{config.pendingLabel}</div>
+          <div className={`stat-value ${config.pendingValueClass}`}>${formatAmount(totalPendiente)}</div>
+          <div className="stat-sub">{config.pendingSub}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Ya te devolvieron</div>
-          <div className="stat-value green">${formatAmount(totalCobrado)}</div>
-          <div className="stat-sub">Abonos y pagos que ya recibiste.</div>
+          <div className="stat-label">{config.settledLabel}</div>
+          <div className={`stat-value ${config.settledValueClass}`}>${formatAmount(totalCobrado)}</div>
+          <div className="stat-sub">{config.settledSub}</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Casos abiertos</div>
           <div className="stat-value">{casosAbiertos}</div>
-          <div className="stat-sub">Deudas que siguen pendientes.</div>
+          <div className="stat-sub">{config.openCasesSub}</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Personas</div>
           <div className="stat-value">{personasUnicas}</div>
-          <div className="stat-sub">Cuantas personas te deben algo.</div>
+          <div className="stat-sub">{config.peopleSub}</div>
         </div>
       </div>
 
@@ -214,8 +298,8 @@ export default function LoQueMeDeben() {
         {items.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon"><Rat size={38} strokeWidth={1.8} /></div>
-            <p className="empty-text">Todavia no registras deudas a tu favor</p>
-            <p className="empty-sub">Aqui puedes anotar prestamos, favores o dinero pendiente por cobrar.</p>
+            <p className="empty-text">{config.emptyText}</p>
+            <p className="empty-sub">{config.emptySub}</p>
           </div>
         ) : (
           <>
@@ -233,12 +317,12 @@ export default function LoQueMeDeben() {
               filteredItems={filtered.length}
               sortField={sortField}
               sortDir={sortDir}
-              onSortChange={(f, d) => { setSortField(f); setSortDir(d); setPage(1) }}
+              onSortChange={(field, dir) => { setSortField(field); setSortDir(dir); setPage(1) }}
               sortOptions={[
                 { value: 'persona', label: 'Persona' },
                 { value: 'monto_total', label: 'Total' },
                 { value: 'saldo_pendiente', label: 'Pendiente' },
-                { value: 'fecha', label: 'Fecha' },
+                { value: 'fecha_prestamo', label: 'Fecha' },
               ]}
             />
 
@@ -246,11 +330,11 @@ export default function LoQueMeDeben() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Quien</th>
-                    <th>Por que</th>
+                    <th>Persona</th>
+                    <th>Motivo</th>
                     <th>Fecha</th>
                     <th style={{ textAlign: 'right' }}>Total</th>
-                    <th style={{ textAlign: 'right' }}>Te ha pagado</th>
+                    <th style={{ textAlign: 'right' }}>{config.paidColumn}</th>
                     <th style={{ textAlign: 'right' }}>Pendiente</th>
                     <th>Estado</th>
                     <th></th>
@@ -289,33 +373,33 @@ export default function LoQueMeDeben() {
         )}
       </div>
 
-      <Modal open={modal} onClose={() => setModal(false)} title={editId ? 'Editar deuda a tu favor' : '+ Nueva deuda a tu favor'}>
+      <Modal open={modal} onClose={() => setModal(false)} title={editId ? config.editTitle : config.createTitle}>
         <form onSubmit={handleSubmit}>
           {!editId && (
             <p style={{ marginTop: -8, marginBottom: 14, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
-              Carga rapida: quien te debe, por que y cuanto.
+              {config.quickHint}
             </p>
           )}
 
           <div className="form-modal-group">
-            <label className="form-modal-label">Quien te debe?</label>
+            <label className="form-modal-label">{config.personaLabel}</label>
             <input
               className="form-modal-input"
               required
-              placeholder="Ej: Mamá, Juan, compañera de trabajo..."
+              placeholder={config.personaPlaceholder}
               value={form.persona}
-              onChange={(e) => setForm({ ...form, persona: e.target.value })}
+              onChange={(event) => setForm({ ...form, persona: event.target.value })}
             />
           </div>
 
           <div className="form-modal-group">
-            <label className="form-modal-label">Por que te debe?</label>
+            <label className="form-modal-label">{config.conceptoLabel}</label>
             <input
               className="form-modal-input"
               required
-              placeholder="Ej: prestamo, almuerzo, pasajes, regalo..."
+              placeholder={config.conceptoPlaceholder}
               value={form.concepto}
-              onChange={(e) => setForm({ ...form, concepto: e.target.value })}
+              onChange={(event) => setForm({ ...form, concepto: event.target.value })}
             />
           </div>
 
@@ -330,11 +414,11 @@ export default function LoQueMeDeben() {
                 step="0.01"
                 placeholder="0"
                 value={form.monto_total}
-                onChange={(e) => setForm({ ...form, monto_total: e.target.value })}
+                onChange={(event) => setForm({ ...form, monto_total: event.target.value })}
               />
             </div>
             <div className="form-modal-group">
-              <label className="form-modal-label">Ya te pagaron</label>
+              <label className="form-modal-label">{config.paidLabel}</label>
               <input
                 className="form-modal-input"
                 type="number"
@@ -342,7 +426,7 @@ export default function LoQueMeDeben() {
                 step="0.01"
                 placeholder="0"
                 value={form.monto_cobrado}
-                onChange={(e) => setForm({ ...form, monto_cobrado: e.target.value })}
+                onChange={(event) => setForm({ ...form, monto_cobrado: event.target.value })}
               />
             </div>
           </div>
@@ -371,10 +455,22 @@ export default function LoQueMeDeben() {
                       min={DATE_INPUT_MIN}
                       max={DATE_INPUT_MAX}
                       value={form.fecha_prestamo}
-                      onChange={(e) => setForm((prev) => ({ ...prev, fecha_prestamo: e.target.value, fecha_recordatorio: prev.fecha_recordatorio && prev.fecha_recordatorio < e.target.value ? '' : prev.fecha_recordatorio }))}
+                      onChange={(event) => setForm((prev) => ({
+                        ...prev,
+                        fecha_prestamo: event.target.value,
+                        fecha_recordatorio: prev.fecha_recordatorio && prev.fecha_recordatorio < event.target.value ? '' : prev.fecha_recordatorio,
+                      }))}
                     />
                   </div>
-                  <DateQuickActions value={form.fecha_prestamo} onChange={(value) => setForm((prev) => ({ ...prev, fecha_prestamo: value, fecha_recordatorio: prev.fecha_recordatorio && prev.fecha_recordatorio < value ? '' : prev.fecha_recordatorio }))} disabled={loading} />
+                  <DateQuickActions
+                    value={form.fecha_prestamo}
+                    onChange={(value) => setForm((prev) => ({
+                      ...prev,
+                      fecha_prestamo: value,
+                      fecha_recordatorio: prev.fecha_recordatorio && prev.fecha_recordatorio < value ? '' : prev.fecha_recordatorio,
+                    }))}
+                    disabled={loading}
+                  />
                 </div>
                 <div className="form-modal-group">
                   <label className="form-modal-label">Recordarmelo <span>(opcional)</span></label>
@@ -385,10 +481,15 @@ export default function LoQueMeDeben() {
                       min={form.fecha_prestamo || DATE_INPUT_MIN}
                       max={DATE_INPUT_MAX}
                       value={form.fecha_recordatorio}
-                      onChange={(e) => setForm({ ...form, fecha_recordatorio: e.target.value })}
+                      onChange={(event) => setForm({ ...form, fecha_recordatorio: event.target.value })}
                     />
                   </div>
-                  <DateQuickActions value={form.fecha_recordatorio} onChange={(value) => setForm({ ...form, fecha_recordatorio: value })} allowClear disabled={loading} />
+                  <DateQuickActions
+                    value={form.fecha_recordatorio}
+                    onChange={(value) => setForm({ ...form, fecha_recordatorio: value })}
+                    allowClear
+                    disabled={loading}
+                  />
                 </div>
               </div>
 
@@ -397,9 +498,9 @@ export default function LoQueMeDeben() {
                 <textarea
                   className="form-modal-input"
                   rows={2}
-                  placeholder="Ej: me dijo que me paga a fin de mes..."
+                  placeholder="Ej: me dijo que lo cierra a fin de mes..."
                   value={form.notas}
-                  onChange={(e) => setForm({ ...form, notas: e.target.value })}
+                  onChange={(event) => setForm({ ...form, notas: event.target.value })}
                   style={{ resize: 'none', height: 'auto' }}
                 />
               </div>
@@ -408,14 +509,14 @@ export default function LoQueMeDeben() {
 
           {!editId && !showAdvanced && (
             <p style={{ marginTop: -4, marginBottom: 18, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
-              Si no cambias nada, queda con fecha de hoy y sin recordatorio.
+              {config.idleHint}
             </p>
           )}
 
           <div className="form-modal-actions">
             <button type="button" className="btn-modal-cancel" onClick={() => setModal(false)}>Cancelar</button>
             <button type="submit" className="btn-modal-save" disabled={loading}>
-              {loading ? 'Guardando...' : editId ? 'Guardar cambios' : 'Guardar deuda'}
+              {loading ? 'Guardando...' : editId ? 'Guardar cambios' : 'Guardar cuenta'}
             </button>
           </div>
         </form>
@@ -423,8 +524,8 @@ export default function LoQueMeDeben() {
 
       <ConfirmDialog
         open={confirmDeleteId !== null}
-        title="Eliminar deuda"
-        message="Esta deuda saldra de tu lista y de tus totales."
+        title="Eliminar cuenta"
+        message="Esta cuenta saldra de tu lista y de tus totales."
         confirmText="Eliminar"
         cancelText="Cancelar"
         loading={deletingId !== null}

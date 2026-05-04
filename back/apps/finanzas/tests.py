@@ -260,6 +260,35 @@ class TestFinanzasAPI(APITestCase):
         self.assertEqual(response.data[0]['persona'], 'Juan')
         self.assertEqual(Decimal(str(response.data[0]['saldo_pendiente'])), Decimal('65.00'))
         self.assertEqual(response.data[0]['estado'], 'pagando')
+        self.assertEqual(response.data[0]['direccion'], 'me_deben')
+
+    def test_cuentas_por_cobrar_filtra_por_direccion(self):
+        CuentaPorCobrar.objects.create(
+            usuario=self.user_a,
+            direccion='me_deben',
+            persona='Juan',
+            concepto='Prestamo del almuerzo',
+            monto_total=Decimal('100.00'),
+            monto_cobrado=Decimal('35.00'),
+            fecha_prestamo='2026-04-01',
+        )
+        CuentaPorCobrar.objects.create(
+            usuario=self.user_a,
+            direccion='debo',
+            persona='Ana',
+            concepto='Cena',
+            monto_total=Decimal('80.00'),
+            monto_cobrado=Decimal('20.00'),
+            fecha_prestamo='2026-04-03',
+        )
+
+        self.client.force_authenticate(user=self.user_a)
+        response = self.client.get('/api/finanzas/cuentas-por-cobrar/?direccion=debo')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['persona'], 'Ana')
+        self.assertEqual(response.data[0]['direccion'], 'debo')
 
     def test_cuentas_por_cobrar_crea_con_recordatorio_vacio(self):
         self.client.force_authenticate(user=self.user_a)
@@ -281,6 +310,7 @@ class TestFinanzasAPI(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['persona'], 'Carlos')
         self.assertEqual(Decimal(str(response.data['saldo_pendiente'])), Decimal('45.00'))
+        self.assertEqual(response.data['direccion'], 'me_deben')
 
     def test_diferido_calcula_cuota_en_backend(self):
         self.client.force_authenticate(user=self.user_a)

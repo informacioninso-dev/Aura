@@ -6,6 +6,7 @@ import { TrendingUp, TrendingDown, Wallet, PiggyBank, RefreshCw, ChevronDown, Ch
 import api from '../../api/client'
 import { getApiErrorMessage } from '../../api/errors'
 import FeedbackAlert from '../../components/ui/FeedbackAlert'
+import Modal from '../../components/ui/Modal'
 import { useAuth } from '../../context/useAuth'
 import { formatMoney } from '../../utils/formatters'
 import '../../components/ui/app.css'
@@ -177,6 +178,7 @@ export default function Dashboard() {
   const [activeSummaryDetail, setActiveSummaryDetail] = useState(null)
   const [detailSort, setDetailSort] = useState('amount-desc')
   const [showCategoryView, setShowCategoryView] = useState(false)
+  const [selectedExpenseCategory, setSelectedExpenseCategory] = useState(null)
   const [selectedMonth, setSelectedMonth] = useState(() => startOfMonth(new Date()))
   const [isCompactProjectionChart, setIsCompactProjectionChart] = useState(
     () => typeof window !== 'undefined' && window.innerWidth < MOBILE_CHART_BREAKPOINT,
@@ -323,6 +325,15 @@ export default function Dashboard() {
   function toggleSummaryDetail(kind) {
     setActiveSummaryDetail((current) => (current === kind ? null : kind))
     setShowCategoryView(false)
+    setSelectedExpenseCategory(null)
+  }
+
+  function toggleCategoryView() {
+    setShowCategoryView((current) => {
+      const next = !current
+      if (!next) setSelectedExpenseCategory(null)
+      return next
+    })
   }
 
   async function handleProjectionModeChange(nextMode) {
@@ -407,6 +418,10 @@ export default function Dashboard() {
     })
   }, [dashboardMonthBounds])
 
+  useEffect(() => {
+    setSelectedExpenseCategory(null)
+  }, [selectedMonth])
+
   function moveSelectedMonth(offset) {
     setSelectedMonth((current) => {
       const next = addMonths(current, offset)
@@ -458,14 +473,14 @@ export default function Dashboard() {
   const totalGastos = totalGC + totalGNC + totalDif
   const balance = totalIng - totalGastos
 
-  function applySortDetail(items) {
+  const applySortDetail = useCallback((items) => {
     return [...items].sort((a, b) => {
       if (detailSort === 'amount-asc') return a.amount - b.amount
       if (detailSort === 'date-desc') return (b.date || '').localeCompare(a.date || '')
       if (detailSort === 'date-asc') return (a.date || '').localeCompare(b.date || '')
       return b.amount - a.amount
     })
-  }
+  }, [detailSort])
 
   const incomeDetailSections = [
     {
@@ -543,24 +558,65 @@ export default function Dashboard() {
     },
   ]
 
-  const expenseCategoryMap = useMemo(() => {
-    const map = {}
+  const expenseCategoryBreakdown = useMemo(() => {
+    const map = new Map()
+
+    function registerExpenseItem(category, item) {
+      const cat = category || 'Sin categoria'
+      const current = map.get(cat) || { cat, total: 0, items: [] }
+      current.total += item.amount
+      current.items.push(item)
+      map.set(cat, current)
+    }
+
     fixedExpensesThisMonth.forEach((item) => {
-      const cat = item.categoria || 'Sin categoria'
-      map[cat] = (map[cat] || 0) + mensualizado(item.monto, item.frecuencia)
+      registerExpenseItem(item.categoria, {
+        id: `expense-fixed-${item.id}`,
+        label: item.descripcion,
+        meta: getFrequencyLabel(item.frecuencia),
+        amount: mensualizado(item.monto, item.frecuencia),
+        date: item.fecha_inicio || '',
+        kind: 'fixed',
+        kindLabel: 'Fijo',
+      })
     })
+
     punctualExpensesThisMonth.forEach((item) => {
-      const cat = item.categoria || 'Sin categoria'
-      map[cat] = (map[cat] || 0) + Number(item.monto)
+      registerExpenseItem(item.categoria, {
+        id: `expense-punctual-${item.id}`,
+        label: item.descripcion,
+        meta: '',
+        amount: Number(item.monto),
+        date: item.fecha || '',
+        kind: 'punctual',
+        kindLabel: 'Puntual',
+      })
     })
+
     installmentsThisMonth.forEach((item) => {
-      const cat = item.categoria || 'Sin categoria'
-      map[cat] = (map[cat] || 0) + Number(item.cuota_mensual)
+      registerExpenseItem(item.categoria, {
+        id: `expense-installment-${item.id}`,
+        label: item.descripcion,
+        meta: 'Cuota mensual',
+        amount: Number(item.cuota_mensual),
+        date: item.fecha_inicio || '',
+        kind: 'installment',
+        kindLabel: 'Cuota',
+      })
     })
-    return Object.entries(map)
-      .map(([cat, total]) => ({ cat, total }))
+
+    return Array.from(map.values())
+      .map((entry) => ({
+        ...entry,
+        items: applySortDetail(entry.items),
+      }))
       .sort((a, b) => b.total - a.total)
-  }, [fixedExpensesThisMonth, punctualExpensesThisMonth, installmentsThisMonth])
+  }, [applySortDetail, fixedExpensesThisMonth, punctualExpensesThisMonth, installmentsThisMonth])
+
+  const activeExpenseCategory = useMemo(
+    () => expenseCategoryBreakdown.find(({ cat }) => cat === selectedExpenseCategory) || null,
+    [expenseCategoryBreakdown, selectedExpenseCategory],
+  )
 
   const activeSummarySections = activeSummaryDetail === 'income' ? incomeDetailSections : expenseDetailSections
   const activeSummaryTitle = activeSummaryDetail === 'income'
@@ -1084,7 +1140,11 @@ export default function Dashboard() {
             <button
               type="button"
               className="dashboard-summary-detail-close"
-              onClick={() => setActiveSummaryDetail(null)}
+              onClick={() => {
+                setActiveSummaryDetail(null)
+                setShowCategoryView(false)
+                setSelectedExpenseCategory(null)
+              }}
             >
               Ocultar
             </button>
@@ -1115,7 +1175,7 @@ export default function Dashboard() {
               <button
                 type="button"
                 className={`dashboard-detail-sort-btn dashboard-detail-cat-btn ${showCategoryView ? 'active' : ''}`}
-                onClick={() => setShowCategoryView((v) => !v)}
+                onClick={toggleCategoryView}
               >
                 <Tag size={12} />
                 Por categorias
@@ -1133,20 +1193,28 @@ export default function Dashboard() {
                   </span>
                   <strong className="dashboard-summary-detail-section-total expense">{fmt(totalGastos)}</strong>
                 </div>
-                {expenseCategoryMap.length ? (
+                {expenseCategoryBreakdown.length ? (
                   <div className="dashboard-summary-detail-list">
-                    {expenseCategoryMap.map(({ cat, total }) => {
+                    {expenseCategoryBreakdown.map(({ cat, total, items }) => {
                       const share = formatDetailShare(total, totalGastos)
                       return (
-                        <div key={cat} className="dashboard-summary-detail-item">
+                        <button
+                          key={cat}
+                          type="button"
+                          className="dashboard-category-row-button"
+                          onClick={() => setSelectedExpenseCategory(cat)}
+                        >
                           <div className="dashboard-summary-detail-item-copy">
                             <span className="dashboard-summary-detail-item-label">{cat}</span>
+                            <span className="dashboard-summary-detail-item-meta">
+                              {items.length} {items.length === 1 ? 'movimiento' : 'movimientos'} - ver desglose
+                            </span>
                           </div>
                           <div className="dashboard-summary-detail-item-trailing">
                             <span className="dashboard-summary-detail-item-amount expense">{fmt(total)}</span>
                             {share && <span className="dashboard-summary-detail-item-share expense">({share})</span>}
                           </div>
-                        </div>
+                        </button>
                       )
                     })}
                   </div>
@@ -1201,6 +1269,49 @@ export default function Dashboard() {
       )}
 
       {/* ── Barra de salud ── */}
+      <Modal
+        open={Boolean(activeExpenseCategory)}
+        onClose={() => setSelectedExpenseCategory(null)}
+        title={activeExpenseCategory ? `${activeExpenseCategory.cat} - ${selectedMonthLabel}` : 'Detalle por categoria'}
+      >
+        {activeExpenseCategory && (
+          <>
+            <div className="dashboard-category-modal-summary">
+              <div className="dashboard-category-modal-summary-top">
+                <span className="dashboard-category-modal-summary-label">Total de la categoria</span>
+                <span className="dashboard-category-modal-summary-pill">
+                  {activeExpenseCategory.items.length} {activeExpenseCategory.items.length === 1 ? 'mov.' : 'movs.'}
+                </span>
+              </div>
+              <div className="dashboard-category-modal-summary-main">
+                <strong className="dashboard-category-modal-summary-total expense">{fmt(activeExpenseCategory.total)}</strong>
+              </div>
+            </div>
+
+            <div className="dashboard-category-modal-list">
+              {activeExpenseCategory.items.map((item) => (
+                <article key={item.id} className="dashboard-category-modal-item">
+                  <div className="dashboard-category-modal-item-head">
+                    <div className="dashboard-category-modal-item-copy">
+                      <div className="dashboard-category-modal-item-topline">
+                        <span className="dashboard-category-modal-item-label">{item.label}</span>
+                        <strong className="dashboard-category-modal-item-amount expense">{fmt(item.amount)}</strong>
+                      </div>
+                      <div className="dashboard-category-modal-item-meta-row">
+                        <span className={`dashboard-category-modal-item-badge is-${item.kind}`}>{item.kindLabel}</span>
+                        {item.meta ? <span className="dashboard-category-modal-item-meta">{item.meta}</span> : null}
+                        {item.meta && item.date ? <span className="dashboard-category-modal-item-divider">•</span> : null}
+                        {item.date ? <span className="dashboard-category-modal-item-date">{item.date}</span> : null}
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </>
+        )}
+      </Modal>
+
       {totalIng > 0 && (
         <div className="dashboard-health-card">
           <div className="dashboard-health-header">

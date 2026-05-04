@@ -325,16 +325,16 @@ class CuentaPorCobrarSerializer(serializers.ModelSerializer):
 
         errors = {}
         if not persona:
-            errors['persona'] = 'Escribe quien te debe.'
+            errors['persona'] = 'Escribe la persona.'
         if not concepto:
-            errors['concepto'] = 'Describe por que te debe.'
+            errors['concepto'] = 'Describe el motivo.'
         if monto_total is not None and monto_total <= 0:
             errors['monto_total'] = 'El monto total debe ser mayor que 0.'
         if monto_cobrado is not None and monto_cobrado < 0:
             errors['monto_cobrado'] = 'Lo cobrado no puede ser negativo.'
         if monto_total is not None and monto_cobrado is not None and monto_cobrado > monto_total:
             errors['monto_cobrado'] = 'Lo cobrado no puede ser mayor al total.'
-        validate_reasonable_date(errors, 'fecha_prestamo', fecha_prestamo, label='prestamo')
+        validate_reasonable_date(errors, 'fecha_prestamo', fecha_prestamo, label='movimiento')
         validate_reasonable_date(errors, 'fecha_recordatorio', fecha_recordatorio, label='recordatorio')
         if fecha_prestamo and fecha_recordatorio and fecha_recordatorio < fecha_prestamo:
             errors['fecha_recordatorio'] = 'El recordatorio no puede quedar antes de la fecha inicial.'
