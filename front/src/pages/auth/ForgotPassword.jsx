@@ -29,6 +29,19 @@ export default function ForgotPassword() {
     }
   }
 
+  if (authLoading) {
+    return (
+      <div className="auth-page">
+        <div className="auth-box">
+          <div className="auth-card">
+            <h2 className="auth-title">Recuperando sesion</h2>
+            <p className="auth-footer" style={{ marginTop: 10 }}>Un momento...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (!authLoading && user) {
     return <Navigate to="/dashboard" replace />
   }

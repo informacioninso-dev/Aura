@@ -120,9 +120,9 @@ function getInitialColchonMinimo() {
   return String(parsed)
 }
 
-function construirFlujoBaseSimple(ingresos, ingresosPuntuales, gastosCorrientes, gastosNoCorrientes, diferidos) {
+function construirFlujoBaseSimple(ingresos, ingresosPuntuales, gastosCorrientes, gastosNoCorrientes, diferidos, desiredMonths = 24) {
   const hoy = new Date()
-  return Array.from({ length: 24 }, (_, i) => {
+  return Array.from({ length: desiredMonths }, (_, i) => {
     const fecha = new Date(hoy.getFullYear(), hoy.getMonth() + i, 1)
     const mes = `${MESES[fecha.getMonth()]} ${fecha.getFullYear()}`
 
@@ -175,6 +175,25 @@ function construirFlujoBaseDesdeProyeccion(series = [], desiredMonths = series.l
     extended.push({ ...lastPoint })
   }
   return extended
+}
+
+function fusionarFlujoBaseSimulacion(simpleFlow = [], projectedFlow = []) {
+  if (projectedFlow.length === 0) return simpleFlow
+
+  return projectedFlow.map((projectedMonth, index) => {
+    const simpleMonth = simpleFlow[index]
+    if (!simpleMonth) return projectedMonth
+
+    const ingresos = roundMoneyNumber(Math.max(Number(projectedMonth.ingresos || 0), Number(simpleMonth.ingresos || 0)))
+    const gastos = roundMoneyNumber(Math.max(Number(projectedMonth.gastos || 0), Number(simpleMonth.gastos || 0)))
+
+    return {
+      ...projectedMonth,
+      ingresos,
+      gastos,
+      balance: roundMoneyNumber(ingresos - gastos),
+    }
+  })
 }
 
 const EMPTY_FORM = {
@@ -243,13 +262,30 @@ export default function Simulador() {
     flujoRequestIdRef.current = requestId
     if (advancedProjectionEnabled) {
       const months = Math.min(Math.max(24, monthsNeeded), advancedProjectionMaxMonths)
-      const { data } = await api.get(`/finanzas/proyeccion-acumulada/?months=${months}&past_months=${SIMULADOR_PAST_MONTHS}`)
+      const [projectionRes, ingresosRes, ingresosPuntualesRes, gastosRes, gastosPuntualesRes, diferidosRes] = await Promise.all([
+        api.get(`/finanzas/proyeccion-acumulada/?months=${months}&past_months=${SIMULADOR_PAST_MONTHS}`),
+        api.get('/finanzas/ingresos/'),
+        api.get('/finanzas/ingresos-puntuales/'),
+        api.get('/finanzas/gastos-corrientes/'),
+        api.get('/finanzas/gastos-no-corrientes/'),
+        api.get('/finanzas/diferidos/'),
+      ])
+      const data = projectionRes.data
       if (requestId !== flujoRequestIdRef.current) return null
       const projectedSeries = (data.series || []).filter((point) => !point.is_real).slice(0, months)
       const nextSaldoInicial = resolveSaldoInicial({
         monto: projectedSeries[0]?.opening_balance ?? data.starting_balance ?? 0,
       })
-      const nextFlujoBase = construirFlujoBaseDesdeProyeccion(projectedSeries, monthsNeeded)
+      const projectedFlow = construirFlujoBaseDesdeProyeccion(projectedSeries, months)
+      const simpleFlow = construirFlujoBaseSimple(
+        ingresosRes.data,
+        ingresosPuntualesRes.data,
+        gastosRes.data,
+        gastosPuntualesRes.data,
+        diferidosRes.data,
+        months,
+      )
+      const nextFlujoBase = fusionarFlujoBaseSimulacion(simpleFlow, projectedFlow)
       const nextMeta = {
         mode: data.projection_mode || user?.projection_mode || 'automatica',
         variableProjectionApplied: data.variable_projection_applied !== false,
@@ -279,6 +315,7 @@ export default function Simulador() {
       gastosRes.data,
       gastosPuntualesRes.data,
       diferidosRes.data,
+      Math.max(24, monthsNeeded),
     )
     const nextMeta = {
       mode: 'simple',

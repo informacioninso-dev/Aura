@@ -28,6 +28,11 @@ class TestSimuladorAPI(APITestCase):
             username='sim_b',
             password='clave12345',
         )
+        self.superadmin = User.objects.create_superuser(
+            email='sim_admin@example.com',
+            username='sim_admin',
+            password='clave12345',
+        )
         self.banco_activo = Banco.objects.create(
             nombre='Banco Activo',
             tasa_anual_minima=Decimal('8.00'),
@@ -170,3 +175,58 @@ class TestSimuladorAPI(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['nombre'], 'Sim A')
+
+    def test_bancos_admin_requiere_superadmin(self):
+        self.client.force_authenticate(user=self.user_a)
+
+        response = self.client.get('/api/simulador/bancos-admin/')
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_superadmin_puede_listar_bancos_inactivos_y_activos(self):
+        self.client.force_authenticate(user=self.superadmin)
+
+        response = self.client.get('/api/simulador/bancos-admin/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual({item['nombre'] for item in response.data}, {'Banco Activo', 'Banco Inactivo'})
+
+    def test_superadmin_puede_crear_banco_para_el_desplegable(self):
+        self.client.force_authenticate(user=self.superadmin)
+
+        response = self.client.post(
+            '/api/simulador/bancos-admin/',
+            {
+                'nombre': 'Banco Nuevo',
+                'tasa_anual_minima': '7.50',
+                'tasa_anual_maxima': '13.25',
+                'plazo_maximo_meses': 180,
+                'monto_minimo': '1000.00',
+                'monto_maximo': '250000.00',
+                'activo': True,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(Banco.objects.filter(nombre='Banco Nuevo', activo=True).exists())
+
+    def test_superadmin_puede_editar_estado_y_tasas_de_banco(self):
+        self.client.force_authenticate(user=self.superadmin)
+
+        response = self.client.patch(
+            f'/api/simulador/bancos-admin/{self.banco_activo.id}/',
+            {
+                'tasa_anual_minima': '9.10',
+                'tasa_anual_maxima': '14.40',
+                'activo': False,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.banco_activo.refresh_from_db()
+        self.assertEqual(self.banco_activo.tasa_anual_minima, Decimal('9.10'))
+        self.assertEqual(self.banco_activo.tasa_anual_maxima, Decimal('14.40'))
+        self.assertFalse(self.banco_activo.activo)

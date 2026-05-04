@@ -71,6 +71,18 @@ function fmtMoney(val) {
   return `$${Number(val || 0).toFixed(2)}`
 }
 
+function buildEmptyBancoForm() {
+  return {
+    nombre: '',
+    tasa_anual_minima: '',
+    tasa_anual_maxima: '',
+    plazo_maximo_meses: '240',
+    monto_minimo: '0',
+    monto_maximo: '',
+    activo: true,
+  }
+}
+
 export default function SuperAdmin() {
   const { user, fetchPerfil } = useAuth()
   const [feedback, setFeedback] = useState({ type: '', message: '' })
@@ -163,6 +175,12 @@ export default function SuperAdmin() {
   const [savingGasto, setSavingGasto] = useState(false)
   const [editingGastoId, setEditingGastoId] = useState(null)
   const [editGastoForm, setEditGastoForm] = useState({})
+  const [bancosAdmin, setBancosAdmin] = useState([])
+  const [bancosAdminLoading, setBancosAdminLoading] = useState(false)
+  const [bancoForm, setBancoForm] = useState(buildEmptyBancoForm())
+  const [savingBanco, setSavingBanco] = useState(false)
+  const [editingBancoId, setEditingBancoId] = useState(null)
+  const [editBancoForm, setEditBancoForm] = useState({})
 
   const loadNegocio = useCallback(async () => {
     setNegocioLoading(true)
@@ -179,6 +197,18 @@ export default function SuperAdmin() {
     } finally {
       setNegocioLoading(false)
       setGastosLoading(false)
+    }
+  }, [])
+
+  const loadBancosAdmin = useCallback(async () => {
+    setBancosAdminLoading(true)
+    try {
+      const { data } = await api.get('/simulador/bancos-admin/')
+      setBancosAdmin(data || [])
+    } catch (error) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo cargar la lista de bancos.') })
+    } finally {
+      setBancosAdminLoading(false)
     }
   }, [])
 
@@ -345,6 +375,10 @@ export default function SuperAdmin() {
     loadNegocio()
   }, [loadNegocio])
 
+  useEffect(() => {
+    loadBancosAdmin()
+  }, [loadBancosAdmin])
+
   if (!user) return null
   if (!user.is_superuser) return <Navigate to="/dashboard" replace />
 
@@ -360,6 +394,7 @@ export default function SuperAdmin() {
         loadFeatures(),
         loadPlans(),
         loadNegocio(),
+        loadBancosAdmin(),
       ])
     } catch {
       // already handled in each request
@@ -738,6 +773,60 @@ export default function SuperAdmin() {
       await loadNegocio()
     } catch (error) {
       setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo actualizar el gasto.') })
+    }
+  }
+
+  function updateBancoForm(field, value) {
+    setBancoForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  async function handleCrearBanco(event) {
+    event.preventDefault()
+    setSavingBanco(true)
+    setFeedback({ type: '', message: '' })
+    try {
+      await api.post('/simulador/bancos-admin/', {
+        ...bancoForm,
+        monto_maximo: bancoForm.monto_maximo || null,
+      })
+      setBancoForm(buildEmptyBancoForm())
+      setFeedback({ type: 'success', message: 'Banco agregado al simulador.' })
+      await loadBancosAdmin()
+    } catch (error) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo guardar el banco.') })
+    } finally {
+      setSavingBanco(false)
+    }
+  }
+
+  async function handleGuardarBanco(id) {
+    setFeedback({ type: '', message: '' })
+    try {
+      const { data } = await api.patch(`/simulador/bancos-admin/${id}/`, {
+        ...editBancoForm,
+        monto_maximo: editBancoForm.monto_maximo || null,
+      })
+      setBancosAdmin((prev) => prev.map((item) => (item.id === id ? data : item)))
+      setEditingBancoId(null)
+      setFeedback({ type: 'success', message: 'Banco actualizado correctamente.' })
+    } catch (error) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo actualizar el banco.') })
+    }
+  }
+
+  async function handleToggleBanco(banco) {
+    setFeedback({ type: '', message: '' })
+    try {
+      const { data } = await api.patch(`/simulador/bancos-admin/${banco.id}/`, {
+        activo: !banco.activo,
+      })
+      setBancosAdmin((prev) => prev.map((item) => (item.id === banco.id ? data : item)))
+      setFeedback({
+        type: 'success',
+        message: data.activo ? `${data.nombre} ya aparece en el simulador.` : `${data.nombre} quedo oculto del simulador.`,
+      })
+    } catch (error) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo cambiar el estado del banco.') })
     }
   }
 
@@ -1625,6 +1714,179 @@ export default function SuperAdmin() {
                           <td style={{ display: 'flex', gap: 6 }}>
                             <button type="button" className="btn-modal-cancel" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => { setEditingGastoId(g.id); setEditGastoForm({ concepto: g.concepto, monto: g.monto, fecha: g.fecha, categoria: g.categoria, notas: g.notas }) }}>Editar</button>
                             <button type="button" className="btn-modal-cancel" style={{ padding: '4px 10px', fontSize: 12, color: '#ef4444' }} onClick={() => handleEliminarGasto(g.id)}>Eliminar</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="card" style={{ marginTop: 20 }}>
+                <div className="card-header">
+                  <h2 className="card-title">Bancos del simulador</h2>
+                </div>
+
+                <p className="superadmin-note" style={{ marginBottom: 16 }}>
+                  Esta lista alimenta el desplegable del simulador. Solo los bancos activos se muestran al usuario final.
+                </p>
+
+                <form onSubmit={handleCrearBanco} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '0 0 16px' }}>
+                  <input
+                    className="form-modal-input"
+                    placeholder="Nombre del banco"
+                    value={bancoForm.nombre}
+                    onChange={(e) => updateBancoForm('nombre', e.target.value)}
+                    required
+                    style={{ flex: '2 1 180px' }}
+                  />
+                  <input
+                    className="form-modal-input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Tasa min"
+                    value={bancoForm.tasa_anual_minima}
+                    onChange={(e) => updateBancoForm('tasa_anual_minima', e.target.value)}
+                    required
+                    style={{ flex: '1 1 110px' }}
+                  />
+                  <input
+                    className="form-modal-input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Tasa max"
+                    value={bancoForm.tasa_anual_maxima}
+                    onChange={(e) => updateBancoForm('tasa_anual_maxima', e.target.value)}
+                    required
+                    style={{ flex: '1 1 110px' }}
+                  />
+                  <input
+                    className="form-modal-input"
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="Plazo max"
+                    value={bancoForm.plazo_maximo_meses}
+                    onChange={(e) => updateBancoForm('plazo_maximo_meses', e.target.value)}
+                    required
+                    style={{ flex: '1 1 110px' }}
+                  />
+                  <input
+                    className="form-modal-input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Monto min"
+                    value={bancoForm.monto_minimo}
+                    onChange={(e) => updateBancoForm('monto_minimo', e.target.value)}
+                    required
+                    style={{ flex: '1 1 120px' }}
+                  />
+                  <input
+                    className="form-modal-input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Monto max"
+                    value={bancoForm.monto_maximo}
+                    onChange={(e) => updateBancoForm('monto_maximo', e.target.value)}
+                    style={{ flex: '1 1 120px' }}
+                  />
+                  <label className="form-modal-check" style={{ margin: 0, padding: '10px 12px', minWidth: 110 }}>
+                    <input
+                      type="checkbox"
+                      checked={bancoForm.activo}
+                      onChange={(e) => updateBancoForm('activo', e.target.checked)}
+                    />
+                    <span>Activo</span>
+                  </label>
+                  <button type="submit" className="btn-primary" disabled={savingBanco} style={{ flex: '0 0 auto' }}>
+                    {savingBanco ? 'Guardando...' : '+ Agregar banco'}
+                  </button>
+                </form>
+
+                <div className="table-wrap">
+                  <table className="table">
+                    <thead>
+                      <tr><th>Banco</th><th>Tasa</th><th>Plazo max</th><th>Monto</th><th>Estado</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                      {bancosAdminLoading && <tr><td colSpan={6} style={{ textAlign: 'center' }}>Cargando...</td></tr>}
+                      {!bancosAdminLoading && bancosAdmin.length === 0 && (
+                        <tr><td colSpan={6} style={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>Sin bancos configurados</td></tr>
+                      )}
+                      {bancosAdmin.map((banco) => editingBancoId === banco.id ? (
+                        <tr key={banco.id}>
+                          <td><input className="form-modal-input" value={editBancoForm.nombre || ''} onChange={(e) => setEditBancoForm((f) => ({ ...f, nombre: e.target.value }))} /></td>
+                          <td style={{ minWidth: 220 }}>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <input type="number" min="0" step="0.01" className="form-modal-input" value={editBancoForm.tasa_anual_minima || ''} onChange={(e) => setEditBancoForm((f) => ({ ...f, tasa_anual_minima: e.target.value }))} />
+                              <input type="number" min="0" step="0.01" className="form-modal-input" value={editBancoForm.tasa_anual_maxima || ''} onChange={(e) => setEditBancoForm((f) => ({ ...f, tasa_anual_maxima: e.target.value }))} />
+                            </div>
+                          </td>
+                          <td><input type="number" min="1" step="1" className="form-modal-input" value={editBancoForm.plazo_maximo_meses || ''} onChange={(e) => setEditBancoForm((f) => ({ ...f, plazo_maximo_meses: e.target.value }))} style={{ width: 110 }} /></td>
+                          <td style={{ minWidth: 220 }}>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <input type="number" min="0" step="0.01" className="form-modal-input" value={editBancoForm.monto_minimo || ''} onChange={(e) => setEditBancoForm((f) => ({ ...f, monto_minimo: e.target.value }))} />
+                              <input type="number" min="0" step="0.01" className="form-modal-input" value={editBancoForm.monto_maximo || ''} onChange={(e) => setEditBancoForm((f) => ({ ...f, monto_maximo: e.target.value }))} placeholder="Sin tope" />
+                            </div>
+                          </td>
+                          <td>
+                            <label className="form-modal-check" style={{ margin: 0 }}>
+                              <input type="checkbox" checked={Boolean(editBancoForm.activo)} onChange={(e) => setEditBancoForm((f) => ({ ...f, activo: e.target.checked }))} />
+                              <span>{editBancoForm.activo ? 'Activo' : 'Inactivo'}</span>
+                            </label>
+                          </td>
+                          <td style={{ display: 'flex', gap: 6 }}>
+                            <button type="button" className="btn-primary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => handleGuardarBanco(banco.id)}>Guardar</button>
+                            <button type="button" className="btn-modal-cancel" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => setEditingBancoId(null)}>Cancelar</button>
+                          </td>
+                        </tr>
+                      ) : (
+                        <tr key={banco.id}>
+                          <td>{banco.nombre}</td>
+                          <td>{Number(banco.tasa_anual_minima).toFixed(2)}% - {Number(banco.tasa_anual_maxima).toFixed(2)}%</td>
+                          <td>{banco.plazo_maximo_meses} meses</td>
+                          <td>
+                            Min {fmtMoney(banco.monto_minimo)}
+                            {' / '}
+                            {banco.monto_maximo ? `Max ${fmtMoney(banco.monto_maximo)}` : 'Sin tope'}
+                          </td>
+                          <td>
+                            <span className={`badge ${banco.activo ? 'badge-green' : 'badge-gray'}`}>
+                              {banco.activo ? 'Activo' : 'Inactivo'}
+                            </span>
+                          </td>
+                          <td style={{ display: 'flex', gap: 6 }}>
+                            <button
+                              type="button"
+                              className="btn-modal-cancel"
+                              style={{ padding: '4px 10px', fontSize: 12 }}
+                              onClick={() => {
+                                setEditingBancoId(banco.id)
+                                setEditBancoForm({
+                                  nombre: banco.nombre,
+                                  tasa_anual_minima: banco.tasa_anual_minima,
+                                  tasa_anual_maxima: banco.tasa_anual_maxima,
+                                  plazo_maximo_meses: banco.plazo_maximo_meses,
+                                  monto_minimo: banco.monto_minimo,
+                                  monto_maximo: banco.monto_maximo || '',
+                                  activo: banco.activo,
+                                })
+                              }}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-modal-cancel"
+                              style={{ padding: '4px 10px', fontSize: 12, color: banco.activo ? '#ef4444' : '#22c55e' }}
+                              onClick={() => handleToggleBanco(banco)}
+                            >
+                              {banco.activo ? 'Ocultar' : 'Activar'}
+                            </button>
                           </td>
                         </tr>
                       ))}

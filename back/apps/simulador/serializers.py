@@ -16,6 +16,32 @@ def round_money(value):
 
 
 class BancoSerializer(serializers.ModelSerializer):
+    def validate(self, attrs):
+        tasa_min = attrs.get('tasa_anual_minima', getattr(self.instance, 'tasa_anual_minima', None))
+        tasa_max = attrs.get('tasa_anual_maxima', getattr(self.instance, 'tasa_anual_maxima', None))
+        monto_min = attrs.get('monto_minimo', getattr(self.instance, 'monto_minimo', None))
+        monto_max = attrs.get('monto_maximo', getattr(self.instance, 'monto_maximo', None))
+        plazo_max = attrs.get('plazo_maximo_meses', getattr(self.instance, 'plazo_maximo_meses', None))
+
+        errors = {}
+        if tasa_min is not None and tasa_min < 0:
+            errors['tasa_anual_minima'] = 'La tasa minima no puede ser negativa.'
+        if tasa_max is not None and tasa_max < 0:
+            errors['tasa_anual_maxima'] = 'La tasa maxima no puede ser negativa.'
+        if tasa_min is not None and tasa_max is not None and tasa_max < tasa_min:
+            errors['tasa_anual_maxima'] = 'La tasa maxima no puede ser menor que la minima.'
+        if monto_min is not None and monto_min < 0:
+            errors['monto_minimo'] = 'El monto minimo no puede ser negativo.'
+        if monto_max is not None and monto_max < 0:
+            errors['monto_maximo'] = 'El monto maximo no puede ser negativo.'
+        if monto_min is not None and monto_max is not None and monto_max < monto_min:
+            errors['monto_maximo'] = 'El monto maximo no puede ser menor que el minimo.'
+        if plazo_max is not None and plazo_max <= 0:
+            errors['plazo_maximo_meses'] = 'El plazo maximo debe ser mayor que 0.'
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
+
     class Meta:
         model = Banco
         fields = '__all__'
