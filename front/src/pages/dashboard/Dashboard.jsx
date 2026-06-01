@@ -758,10 +758,10 @@ export default function Dashboard() {
                 }}
               />
               {({
-                ing_real: 'Total de ingresos del mes (real)',
-                ing_proj: 'Total de ingresos del mes (proyectado)',
-                gasto_real: 'Total de gastos del mes (real)',
-                gasto_proj: 'Total de gastos del mes (proyectado)',
+                ing_real: 'Disponible este mes (real)',
+                ing_proj: 'Disponible este mes (proyectado)',
+                gasto_real: 'Gastos del mes (real)',
+                gasto_proj: 'Gastos del mes (proyectado)',
               }[entry.dataKey] || entry.value)}
             </button>
           )
@@ -787,7 +787,7 @@ export default function Dashboard() {
             {`Saldo disponible: ${fmt(point.gapAcumulado)}`}
           </div>
         )}
-        <div style={{ color: '#10B981' }}>{`Ingresos del mes: ${fmt(ingDisponible)}`}</div>
+        <div style={{ color: '#10B981' }}>{`Disponible este mes: ${fmt(ingDisponible)}`}</div>
         <div style={{ color: '#F87171' }}>{`Gastos del mes: ${fmt(gastoDisplay)}`}</div>
         {advancedProjectionEnabled && point.opening != null && (
           <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, marginTop: 4 }}>
@@ -849,10 +849,10 @@ export default function Dashboard() {
             formatter={(value, name) => {
               if (value == null) return null
               const labels = {
-                ing_real: 'Total de ingresos del mes (real)',
-                ing_proj: 'Total de ingresos del mes (proyectado)',
-                gasto_real: 'Total de gastos del mes (real)',
-                gasto_proj: 'Total de gastos del mes (proyectado)',
+                ing_real: 'Disponible este mes (real)',
+                ing_proj: 'Disponible este mes (proyectado)',
+                gasto_real: 'Gastos del mes (real)',
+                gasto_proj: 'Gastos del mes (proyectado)',
               }
               return [fmt(value), labels[name] || name]
             }}

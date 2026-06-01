@@ -766,6 +766,10 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
 
     # ── Meses proyectados (futuro, desde el mes siguiente al actual) ─────────
     latest_closing_balance = _money(series[-1]['closing_balance']) if series else seeded_balance
+    # Anchor projected cumulative_cash_position from the last real closing balance,
+    # not seeded_balance, so the cumulative series stays consistent with the per-month chain.
+    proj_cum_cash_base = _money(series[-1]['cumulative_cash_position']) if series else seeded_balance
+    proj_net = Decimal('0.00')
 
     for offset in range(months):
         month_start = _sumar_meses_fecha(next_month, offset)
@@ -787,7 +791,8 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
         cum_ingresos = (cum_ingresos + projected_ingresos).quantize(Decimal('0.01'))
         cum_gastos = (cum_gastos + projected_gastos).quantize(Decimal('0.01'))
         cumulative_balance = (cum_ingresos - cum_gastos).quantize(Decimal('0.01'))
-        cumulative_cash_position = (seeded_balance + cumulative_balance).quantize(Decimal('0.01'))
+        proj_net = (proj_net + projected_gap).quantize(Decimal('0.01'))
+        cumulative_cash_position = (proj_cum_cash_base + proj_net).quantize(Decimal('0.01'))
 
         series.append({
             'month': f'{month_start.year}-{month_start.month:02d}',

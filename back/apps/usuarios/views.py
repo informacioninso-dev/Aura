@@ -968,6 +968,13 @@ class ConfirmarPagoView(APIView):
         if pago.status == PagoPayPhone.APPROVED:
             return Response({'status': 'approved', 'plan': pago.plan.name})
 
+        # ERROR is terminal: block retries to prevent calling PayPhone again on an already-failed payment.
+        if pago.status == PagoPayPhone.ERROR:
+            return Response(
+                {'detail': 'Este pago registró un error previo. Contacta soporte.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
         try:
             result = payphone_service.confirmar_cobro(
                 payphone_id=payphone_id,
@@ -976,13 +983,16 @@ class ConfirmarPagoView(APIView):
         except Exception as exc:
             return Response({'detail': f'Error al verificar el pago: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
 
-        pago.payphone_response = result
         status_code = result.get('statusCode')
 
         if status_code == 3:
-            ends_at = timezone.now() + timedelta(days=30 * pago.plan.duracion_meses)
             try:
                 with transaction.atomic():
+                    # Re-fetch with row lock to prevent concurrent double-activation.
+                    pago = PagoPayPhone.objects.select_for_update().get(pk=pago.pk)
+                    if pago.status == PagoPayPhone.APPROVED:
+                        return Response({'status': 'approved', 'plan': pago.plan.name})
+                    ends_at = timezone.now() + timedelta(days=30 * pago.plan.duracion_meses)
                     assign_plan_to_user(
                         user=pago.usuario,
                         plan=pago.plan,
@@ -990,6 +1000,7 @@ class ConfirmarPagoView(APIView):
                         ends_at=ends_at,
                     )
                     pago.status = PagoPayPhone.APPROVED
+                    pago.payphone_response = result
                     pago.save(update_fields=['status', 'payphone_response', 'updated_at'])
             except Exception as exc:
                 logger.exception(
@@ -998,6 +1009,8 @@ class ConfirmarPagoView(APIView):
                     pago.usuario_id,
                     pago.plan_id,
                 )
+                # Re-fetch from DB to discard any in-memory mutations from the rolled-back atomic block.
+                pago = PagoPayPhone.objects.get(pk=pago.pk)
                 pago.status = PagoPayPhone.ERROR
                 pago.payphone_response = {
                     **result,
@@ -1013,10 +1026,12 @@ class ConfirmarPagoView(APIView):
 
         if status_code == 2:
             pago.status = PagoPayPhone.CANCELLED
+            pago.payphone_response = result
             pago.save(update_fields=['status', 'payphone_response', 'updated_at'])
             return Response({'status': 'cancelled'})
 
         pago.status = PagoPayPhone.ERROR
+        pago.payphone_response = result
         pago.save(update_fields=['status', 'payphone_response', 'updated_at'])
         return Response({'status': 'error', 'code': status_code})
 

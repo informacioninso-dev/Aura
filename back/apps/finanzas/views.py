@@ -461,6 +461,66 @@ class ProyeccionAcumuladaView(APIView):
         return Response(data)
 
 
+class AsistenteParseView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    _PROMPT_SYSTEM = """Eres un asistente financiero. Extrae la intención del texto y devuelve SOLO un JSON válido con esta estructura:
+
+{
+  "tipo": "ingreso_fijo" | "ingreso_puntual" | "gasto_fijo" | "gasto_puntual",
+  "monto": número positivo,
+  "descripcion": "nombre corto y limpio del ítem (solo el objeto/concepto, sin verbos como gasté/compré/pagué/recibí)",
+  "categoria": una de [vivienda, alimentacion, transporte, salud, educacion, entretenimiento, ropa, servicios, tecnologia, deudas, ahorro, otro],
+  "frecuencia": una de [diario, semanal, quincenal, mensual, bimestral, trimestral, semestral, anual] (solo si es fijo),
+  "fecha": "YYYY-MM-DD" (solo si es puntual, usa la fecha de hoy si dice "hoy" o no especifica),
+  "confianza": "alta" | "media" | "baja"
+}
+
+Reglas:
+- "fijo" = recurrente (salario, arriendo, suscripción, cuota mensual)
+- "puntual" = único (compré, gasté, recibí, pagué una vez)
+- descripcion debe ser el concepto limpio: "Almuerzo", "Arriendo", "Salario", "Netflix" — nunca "gasté en almuerzo" ni "pagué el arriendo"
+- Si no se menciona categoría, dedúcela del contexto
+- Si no se menciona frecuencia en un fijo, usa "mensual"
+- Devuelve SOLO el JSON, sin texto adicional"""
+
+    def post(self, request):
+        texto = (request.data.get('texto') or '').strip()
+        if not texto:
+            return Response({'detail': 'El campo texto es requerido.'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(texto) > 500:
+            return Response({'detail': 'El texto es demasiado largo.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        api_key = getattr(settings, 'GROQ_API_KEY', '')
+        if not api_key:
+            return Response({'detail': 'Asistente no configurado.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        hoy = datetime.date.today().isoformat()
+        try:
+            from groq import Groq
+            client = Groq(api_key=api_key)
+            completion = client.chat.completions.create(
+                model='llama-3.1-8b-instant',
+                messages=[
+                    {'role': 'system', 'content': self._PROMPT_SYSTEM},
+                    {'role': 'user', 'content': f'Fecha de hoy: {hoy}\n\nTexto: {texto}'},
+                ],
+                response_format={'type': 'json_object'},
+                temperature=0.1,
+                max_tokens=256,
+            )
+            import json
+            resultado = json.loads(completion.choices[0].message.content)
+        except Exception as exc:
+            return Response({'detail': f'Error al procesar: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
+
+        campos_requeridos = {'tipo', 'monto', 'descripcion'}
+        if not campos_requeridos.issubset(resultado.keys()):
+            return Response({'detail': 'No pude entender el registro. Intentá ser más específico.'}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        return Response(resultado)
+
+
 class ImportarView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
     parser_classes = (MultiPartParser, JSONParser)

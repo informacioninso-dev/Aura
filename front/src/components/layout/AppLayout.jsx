@@ -4,6 +4,7 @@ import { useAuth } from '../../context/useAuth'
 import BrandMark from '../brand/BrandMark'
 import Sidebar from './Sidebar'
 import NotificationBell from './NotificationBell'
+import AuraAssistant from '../ui/AuraAssistant'
 import './layout.css'
 
 export default function AppLayout() {
@@ -55,6 +56,8 @@ export default function AppLayout() {
         </div>
         <Outlet />
       </main>
+
+      <AuraAssistant />
     </div>
   )
 }
