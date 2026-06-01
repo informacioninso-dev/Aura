@@ -18,6 +18,13 @@ from django.core.exceptions import ImproperlyConfigured
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Carga .env en desarrollo (en producción las vars las inyecta systemd)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(BASE_DIR / '.env')
+except ImportError:
+    pass
+
 
 def env_bool(name, default=False):
     value = os.getenv(name)
@@ -163,6 +170,9 @@ FINANZAS_PROJECTION_CACHE_TTL = int(os.getenv('FINANZAS_PROJECTION_CACHE_TTL', '
 # PayPhone
 PAYPHONE_TOKEN = os.getenv('PAYPHONE_TOKEN', '')
 PAYPHONE_APP_ID = os.getenv('PAYPHONE_APP_ID', '')
+
+# Groq AI (asistente)
+GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
 
 
 # Password validation

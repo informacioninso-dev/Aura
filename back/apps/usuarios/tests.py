@@ -1,3 +1,4 @@
+from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
@@ -8,7 +9,7 @@ from django.utils.encoding import force_bytes
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import AdminActionLog, EmailServerConfig, Feature, Plan
+from .models import AdminActionLog, EmailServerConfig, Feature, PagoPayPhone, Plan, UserPlanAssignment
 from .plans import assign_plan_to_user
 
 
@@ -262,6 +263,82 @@ class TestUsuarioAPI(APITestCase):
         self.assertEqual(refresh_response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
+
+    @patch('apps.usuarios.views.payphone_service.confirmar_cobro', return_value={'statusCode': 3})
+    def test_confirmar_pago_aprobado_activa_plan_y_marca_pago_aprobado(self, mock_confirmar):
+        user = User.objects.create_user(
+            email='payphoneok@example.com',
+            username='payphoneok',
+            password='clave12345',
+        )
+        plan = Plan.objects.get(slug='pro')
+        pago = PagoPayPhone.objects.create(
+            usuario=user,
+            plan=plan,
+            monto=plan.precio_mensual,
+            client_transaction_id='tx-ok-123',
+        )
+        self.client.force_authenticate(user=user)
+
+        response = self.client.post(
+            '/api/usuarios/pago/confirmar/',
+            {'id': 'pay-001', 'clientTransactionId': pago.client_transaction_id},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['status'], 'approved')
+        pago.refresh_from_db()
+        self.assertEqual(pago.status, PagoPayPhone.APPROVED)
+        self.assertEqual(pago.payphone_response.get('statusCode'), 3)
+        assignment = UserPlanAssignment.objects.get(user=user, is_active=True)
+        self.assertEqual(assignment.plan, plan)
+        self.assertEqual(assignment.notes, f'PayPhone {pago.client_transaction_id}')
+        mock_confirmar.assert_called_once()
+
+    @patch('apps.usuarios.views.assign_plan_to_user', side_effect=RuntimeError('plan assignment exploded'))
+    @patch('apps.usuarios.views.payphone_service.confirmar_cobro', return_value={'statusCode': 3})
+    def test_confirmar_pago_no_marca_aprobado_si_falla_activacion(self, mock_confirmar, mock_assign):
+        user = User.objects.create_user(
+            email='payphonefail@example.com',
+            username='payphonefail',
+            password='clave12345',
+        )
+        plan = Plan.objects.get(slug='pro')
+        pago = PagoPayPhone.objects.create(
+            usuario=user,
+            plan=plan,
+            monto=plan.precio_mensual,
+            client_transaction_id='tx-fail-123',
+        )
+        self.client.force_authenticate(user=user)
+
+        response = self.client.post(
+            '/api/usuarios/pago/confirmar/',
+            {'id': 'pay-002', 'clientTransactionId': pago.client_transaction_id},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        self.assertIn('detail', response.data)
+        pago.refresh_from_db()
+        self.assertEqual(pago.status, PagoPayPhone.ERROR)
+        self.assertEqual(pago.payphone_response.get('statusCode'), 3)
+        self.assertEqual(pago.payphone_response.get('activation_error'), 'plan_activation_failed')
+        self.assertEqual(
+            pago.payphone_response.get('activation_error_detail'),
+            'plan assignment exploded',
+        )
+        self.assertFalse(
+            UserPlanAssignment.objects.filter(
+                user=user,
+                is_active=True,
+                plan=plan,
+                notes=f'PayPhone {pago.client_transaction_id}',
+            ).exists()
+        )
+        mock_confirmar.assert_called_once()
+        mock_assign.assert_called_once()
 class TestSuperAdminAPI(APITestCase):
     def setUp(self):
         self.superadmin = User.objects.create_superuser(

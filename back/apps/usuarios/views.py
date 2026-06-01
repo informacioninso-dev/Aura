@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import EmailMessage, get_connection
-from django.db import connections
+from django.db import connections, transaction
 from django.db.models import Count, DecimalField, Q, Sum
 from django.db.models.functions import TruncDate, TruncMonth
 from django.shortcuts import get_object_or_404
@@ -968,6 +968,13 @@ class ConfirmarPagoView(APIView):
         if pago.status == PagoPayPhone.APPROVED:
             return Response({'status': 'approved', 'plan': pago.plan.name})
 
+        # ERROR is terminal: block retries to prevent calling PayPhone again on an already-failed payment.
+        if pago.status == PagoPayPhone.ERROR:
+            return Response(
+                {'detail': 'Este pago registró un error previo. Contacta soporte.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
         try:
             result = payphone_service.confirmar_cobro(
                 payphone_id=payphone_id,
@@ -976,28 +983,56 @@ class ConfirmarPagoView(APIView):
         except Exception as exc:
             return Response({'detail': f'Error al verificar el pago: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
 
-        pago.payphone_response = result
         status_code = result.get('statusCode')
 
         if status_code == 3:
-            pago.status = PagoPayPhone.APPROVED
-            pago.save()
-            ends_at = timezone.now() + timedelta(days=30 * pago.plan.duracion_meses)
-            assign_plan_to_user(
-                user=pago.usuario,
-                plan=pago.plan,
-                notes=f'PayPhone {client_transaction_id}',
-                ends_at=ends_at,
-            )
+            try:
+                with transaction.atomic():
+                    # Re-fetch with row lock to prevent concurrent double-activation.
+                    pago = PagoPayPhone.objects.select_for_update().get(pk=pago.pk)
+                    if pago.status == PagoPayPhone.APPROVED:
+                        return Response({'status': 'approved', 'plan': pago.plan.name})
+                    ends_at = timezone.now() + timedelta(days=30 * pago.plan.duracion_meses)
+                    assign_plan_to_user(
+                        user=pago.usuario,
+                        plan=pago.plan,
+                        notes=f'PayPhone {client_transaction_id}',
+                        ends_at=ends_at,
+                    )
+                    pago.status = PagoPayPhone.APPROVED
+                    pago.payphone_response = result
+                    pago.save(update_fields=['status', 'payphone_response', 'updated_at'])
+            except Exception as exc:
+                logger.exception(
+                    'Pago PayPhone aprobado pero sin activar plan. pago_id=%s user_id=%s plan_id=%s',
+                    pago.pk,
+                    pago.usuario_id,
+                    pago.plan_id,
+                )
+                # Re-fetch from DB to discard any in-memory mutations from the rolled-back atomic block.
+                pago = PagoPayPhone.objects.get(pk=pago.pk)
+                pago.status = PagoPayPhone.ERROR
+                pago.payphone_response = {
+                    **result,
+                    'activation_error': 'plan_activation_failed',
+                    'activation_error_detail': str(exc),
+                }
+                pago.save(update_fields=['status', 'payphone_response', 'updated_at'])
+                return Response(
+                    {'detail': 'El pago fue validado, pero no pudimos activar tu plan. Contacta soporte antes de reintentar.'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
             return Response({'status': 'approved', 'plan': pago.plan.name})
 
         if status_code == 2:
             pago.status = PagoPayPhone.CANCELLED
-            pago.save()
+            pago.payphone_response = result
+            pago.save(update_fields=['status', 'payphone_response', 'updated_at'])
             return Response({'status': 'cancelled'})
 
         pago.status = PagoPayPhone.ERROR
-        pago.save()
+        pago.payphone_response = result
+        pago.save(update_fields=['status', 'payphone_response', 'updated_at'])
         return Response({'status': 'error', 'code': status_code})
 
 

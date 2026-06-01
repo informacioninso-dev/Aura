@@ -15,6 +15,7 @@ from .views import (
     ReportePDFView,
     ReporteView,
     DashboardResumenView,
+    AsistenteParseView,
 )
 
 router = DefaultRouter()
@@ -35,4 +36,5 @@ urlpatterns = [
     path('proyeccion-acumulada/', ProyeccionAcumuladaView.as_view(), name='proyeccion-acumulada'),
     path('reporte/', ReporteView.as_view(), name='reporte'),
     path('reporte/pdf/', ReportePDFView.as_view(), name='reporte-pdf'),
+    path('asistente/parsear/', AsistenteParseView.as_view(), name='asistente-parsear'),
 ]

@@ -1121,6 +1121,60 @@ class TestFinanzasAPI(APITestCase):
             + Decimal(str(response.data['series'][6]['cumulative_balance'])),
         )
 
+    def test_proyeccion_acumulada_arrastra_cierre_actual_al_primer_mes_futuro(self):
+        current_month = first_day_of_month(datetime.date.today())
+        previous_month = add_months(current_month, -1)
+        self.user_a.date_joined = aware_midnight(add_months(current_month, -6))
+        self.user_a.save(update_fields=['date_joined'])
+
+        plan_pro = Plan.objects.get(slug='pro')
+        assign_plan_to_user(user=self.user_a, plan=plan_pro, assigned_by=None, notes='Carry forward test')
+
+        Ingreso.objects.create(
+            usuario=self.user_a,
+            descripcion='Salario base',
+            monto=Decimal('1000.00'),
+            frecuencia='mensual',
+            fecha_inicio=add_months(current_month, -1),
+            activo=True,
+        )
+        GastoCorriente.objects.create(
+            usuario=self.user_a,
+            descripcion='Arriendo',
+            categoria='vivienda',
+            monto=Decimal('200.00'),
+            frecuencia='mensual',
+            fecha_inicio=add_months(current_month, -1),
+            activo=True,
+        )
+        IngresoPuntual.objects.create(
+            usuario=self.user_a,
+            descripcion='Ingreso extra del mes actual',
+            monto=Decimal('300.00'),
+            fecha=current_month + datetime.timedelta(days=5),
+        )
+        SaldoMes.objects.update_or_create(
+            usuario=self.user_a,
+            anio=previous_month.year,
+            mes=previous_month.month,
+            defaults={'monto': Decimal('1200.00'), 'activo': True},
+        )
+
+        self.client.force_authenticate(user=self.user_a)
+        response = self.client.get('/api/finanzas/proyeccion-acumulada/?months=1&past_months=1')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        current_point = next(point for point in response.data['series'] if point.get('is_current'))
+        projected_point = next(point for point in response.data['series'] if not point['is_real'])
+
+        self.assertEqual(
+            Decimal(str(projected_point['opening_balance'])),
+            Decimal(str(current_point['closing_balance'])),
+        )
+        self.assertNotEqual(
+            Decimal(str(projected_point['opening_balance'])),
+            Decimal(str(response.data['starting_balance'])),
+        )
     def test_proyeccion_acumulada_suaviza_outliers_de_puntuales(self):
         current_month = first_day_of_month(datetime.date.today())
         previous_month = add_months(current_month, -1)
