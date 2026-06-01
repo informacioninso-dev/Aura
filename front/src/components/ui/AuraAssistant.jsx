@@ -56,6 +56,7 @@ export default function AuraAssistant() {
   const [error, setError] = useState('')
   const [edits, setEdits] = useState({})
   const recognitionRef = useRef(null)
+  const micTimeoutRef = useRef(null)
 
   useEffect(() => { if (parsed) setEdits({}) }, [parsed])
 
@@ -73,11 +74,18 @@ export default function AuraAssistant() {
   }, [])
 
   const cerrar = useCallback(() => {
+    clearTimeout(micTimeoutRef.current)
     recognitionRef.current?.stop()
     setEscuchando(false)
     setOpen(false)
     resetear()
   }, [resetear])
+
+  function detenerMic() {
+    clearTimeout(micTimeoutRef.current)
+    recognitionRef.current?.stop()
+    setEscuchando(false)
+  }
 
   function toggleMic() {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -85,8 +93,7 @@ export default function AuraAssistant() {
       return
     }
     if (escuchando) {
-      recognitionRef.current?.stop()
-      setEscuchando(false)
+      detenerMic()
       return
     }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -95,15 +102,21 @@ export default function AuraAssistant() {
     rec.continuous = false
     rec.interimResults = false
     rec.onresult = (e) => {
+      clearTimeout(micTimeoutRef.current)
       const transcripcion = e.results[0][0].transcript
       setTexto(transcripcion)
       setEscuchando(false)
     }
-    rec.onerror = () => setEscuchando(false)
-    rec.onend = () => setEscuchando(false)
+    rec.onerror = () => detenerMic()
+    rec.onend = () => detenerMic()
     recognitionRef.current = rec
     rec.start()
     setEscuchando(true)
+    // Seguridad para mobile: corta solo si no llegó resultado en 10s
+    micTimeoutRef.current = setTimeout(() => {
+      recognitionRef.current?.stop()
+      setEscuchando(false)
+    }, 10000)
   }
 
   async function parsear() {
