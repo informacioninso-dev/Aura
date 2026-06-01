@@ -100,12 +100,15 @@ export default function AuraAssistant() {
     const rec = new SR()
     rec.lang = 'es-ES'
     rec.continuous = false
-    rec.interimResults = false
+    rec.interimResults = true
     rec.onresult = (e) => {
       clearTimeout(micTimeoutRef.current)
-      const transcripcion = e.results[0][0].transcript
-      setTexto(transcripcion)
-      setEscuchando(false)
+      let transcripcion = ''
+      for (let i = 0; i < e.results.length; i++) {
+        transcripcion += e.results[i][0].transcript
+      }
+      if (transcripcion) setTexto(transcripcion)
+      if (e.results[e.results.length - 1].isFinal) setEscuchando(false)
     }
     rec.onerror = () => detenerMic()
     rec.onend = () => detenerMic()
