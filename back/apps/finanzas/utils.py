@@ -765,6 +765,8 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
         cursor = _sumar_meses_fecha(cursor, 1)
 
     # ── Meses proyectados (futuro, desde el mes siguiente al actual) ─────────
+    latest_closing_balance = _money(series[-1]['closing_balance']) if series else seeded_balance
+
     for offset in range(months):
         month_start = _sumar_meses_fecha(next_month, offset)
         month_end = _ultimo_dia_mes(month_start.year, month_start.month)
@@ -778,8 +780,9 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
         projected_ingresos = (total_ing_fijos + smoothed_variable_ingresos + ing_puntual_futuro).quantize(Decimal('0.01'))
         projected_gastos = (total_gastos_fijos + total_cuotas + smoothed_variable_gastos).quantize(Decimal('0.01'))
         projected_gap = (projected_ingresos - projected_gastos).quantize(Decimal('0.01'))
-        opening_balance = seeded_balance if offset == 0 else closing_balance
+        opening_balance = latest_closing_balance
         closing_balance = (opening_balance + projected_gap).quantize(Decimal('0.01'))
+        latest_closing_balance = closing_balance
 
         cum_ingresos = (cum_ingresos + projected_ingresos).quantize(Decimal('0.01'))
         cum_gastos = (cum_gastos + projected_gastos).quantize(Decimal('0.01'))
