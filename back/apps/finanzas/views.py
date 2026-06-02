@@ -521,6 +521,35 @@ Reglas:
         return Response(resultado)
 
 
+class AsistenteTranscribirView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+    parser_classes = (MultiPartParser,)
+
+    def post(self, request):
+        audio = request.FILES.get('audio')
+        if not audio:
+            return Response({'detail': 'Se requiere un archivo de audio.'}, status=status.HTTP_400_BAD_REQUEST)
+        if audio.size > 25 * 1024 * 1024:
+            return Response({'detail': 'El audio supera los 25 MB.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        api_key = getattr(settings, 'GROQ_API_KEY', '')
+        if not api_key:
+            return Response({'detail': 'Asistente no configurado.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        try:
+            from groq import Groq
+            client = Groq(api_key=api_key)
+            transcripcion = client.audio.transcriptions.create(
+                file=(audio.name or 'audio.m4a', audio.read(), audio.content_type or 'audio/m4a'),
+                model='whisper-large-v3-turbo',
+                language='es',
+                response_format='json',
+            )
+            return Response({'texto': transcripcion.text})
+        except Exception as exc:
+            return Response({'detail': f'Error al transcribir: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
+
+
 class ImportarView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
     parser_classes = (MultiPartParser, JSONParser)

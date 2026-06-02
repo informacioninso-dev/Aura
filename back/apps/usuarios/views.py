@@ -78,6 +78,24 @@ def _sanitize_page(raw_value, default):
         return default
 
 
+def _is_mobile_client(request):
+    return request.META.get('HTTP_X_CLIENT') == 'mobile'
+
+
+def _get_refresh_token_from_request(request):
+    refresh_token = request.COOKIES.get(settings.AUTH_REFRESH_COOKIE_NAME)
+    if refresh_token:
+        return refresh_token
+
+    data = getattr(request, 'data', None)
+    if hasattr(data, 'get'):
+        body_refresh = str(data.get('refresh', '') or '').strip()
+        if body_refresh:
+            return body_refresh
+
+    return None
+
+
 def _client_ip(request):
     forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
     if forwarded_for:
@@ -221,7 +239,7 @@ class LoginTokenObtainPairView(APIView):
 
         refresh_token = serializer.validated_data['refresh']
         access_token = serializer.validated_data['access']
-        is_mobile = request.META.get('HTTP_X_CLIENT') == 'mobile'
+        is_mobile = _is_mobile_client(request)
         body = {'access': access_token}
         if is_mobile:
             body['refresh'] = refresh_token
@@ -236,7 +254,7 @@ class RefreshCookieTokenView(APIView):
     throttle_scope = 'auth_token_refresh'
 
     def post(self, request):
-        refresh_token = request.COOKIES.get(settings.AUTH_REFRESH_COOKIE_NAME)
+        refresh_token = _get_refresh_token_from_request(request)
         if not refresh_token:
             return Response({'detail': 'No hay sesion para renovar.'}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -254,8 +272,13 @@ class RefreshCookieTokenView(APIView):
             clear_refresh_cookie(response)
             return response
 
-        response = Response({'access': serializer.validated_data['access']}, status=status.HTTP_200_OK)
         new_refresh_token = serializer.validated_data.get('refresh')
+        effective_refresh_token = new_refresh_token or refresh_token
+        response_body = {'access': serializer.validated_data['access']}
+        if _is_mobile_client(request):
+            response_body['refresh'] = effective_refresh_token
+
+        response = Response(response_body, status=status.HTTP_200_OK)
         if new_refresh_token:
             set_refresh_cookie(response, new_refresh_token)
         else:
@@ -267,7 +290,7 @@ class LogoutView(APIView):
     permission_classes = (permissions.AllowAny,)
 
     def post(self, request):
-        refresh_token = request.COOKIES.get(settings.AUTH_REFRESH_COOKIE_NAME)
+        refresh_token = _get_refresh_token_from_request(request)
         if refresh_token:
             try:
                 RefreshToken(refresh_token).blacklist()
