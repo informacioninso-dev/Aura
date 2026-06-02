@@ -221,7 +221,11 @@ class LoginTokenObtainPairView(APIView):
 
         refresh_token = serializer.validated_data['refresh']
         access_token = serializer.validated_data['access']
-        response = Response({'access': access_token}, status=status.HTTP_200_OK)
+        is_mobile = request.META.get('HTTP_X_CLIENT') == 'mobile'
+        body = {'access': access_token}
+        if is_mobile:
+            body['refresh'] = refresh_token
+        response = Response(body, status=status.HTTP_200_OK)
         set_refresh_cookie(response, refresh_token)
         return response
 
