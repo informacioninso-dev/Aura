@@ -6,6 +6,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import Modal from '../../components/ui/Modal'
 import { formatAmount } from '../../utils/formatters'
+import { montoEfectivoMes } from '../../utils/frecuencias'
 import '../../components/ui/app.css'
 
 const MESES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
@@ -16,17 +17,6 @@ function startOfMonth(date) {
 
 function addMonths(date, n) {
   return new Date(date.getFullYear(), date.getMonth() + n, 1)
-}
-
-const FREQ = {
-  diario: 30,
-  semanal: 4.33,
-  quincenal: 2,
-  mensual: 1,
-  bimestral: 0.5,
-  trimestral: 0.333,
-  semestral: 0.167,
-  anual: 0.083,
 }
 
 const ICONOS_SUGERIDOS = ['📦', '🏠', '🛒', '🚗', '💊', '📚', '🎬', '👕', '💡', '💻', '💳', '🐷', '✈️', '🏋️', '🎵', '🍔', '☕', '🎮', '🐾', '🌿', '💰', '🎁', '🔧', '📱']
@@ -101,7 +91,7 @@ export default function Presupuesto() {
       const fin = g.fecha_fin ? parseLocalDate(g.fecha_fin) : null
       const fecha = new Date(anio, mes, 1)
       if (ini <= fecha && (!fin || fin >= fecha)) {
-        totales[g.categoria] = (totales[g.categoria] || 0) + toMoneyNumber(g.monto) * (FREQ[g.frecuencia] || 1)
+        totales[g.categoria] = (totales[g.categoria] || 0) + montoEfectivoMes(g.monto, g.frecuencia, g.fecha_inicio, anio, mes + 1)
       }
     })
 

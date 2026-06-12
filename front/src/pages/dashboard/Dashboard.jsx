@@ -9,19 +9,10 @@ import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import Modal from '../../components/ui/Modal'
 import { useAuth } from '../../context/useAuth'
 import { formatMoney } from '../../utils/formatters'
+import { montoEfectivoMes } from '../../utils/frecuencias'
 import '../../components/ui/app.css'
 
 const MESES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
-const FREQ = {
-  diario: 30,
-  semanal: 4.33,
-  quincenal: 2,
-  mensual: 1,
-  bimestral: 0.5,
-  trimestral: 0.333,
-  semestral: 0.167,
-  anual: 0.083,
-}
 const FREQUENCY_LABELS = {
   diario: 'Diario',
   semanal: 'Semanal',
@@ -363,7 +354,7 @@ export default function Dashboard() {
     notation: 'compact',
     maximumFractionDigits: 1,
   })
-  const mensualizado = (monto, freq) => Number(monto) * (FREQ[freq] || 1)
+  const mensualizado = (item) => montoEfectivoMes(item.monto, item.frecuencia, item.fecha_inicio, selectedMonth.getFullYear(), selectedMonth.getMonth() + 1)
   const realMonth = useMemo(() => startOfMonth(new Date()), [])
 
   const dashboardMonthBounds = useMemo(() => {
@@ -459,13 +450,13 @@ export default function Dashboard() {
   )
 
   const totalIngFijos = fixedIncomesThisMonth
-    .reduce((sum, item) => sum + mensualizado(item.monto, item.frecuencia), 0)
+    .reduce((sum, item) => sum + mensualizado(item), 0)
   const totalIngPuntuales = punctualIncomesThisMonth
     .reduce((sum, item) => sum + Number(item.monto), 0)
   const totalIng = totalIngFijos + totalIngPuntuales
 
   const totalGC = fixedExpensesThisMonth
-    .reduce((sum, item) => sum + mensualizado(item.monto, item.frecuencia), 0)
+    .reduce((sum, item) => sum + mensualizado(item), 0)
   const totalGNC = punctualExpensesThisMonth
     .reduce((sum, item) => sum + Number(item.monto), 0)
   const totalDif = installmentsThisMonth
@@ -493,7 +484,7 @@ export default function Dashboard() {
         id: `income-fixed-${item.id}`,
         label: item.descripcion,
         meta: `${getFrequencyLabel(item.frecuencia)} - impacto mensual`,
-        amount: mensualizado(item.monto, item.frecuencia),
+        amount: mensualizado(item),
         date: item.fecha_inicio || '',
       }))),
     },
@@ -524,7 +515,7 @@ export default function Dashboard() {
         id: `expense-fixed-${item.id}`,
         label: item.descripcion,
         meta: `${item.categoria || 'Sin categoria'} - ${getFrequencyLabel(item.frecuencia)}`,
-        amount: mensualizado(item.monto, item.frecuencia),
+        amount: mensualizado(item),
         date: item.fecha_inicio || '',
       }))),
     },
@@ -574,7 +565,7 @@ export default function Dashboard() {
         id: `expense-fixed-${item.id}`,
         label: item.descripcion,
         meta: getFrequencyLabel(item.frecuencia),
-        amount: mensualizado(item.monto, item.frecuencia),
+        amount: mensualizado(item),
         date: item.fecha_inicio || '',
         kind: 'fixed',
         kindLabel: 'Fijo',
@@ -758,8 +749,8 @@ export default function Dashboard() {
                 }}
               />
               {({
-                ing_real: 'Disponible este mes (real)',
-                ing_proj: 'Disponible este mes (proyectado)',
+                ing_real: 'Total disponible este mes (real)',
+                ing_proj: 'Total disponible este mes (proyectado)',
                 gasto_real: 'Gastos del mes (real)',
                 gasto_proj: 'Gastos del mes (proyectado)',
               }[entry.dataKey] || entry.value)}
@@ -787,7 +778,7 @@ export default function Dashboard() {
             {`Saldo disponible: ${fmt(point.gapAcumulado)}`}
           </div>
         )}
-        <div style={{ color: '#10B981' }}>{`Disponible este mes: ${fmt(ingDisponible)}`}</div>
+        <div style={{ color: '#10B981' }}>{`Total disponible este mes: ${fmt(ingDisponible)}`}</div>
         <div style={{ color: '#F87171' }}>{`Gastos del mes: ${fmt(gastoDisplay)}`}</div>
         {advancedProjectionEnabled && point.opening != null && (
           <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, marginTop: 4 }}>
@@ -849,8 +840,8 @@ export default function Dashboard() {
             formatter={(value, name) => {
               if (value == null) return null
               const labels = {
-                ing_real: 'Disponible este mes (real)',
-                ing_proj: 'Disponible este mes (proyectado)',
+                ing_real: 'Total disponible este mes (real)',
+                ing_proj: 'Total disponible este mes (proyectado)',
                 gasto_real: 'Gastos del mes (real)',
                 gasto_proj: 'Gastos del mes (proyectado)',
               }

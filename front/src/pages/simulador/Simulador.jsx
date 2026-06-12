@@ -11,19 +11,10 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import { useAuth } from '../../context/useAuth'
 import { DATE_INPUT_MAX } from '../../utils/dateBounds'
 import { formatMoney } from '../../utils/formatters'
+import { montoEfectivoMes } from '../../utils/frecuencias'
 import '../../components/ui/app.css'
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-const FACTOR_FRECUENCIA = {
-  diario: 30,
-  semanal: 4.33,
-  quincenal: 2,
-  mensual: 1,
-  bimestral: 0.5,
-  trimestral: 0.333,
-  semestral: 0.167,
-  anual: 0.083,
-}
 const COLCHON_STORAGE_KEY = 'simulador_colchon_minimo'
 const SIMULADOR_PAST_MONTHS = 6
 const PROJECTION_MODE_LABELS = {
@@ -128,7 +119,7 @@ function construirFlujoBaseSimple(ingresos, ingresosPuntuales, gastosCorrientes,
 
     const totalIngresos = ingresos
       .filter((item) => overlapsMonth(item, fecha))
-      .reduce((sum, item) => sum + Number(item.monto) * (FACTOR_FRECUENCIA[item.frecuencia] || 1), 0)
+      .reduce((sum, item) => sum + montoEfectivoMes(item.monto, item.frecuencia, item.fecha_inicio, fecha.getFullYear(), fecha.getMonth() + 1), 0)
 
     const totalIngresosPuntuales = ingresosPuntuales
       .filter((item) => occursInMonth(item, fecha))
@@ -136,7 +127,7 @@ function construirFlujoBaseSimple(ingresos, ingresosPuntuales, gastosCorrientes,
 
     const totalGastosCorrientes = gastosCorrientes
       .filter((item) => overlapsMonth(item, fecha))
-      .reduce((sum, item) => sum + Number(item.monto) * (FACTOR_FRECUENCIA[item.frecuencia] || 1), 0)
+      .reduce((sum, item) => sum + montoEfectivoMes(item.monto, item.frecuencia, item.fecha_inicio, fecha.getFullYear(), fecha.getMonth() + 1), 0)
 
     const totalGastosPuntuales = gastosNoCorrientes
       .filter((item) => occursInMonth(item, fecha))

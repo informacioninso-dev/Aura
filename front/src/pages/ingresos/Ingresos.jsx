@@ -11,10 +11,9 @@ import DateQuickActions from '../../components/ui/DateQuickActions'
 import Modal from '../../components/ui/Modal'
 import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../../utils/dateBounds'
 import { formatAmount } from '../../utils/formatters'
+import { FRECUENCIAS, montoEfectivoMes } from '../../utils/frecuencias'
 import '../../components/ui/app.css'
 
-const FRECUENCIAS = ['diario', 'semanal', 'quincenal', 'mensual', 'bimestral', 'trimestral', 'semestral', 'anual']
-const FREQ_FACTOR = { diario: 30, semanal: 4.33, quincenal: 2, mensual: 1, bimestral: 0.5, trimestral: 0.333, semestral: 0.167, anual: 0.083 }
 const FRECUENCIA_STORAGE_KEY = 'ingresos_last_frecuencia'
 
 function getTodayDate() {
@@ -214,9 +213,10 @@ export default function Ingresos({ embedded = false }) {
 
   // — computos derivados —
   const hoy = getTodayDate()
+  const hoyDate = new Date(hoy + 'T00:00:00')
   const total = items
     .filter((i) => i.activo && i.fecha_inicio <= hoy && (!i.fecha_fin || i.fecha_fin >= hoy))
-    .reduce((s, i) => s + parseFloat(i.monto) * (FREQ_FACTOR[i.frecuencia] || 1), 0)
+    .reduce((s, i) => s + montoEfectivoMes(i.monto, i.frecuencia, i.fecha_inicio, hoyDate.getFullYear(), hoyDate.getMonth() + 1), 0)
 
   const filteredItems = items.filter((item) => {
     const q = query.trim().toLowerCase()

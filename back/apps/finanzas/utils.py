@@ -29,6 +29,35 @@ FREQ_FACTOR = {
     'anual': Decimal('0.083'),
 }
 
+# Frecuencias que ocurren cada N meses con el monto completo (no prorrateado),
+# en el mismo mes que fecha_inicio cada N meses (ej. matrícula anual en enero).
+PERIODO_MESES = {
+    'bimestral': 2,
+    'trimestral': 3,
+    'semestral': 6,
+    'anual': 12,
+}
+
+
+def _monto_efectivo_mes(monto, frecuencia, fecha_inicio, month_start):
+    """
+    Monto que corresponde a un ingreso/gasto recurrente en un mes dado.
+
+    - diario/semanal/quincenal/mensual: ocurren una o varias veces dentro del
+      mes, se usa el factor de FREQ_FACTOR para obtener el equivalente mensual.
+    - bimestral/trimestral/semestral/anual: el monto completo aparece solo en
+      los meses de recurrencia (cada N meses desde fecha_inicio); 0 el resto.
+    """
+    periodo = PERIODO_MESES.get(frecuencia)
+    if periodo is None:
+        return Decimal(str(monto)) * Decimal(str(FREQ_FACTOR.get(frecuencia, 1)))
+
+    inicio = _coerce_date(fecha_inicio)
+    diff = (month_start.year - inicio.year) * 12 + (month_start.month - inicio.month)
+    if diff < 0 or diff % periodo != 0:
+        return Decimal('0.00')
+    return _money(monto)
+
 
 def _primer_dia_mes(fecha):
     return datetime.date(fecha.year, fecha.month, 1)
@@ -335,7 +364,7 @@ def calcular_balance_mes(usuario, anio, mes):
         activo=True,
         fecha_inicio__lte=ultimo_dia,
     ).filter(db_models.Q(fecha_fin__isnull=True) | db_models.Q(fecha_fin__gte=primer_dia))
-    total_ing = sum(Decimal(str(i.monto)) * FREQ_FACTOR.get(i.frecuencia, 1) for i in ingresos)
+    total_ing = sum(_monto_efectivo_mes(i.monto, i.frecuencia, i.fecha_inicio, primer_dia) for i in ingresos)
     ingresos_puntuales = IngresoPuntual.objects.filter(
         usuario=usuario,
         fecha__gte=primer_dia,
@@ -348,7 +377,7 @@ def calcular_balance_mes(usuario, anio, mes):
         activo=True,
         fecha_inicio__lte=ultimo_dia,
     ).filter(db_models.Q(fecha_fin__isnull=True) | db_models.Q(fecha_fin__gte=primer_dia))
-    total_gc = sum(Decimal(str(g.monto)) * FREQ_FACTOR.get(g.frecuencia, 1) for g in gastos_c)
+    total_gc = sum(_monto_efectivo_mes(g.monto, g.frecuencia, g.fecha_inicio, primer_dia) for g in gastos_c)
 
     diferidos = Diferido.objects.filter(
         usuario=usuario,
@@ -386,9 +415,10 @@ def _calcular_neto_mensual_en_rango(usuario, desde_mes, hasta_mes):
             if item_start > item_end:
                 continue
 
-            amount = _money(amount_fn(item))
             for month_date in _iter_month_starts(item_start, item_end):
-                add_amount(month_date, amount)
+                amount = _money(amount_fn(item, month_date))
+                if amount:
+                    add_amount(month_date, amount)
 
     ingresos = Ingreso.objects.filter(
         usuario=usuario,
@@ -399,7 +429,9 @@ def _calcular_neto_mensual_en_rango(usuario, desde_mes, hasta_mes):
     ).values('monto', 'frecuencia', 'fecha_inicio', 'fecha_fin')
     add_recurrente(
         ingresos,
-        amount_fn=lambda item: Decimal(str(item['monto'])) * Decimal(str(FREQ_FACTOR.get(item['frecuencia'], 1))),
+        amount_fn=lambda item, month_date: _monto_efectivo_mes(
+            item['monto'], item['frecuencia'], item['fecha_inicio'], month_date,
+        ),
     )
 
     ingresos_puntuales = IngresoPuntual.objects.filter(
@@ -419,7 +451,9 @@ def _calcular_neto_mensual_en_rango(usuario, desde_mes, hasta_mes):
     ).values('monto', 'frecuencia', 'fecha_inicio', 'fecha_fin')
     add_recurrente(
         gastos_corrientes,
-        amount_fn=lambda item: -Decimal(str(item['monto'])) * Decimal(str(FREQ_FACTOR.get(item['frecuencia'], 1))),
+        amount_fn=lambda item, month_date: -_monto_efectivo_mes(
+            item['monto'], item['frecuencia'], item['fecha_inicio'], month_date,
+        ),
     )
 
     diferidos = Diferido.objects.filter(
@@ -430,7 +464,7 @@ def _calcular_neto_mensual_en_rango(usuario, desde_mes, hasta_mes):
     ).values('cuota_mensual', 'fecha_inicio', 'fecha_fin')
     add_recurrente(
         diferidos,
-        amount_fn=lambda item: -Decimal(str(item['cuota_mensual'])),
+        amount_fn=lambda item, month_date: -Decimal(str(item['cuota_mensual'])),
     )
 
     gastos_no_corrientes = GastoNoCorriente.objects.filter(
@@ -690,7 +724,7 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
 
     def _ing_fijos_mes(month_start, month_end):
         return sum(
-            (_money(item.monto) * Decimal(str(FREQ_FACTOR.get(item.frecuencia, 1)))
+            (_monto_efectivo_mes(item.monto, item.frecuencia, item.fecha_inicio, month_start)
              for item in ingresos
              if item.fecha_inicio <= month_end and (item.fecha_fin is None or item.fecha_fin >= month_start)),
             Decimal('0.00'),
@@ -698,7 +732,7 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
 
     def _gastos_fijos_mes(month_start, month_end):
         return sum(
-            (_money(item.monto) * Decimal(str(FREQ_FACTOR.get(item.frecuencia, 1)))
+            (_monto_efectivo_mes(item.monto, item.frecuencia, item.fecha_inicio, month_start)
              for item in gastos_corrientes
              if item.fecha_inicio <= month_end and (item.fecha_fin is None or item.fecha_fin >= month_start)),
             Decimal('0.00'),

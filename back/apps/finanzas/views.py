@@ -43,7 +43,7 @@ from .utils import (
     recalcular_saldo_mes_para,
     obtener_o_sembrar_saldo_mes,
     build_projection_cache_key,
-    FREQ_FACTOR,
+    _monto_efectivo_mes,
 )
 from .serializers import (
     CategoriaSerializer,
@@ -635,7 +635,7 @@ def _build_reporte_data(usuario, anio, mes):
         activo=True,
         fecha_inicio__lte=ultimo_dia,
     ).filter(models.Q(fecha_fin__isnull=True) | models.Q(fecha_fin__gte=primer_dia))
-    total_ing = sum(Decimal(str(i.monto)) * FREQ_FACTOR.get(i.frecuencia, 1) for i in ingresos_qs)
+    total_ing = sum(_monto_efectivo_mes(i.monto, i.frecuencia, i.fecha_inicio, primer_dia) for i in ingresos_qs)
     ingresos_puntuales_qs = IngresoPuntual.objects.filter(
         usuario=usuario,
         fecha__gte=primer_dia,
@@ -648,7 +648,7 @@ def _build_reporte_data(usuario, anio, mes):
         activo=True,
         fecha_inicio__lte=ultimo_dia,
     ).filter(models.Q(fecha_fin__isnull=True) | models.Q(fecha_fin__gte=primer_dia))
-    total_gc = sum(Decimal(str(g.monto)) * FREQ_FACTOR.get(g.frecuencia, 1) for g in gc_qs)
+    total_gc = sum(_monto_efectivo_mes(g.monto, g.frecuencia, g.fecha_inicio, primer_dia) for g in gc_qs)
 
     dif_qs = Diferido.objects.filter(
         usuario=usuario,
@@ -670,7 +670,7 @@ def _build_reporte_data(usuario, anio, mes):
     for gasto in gc_qs:
         cat_totales[gasto.categoria] = (
             cat_totales.get(gasto.categoria, Decimal('0'))
-            + Decimal(str(gasto.monto)) * FREQ_FACTOR.get(gasto.frecuencia, 1)
+            + _monto_efectivo_mes(gasto.monto, gasto.frecuencia, gasto.fecha_inicio, primer_dia)
         )
     for gasto in gnc_qs:
         cat_totales[gasto.categoria] = cat_totales.get(gasto.categoria, Decimal('0')) + Decimal(str(gasto.monto))

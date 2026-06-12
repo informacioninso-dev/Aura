@@ -12,10 +12,9 @@ import Modal from '../../components/ui/Modal'
 import { useCategorias } from '../../hooks/useCategorias'
 import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../../utils/dateBounds'
 import { formatAmount } from '../../utils/formatters'
+import { FRECUENCIAS, montoEfectivoMes } from '../../utils/frecuencias'
 import '../../components/ui/app.css'
 
-const FRECUENCIAS = ['diario', 'semanal', 'quincenal', 'mensual', 'bimestral', 'trimestral', 'semestral', 'anual']
-const FREQ = { diario: 30, semanal: 4.33, quincenal: 2, mensual: 1, bimestral: 0.5, trimestral: 0.333, semestral: 0.167, anual: 0.083 }
 const FRECUENCIA_STORAGE_KEY = 'gastos_corrientes_last_frecuencia'
 const CATEGORIA_STORAGE_KEY = 'gastos_corrientes_last_categoria'
 const FUTURE_EXPENSE_MESSAGE = 'Los gastos futuros no se cargan aqui. Simulalos desde el simulador con tasa 0%.'
@@ -255,9 +254,10 @@ export default function GastosCorrientes({ embedded = false }) {
 
   // — computos derivados —
   const hoy = getTodayDate()
+  const hoyDate = new Date(hoy + 'T00:00:00')
   const total = items
     .filter((i) => i.activo && i.fecha_inicio <= hoy && (!i.fecha_fin || i.fecha_fin >= hoy))
-    .reduce((s, i) => s + parseFloat(i.monto) * (FREQ[i.frecuencia] || 1), 0)
+    .reduce((s, i) => s + montoEfectivoMes(i.monto, i.frecuencia, i.fecha_inicio, hoyDate.getFullYear(), hoyDate.getMonth() + 1), 0)
 
   const filteredItems = items.filter((item) => {
     const q = query.trim().toLowerCase()

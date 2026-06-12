@@ -18,13 +18,7 @@ from .models import (
     IngresoPuntual,
     Notificacion,
 )
-from .utils import invalidate_finanzas_cache, recalcular_saldo_mes_para
-
-FREQ = {
-    'diario': 30, 'semanal': Decimal('4.33'), 'quincenal': 2,
-    'mensual': 1, 'bimestral': Decimal('0.5'), 'trimestral': Decimal('0.333'),
-    'semestral': Decimal('0.167'), 'anual': Decimal('0.083'),
-}
+from .utils import _monto_efectivo_mes, invalidate_finanzas_cache, recalcular_saldo_mes_para
 
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
@@ -50,7 +44,7 @@ def _gasto_mensual_categoria(usuario, categoria, anio, mes):
         usuario=usuario, activo=True, categoria=categoria,
         fecha_inicio__lte=ultimo_dia,
     ).filter(Q(fecha_fin__isnull=True) | Q(fecha_fin__gte=primer_dia))
-    total = sum(Decimal(str(g.monto)) * FREQ.get(g.frecuencia, 1) for g in gc)
+    total = sum((_monto_efectivo_mes(g.monto, g.frecuencia, g.fecha_inicio, primer_dia) for g in gc), Decimal('0.00'))
 
     gnc = GastoNoCorriente.objects.filter(
         usuario=usuario, categoria=categoria,
