@@ -1012,9 +1012,10 @@ class TestFinanzasAPI(APITestCase):
         self.assertEqual(response.data['months'], 3)
         self.assertEqual(response.data['display_past_months'], 3)
         self.assertEqual(response.data['max_months_allowed'], 3)
-        self.assertEqual(len(response.data['series']), 6)
-        self.assertTrue(all(point['is_real'] for point in response.data['series'][:3]))
-        self.assertTrue(all(not point['is_real'] for point in response.data['series'][3:]))
+        # El mes en curso se incluye como dato real (past_months + 1) antes de los proyectados.
+        self.assertEqual(len(response.data['series']), 7)
+        self.assertTrue(all(point['is_real'] for point in response.data['series'][:4]))
+        self.assertTrue(all(not point['is_real'] for point in response.data['series'][4:]))
 
     def test_proyeccion_acumulada_para_plan_pro_retorna_serie_acumulada(self):
         current_month = first_day_of_month(datetime.date.today())
@@ -1090,35 +1091,37 @@ class TestFinanzasAPI(APITestCase):
             Decimal(str(response.data['starting_balance'])),
             Decimal(str(response.data['series'][5]['closing_balance'])),
         )
-        self.assertEqual(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('80.0'))
+        # Los ingresos puntuales no se proyectan hacia adelante (solo cuentan en su mes real).
+        self.assertEqual(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('0.0'))
         self.assertEqual(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('20.0'))
-        self.assertEqual(Decimal(str(response.data['smoothed_variable_gap'])), Decimal('60.0'))
-        self.assertEqual(len(response.data['series']), 12)
-        self.assertTrue(all(point['is_real'] for point in response.data['series'][:6]))
-        self.assertTrue(all(not point['is_real'] for point in response.data['series'][6:]))
+        self.assertEqual(Decimal(str(response.data['smoothed_variable_gap'])), Decimal('-20.0'))
+        # El mes en curso se incluye como dato real (past_months + 1) antes de los proyectados.
+        self.assertEqual(len(response.data['series']), 13)
+        self.assertTrue(all(point['is_real'] for point in response.data['series'][:7]))
+        self.assertTrue(all(not point['is_real'] for point in response.data['series'][7:]))
         self.assertEqual(
-            Decimal(str(response.data['series'][6]['opening_balance'])),
-            Decimal(str(response.data['series'][5]['closing_balance'])),
-        )
-        self.assertEqual(Decimal(str(response.data['series'][6]['monthly_ingresos'])), Decimal('1080.0'))
-        self.assertEqual(Decimal(str(response.data['series'][6]['monthly_gastos'])), Decimal('520.0'))
-        self.assertEqual(Decimal(str(response.data['series'][6]['projected_gap'])), Decimal('560.0'))
-        self.assertEqual(
+            Decimal(str(response.data['series'][7]['opening_balance'])),
             Decimal(str(response.data['series'][6]['closing_balance'])),
-            Decimal(str(response.data['series'][6]['opening_balance']))
-            + Decimal(str(response.data['series'][6]['projected_gap'])),
         )
-        self.assertEqual(Decimal(str(response.data['series'][6]['cumulative_balance'])), Decimal('2720.0'))
-        self.assertEqual(Decimal(str(response.data['series'][7]['cumulative_balance'])), Decimal('3280.0'))
+        self.assertEqual(Decimal(str(response.data['series'][7]['monthly_ingresos'])), Decimal('1000.0'))
+        self.assertEqual(Decimal(str(response.data['series'][7]['monthly_gastos'])), Decimal('520.0'))
+        self.assertEqual(Decimal(str(response.data['series'][7]['projected_gap'])), Decimal('480.0'))
         self.assertEqual(
-            Decimal(str(response.data['series'][6]['cumulative_balance'])),
-            Decimal(str(response.data['series'][6]['cumulative_ingresos']))
-            - Decimal(str(response.data['series'][6]['cumulative_gastos'])),
+            Decimal(str(response.data['series'][7]['closing_balance'])),
+            Decimal(str(response.data['series'][7]['opening_balance']))
+            + Decimal(str(response.data['series'][7]['projected_gap'])),
+        )
+        self.assertEqual(Decimal(str(response.data['series'][7]['cumulative_balance'])), Decimal('3140.0'))
+        self.assertEqual(Decimal(str(response.data['series'][8]['cumulative_balance'])), Decimal('3620.0'))
+        self.assertEqual(
+            Decimal(str(response.data['series'][7]['cumulative_balance'])),
+            Decimal(str(response.data['series'][7]['cumulative_ingresos']))
+            - Decimal(str(response.data['series'][7]['cumulative_gastos'])),
         )
         self.assertEqual(
-            Decimal(str(response.data['series'][6]['cumulative_cash_position'])),
+            Decimal(str(response.data['series'][7]['cumulative_cash_position'])),
             Decimal(str(response.data['starting_balance']))
-            + Decimal(str(response.data['series'][6]['cumulative_balance'])),
+            + Decimal(str(response.data['series'][7]['cumulative_balance'])),
         )
 
     def test_proyeccion_acumulada_arrastra_cierre_actual_al_primer_mes_futuro(self):
@@ -1219,10 +1222,11 @@ class TestFinanzasAPI(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data['variable_projection_applied'])
-        self.assertEqual(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('100.0'))
+        # Los ingresos puntuales no se proyectan hacia adelante (solo cuentan en su mes real).
+        self.assertEqual(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('0.0'))
         self.assertEqual(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('45.83'))
-        self.assertEqual(Decimal(str(response.data['smoothed_variable_gap'])), Decimal('54.17'))
-        self.assertEqual(Decimal(str(response.data['series'][-1]['projected_gap'])), Decimal('54.17'))
+        self.assertEqual(Decimal(str(response.data['smoothed_variable_gap'])), Decimal('-45.83'))
+        self.assertEqual(Decimal(str(response.data['series'][-1]['projected_gap'])), Decimal('-45.83'))
 
     def test_proyeccion_acumulada_free_no_aplica_variable_con_muestra_insuficiente(self):
         current_month = first_day_of_month(datetime.date.today())
@@ -1411,9 +1415,10 @@ class TestFinanzasAPI(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['history_months_used'], 3)
         self.assertTrue(response.data['variable_projection_applied'])
-        self.assertGreater(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('0.0'))
+        # Los ingresos puntuales no se proyectan hacia adelante (solo cuentan en su mes real).
+        self.assertEqual(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('0.0'))
         self.assertGreater(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('0.0'))
-        self.assertGreater(Decimal(str(response.data['series'][-1]['projected_gap'])), Decimal('600.0'))
+        self.assertEqual(Decimal(str(response.data['series'][-1]['projected_gap'])), Decimal('550.0'))
 
     def test_proyeccion_acumulada_plan_pro_modo_simple_usa_todos_los_extras(self):
         current_month = first_day_of_month(datetime.date.today())
@@ -1588,9 +1593,10 @@ class TestFinanzasAPI(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['history_months_used'], 3)
         self.assertTrue(response.data['variable_projection_applied'])
-        self.assertEqual(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('120.0'))
+        # Los ingresos puntuales no se proyectan hacia adelante (solo cuentan en su mes real).
+        self.assertEqual(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('0.0'))
         self.assertEqual(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('60.0'))
-        self.assertEqual(Decimal(str(response.data['series'][-1]['projected_gap'])), Decimal('660.0'))
+        self.assertEqual(Decimal(str(response.data['series'][-1]['projected_gap'])), Decimal('540.0'))
 
     def test_proyeccion_acumulada_plan_pro_amortigua_outlier_con_iqr_y_ewma(self):
         current_month = first_day_of_month(datetime.date.today())
@@ -1642,7 +1648,8 @@ class TestFinanzasAPI(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['history_months_used'], 6)
         self.assertTrue(response.data['variable_projection_applied'])
-        self.assertEqual(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('100.0'))
+        # Los ingresos puntuales no se proyectan hacia adelante (solo cuentan en su mes real).
+        self.assertEqual(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('0.0'))
         self.assertEqual(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('0.0'))
         self.assertEqual(Decimal(str(response.data['series'][1]['projected_gap'])), Decimal('700.0'))
 
@@ -1733,6 +1740,7 @@ class TestFinanzasAPI(APITestCase):
         self.assertEqual(response.data['display_past_months'], 6)
         self.assertEqual(response.data['analysis_history_months'], 18)
         self.assertEqual(response.data['analysis_history_cap_months'], 18)
-        self.assertEqual(len(response.data['series']), 7)
-        self.assertTrue(all(point['is_real'] for point in response.data['series'][:6]))
-        self.assertTrue(all(not point['is_real'] for point in response.data['series'][6:]))
+        # El mes en curso se incluye como dato real (past_months + 1) antes de los proyectados.
+        self.assertEqual(len(response.data['series']), 8)
+        self.assertTrue(all(point['is_real'] for point in response.data['series'][:7]))
+        self.assertTrue(all(not point['is_real'] for point in response.data['series'][7:]))
