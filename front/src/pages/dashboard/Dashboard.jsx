@@ -779,12 +779,12 @@ export default function Dashboard() {
           </div>
         )}
         <div style={{ color: '#10B981' }}>{`Total disponible este mes: ${fmt(ingDisponible)}`}</div>
-        <div style={{ color: '#F87171' }}>{`Gastos del mes: ${fmt(gastoDisplay)}`}</div>
         {advancedProjectionEnabled && point.opening != null && (
-          <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, marginTop: 4 }}>
+          <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, marginBottom: 4 }}>
             {`Saldo anterior: ${fmt(point.opening)} + ingresos: ${fmt(point.ingMes)}`}
           </div>
         )}
+        <div style={{ color: '#F87171' }}>{`Gastos del mes: ${fmt(gastoDisplay)}`}</div>
       </div>
     )
   }
