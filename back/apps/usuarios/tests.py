@@ -24,6 +24,14 @@ class TestUsuarioAPI(APITestCase):
             format='json',
         )
 
+    def login_mobile_user(self, user, password='clave12345'):
+        return self.client.post(
+            '/api/usuarios/login/',
+            {'email': user.email, 'password': password},
+            format='json',
+            HTTP_X_CLIENT='mobile',
+        )
+
     def test_registro_crea_usuario_y_hashea_password(self):
         payload = {
             'email': 'nuevo@example.com',
@@ -188,6 +196,21 @@ class TestUsuarioAPI(APITestCase):
         self.assertTrue(cookie['httponly'])
         self.assertEqual(cookie['path'], settings.AUTH_REFRESH_COOKIE_PATH)
 
+    def test_login_mobile_entrega_refresh_en_body(self):
+        user = User.objects.create_user(
+            email='loginmobile@example.com',
+            username='loginmobile',
+            password='clave12345',
+        )
+
+        response = self.login_mobile_user(user)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', response.data)
+        self.assertIn('refresh', response.data)
+        self.assertTrue(response.data['refresh'])
+        self.assertIn(settings.AUTH_REFRESH_COOKIE_NAME, response.cookies)
+
     def test_refresh_cookie_renueva_access_y_rota_refresh(self):
         user = User.objects.create_user(
             email='refreshcookie@example.com',
@@ -205,6 +228,34 @@ class TestUsuarioAPI(APITestCase):
         self.assertIn(settings.AUTH_REFRESH_COOKIE_NAME, response.cookies)
         self.assertNotEqual(response.cookies[settings.AUTH_REFRESH_COOKIE_NAME].value, previous_refresh)
 
+    def test_refresh_mobile_acepta_refresh_en_body_y_lo_rota(self):
+        user = User.objects.create_user(
+            email='refreshmobile@example.com',
+            username='refreshmobile',
+            password='clave12345',
+        )
+
+        login_response = self.login_mobile_user(user)
+        previous_refresh = login_response.data['refresh']
+        self.client.cookies.clear()
+
+        response = self.client.post(
+            '/api/usuarios/token/refresh/',
+            {'refresh': previous_refresh},
+            format='json',
+            HTTP_X_CLIENT='mobile',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', response.data)
+        self.assertIn('refresh', response.data)
+        self.assertNotEqual(response.data['refresh'], previous_refresh)
+        self.assertIn(settings.AUTH_REFRESH_COOKIE_NAME, response.cookies)
+        self.assertEqual(
+            response.cookies[settings.AUTH_REFRESH_COOKIE_NAME].value,
+            response.data['refresh'],
+        )
+
     def test_logout_limpia_cookie_refresh(self):
         user = User.objects.create_user(
             email='logoutcookie@example.com',
@@ -218,6 +269,33 @@ class TestUsuarioAPI(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn(settings.AUTH_REFRESH_COOKIE_NAME, response.cookies)
         self.assertEqual(response.cookies[settings.AUTH_REFRESH_COOKIE_NAME].value, '')
+
+    def test_logout_mobile_blacklistea_refresh_en_body(self):
+        user = User.objects.create_user(
+            email='logoutmobile@example.com',
+            username='logoutmobile',
+            password='clave12345',
+        )
+        login_response = self.login_mobile_user(user)
+        refresh_token = login_response.data['refresh']
+        self.client.cookies.clear()
+
+        response = self.client.post(
+            '/api/usuarios/logout/',
+            {'refresh': refresh_token},
+            format='json',
+            HTTP_X_CLIENT='mobile',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        refresh_response = self.client.post(
+            '/api/usuarios/token/refresh/',
+            {'refresh': refresh_token},
+            format='json',
+            HTTP_X_CLIENT='mobile',
+        )
+        self.assertEqual(refresh_response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_password_change_invalida_token_actual(self):
         user = User.objects.create_user(
