@@ -263,23 +263,32 @@ export default function GastosNoCorrientes({ embedded = false }) {
     else setFeedback({ type: 'error', message: `Se eliminaron ${ids.length - errors} de ${ids.length}. Algunos fallaron.` })
   }
 
-  async function handleConvertToFijo() {
+  async function handleConvertToRecurrente(destino) {
     if (!editId || converting) return
+    const esVariable = destino === 'variable'
     setConverting(true)
     setConfirmConvert(false)
     setFeedback({ type: '', message: '' })
     try {
-      await api.post(`/finanzas/gastos-no-corrientes/${editId}/convertir_a_fijo/`, {
-        descripcion: form.descripcion,
-        categoria: form.categoria,
-        monto: form.monto,
-        fecha_inicio: form.fecha,
-      })
+      await api.post(
+        `/finanzas/gastos-no-corrientes/${editId}/${esVariable ? 'convertir_a_variable' : 'convertir_a_fijo'}/`,
+        {
+          descripcion: form.descripcion,
+          categoria: form.categoria,
+          monto: form.monto,
+          fecha_inicio: form.fecha,
+        },
+      )
       setModal(false)
-      await fetchItems()
-      setFeedback({ type: 'success', message: 'Listo. Ahora lo veras en Gastos fijos.' })
+      await Promise.all([fetchItems(), fetchSugerencias()])
+      setFeedback({
+        type: 'success',
+        message: esVariable
+          ? 'Listo. Ahora lo veras en Gastos variables, y este monto quedo como el pago real de su mes.'
+          : 'Listo. Ahora lo veras en Gastos fijos.',
+      })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo convertir el gasto a fijo.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo convertir el gasto.') })
     } finally {
       setConverting(false)
     }
@@ -533,17 +542,28 @@ export default function GastosNoCorrientes({ embedded = false }) {
               <div className="form-modal-convert-copy">
                 <span className="form-modal-convert-title">Cambiar tipo de movimiento</span>
                 <span className="form-modal-convert-text">
-                  Si esto se repite todos los meses, puedes pasarlo a fijo y luego ajustar la frecuencia si hace falta.
+                  Si esto se repite todos los meses: pasalo a <strong>fijo</strong> si siempre pagas lo mismo,
+                  o a <strong>variable</strong> si el monto cambia (luz, agua, super).
                 </span>
               </div>
-              <button
-                type="button"
-                className="btn-modal-convert"
-                onClick={() => setConfirmConvert(true)}
-                disabled={loading || converting}
-              >
-                {converting ? 'Convirtiendo...' : 'Pasar a fijo'}
-              </button>
+              <div className="form-modal-convert-actions">
+                <button
+                  type="button"
+                  className="btn-modal-convert"
+                  onClick={() => setConfirmConvert(true)}
+                  disabled={loading || converting}
+                >
+                  {converting ? 'Convirtiendo...' : 'Pasar a fijo'}
+                </button>
+                <button
+                  type="button"
+                  className="btn-modal-convert"
+                  onClick={() => handleConvertToRecurrente('variable')}
+                  disabled={loading || converting}
+                >
+                  Pasar a variable
+                </button>
+              </div>
             </div>
           )}
 
@@ -563,7 +583,7 @@ export default function GastosNoCorrientes({ embedded = false }) {
         confirmText="Convertir"
         cancelText="Cancelar"
         loading={converting}
-        onConfirm={handleConvertToFijo}
+        onConfirm={() => handleConvertToRecurrente('fijo')}
         onClose={() => setConfirmConvert(false)}
       />
 
