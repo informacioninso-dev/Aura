@@ -2605,3 +2605,131 @@ class TestMotorDeSenales(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class TestImportacionRecurrentes(APITestCase):
+    """El import distingue recurrentes (fijo/variable) de puntuales."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            email='imp@example.com', username='usuario_imp', password='clave12345',
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def _preview(self, csv_text):
+        from apps.finanzas.importar import parsear_archivo
+        return parsear_archivo('x.csv', csv_text.encode('utf-8'))
+
+    # -- Parseo --------------------------------------------------------------
+
+    def test_columna_frecuencia_marca_recurrente(self):
+        r = self._preview(
+            'fecha,descripcion,monto,tipo,categoria,frecuencia\n'
+            '2025-01-10,Arriendo,-600,gasto,vivienda,mensual\n'
+            '2025-01-20,Tele,-500,gasto,tecnologia,\n'
+        )
+        por_desc = {f['descripcion']: f for f in r['filas_ok']}
+        self.assertEqual(por_desc['Arriendo']['frecuencia'], 'mensual')
+        self.assertEqual(por_desc['Tele']['frecuencia'], '')  # puntual
+
+    def test_tipo_monto_variable_se_reconoce(self):
+        r = self._preview(
+            'fecha,descripcion,monto,tipo,categoria,frecuencia,tipo_monto\n'
+            '2025-01-15,Luz,-45,gasto,servicios,mensual,variable\n'
+        )
+        self.assertEqual(r['filas_ok'][0]['tipo_monto'], 'variable')
+
+    def test_frecuencia_acepta_sinonimos_y_tildes(self):
+        r = self._preview(
+            'fecha,descripcion,monto,tipo,categoria,frecuencia\n'
+            '2025-01-10,A,-1,gasto,otro,Mensualmente\n'
+            '2025-01-10,B,-1,gasto,otro,anual\n'
+            '2025-01-10,C,-1,gasto,otro,quincena\n'
+        )
+        frecs = sorted(f['frecuencia'] for f in r['filas_ok'])
+        self.assertEqual(frecs, ['anual', 'mensual', 'quincenal'])
+
+    def test_frecuencia_invalida_cae_a_puntual(self):
+        r = self._preview(
+            'fecha,descripcion,monto,tipo,categoria,frecuencia\n'
+            '2025-01-10,X,-1,gasto,otro,cuando_pueda\n'
+        )
+        self.assertEqual(r['filas_ok'][0]['frecuencia'], '')
+
+    def test_sin_columna_frecuencia_todo_es_puntual(self):
+        # Compatibilidad hacia atras: archivos viejos siguen funcionando.
+        r = self._preview(
+            'fecha,descripcion,monto,tipo,categoria\n'
+            '2025-01-10,Arriendo,-600,gasto,vivienda\n'
+        )
+        self.assertEqual(r['filas_ok'][0]['frecuencia'], '')
+
+    # -- Anti duplicado 12x --------------------------------------------------
+
+    def test_recurrente_repetido_va_a_errores(self):
+        r = self._preview(
+            'fecha,descripcion,monto,tipo,categoria,frecuencia\n'
+            '2025-01-10,Arriendo,-600,gasto,vivienda,mensual\n'
+            '2025-02-10,Arriendo,-600,gasto,vivienda,mensual\n'
+            '2025-03-10,Arriendo,-600,gasto,vivienda,mensual\n'
+        )
+        self.assertEqual(len([f for f in r['filas_ok'] if f['descripcion'] == 'Arriendo']), 1)
+        self.assertEqual(len(r['filas_error']), 2)
+        self.assertIn('recurrente repetido', r['filas_error'][0]['error'].lower())
+
+    def test_puntuales_repetidos_no_se_marcan(self):
+        # Tres compras de super distintas SI son validas como puntuales.
+        r = self._preview(
+            'fecha,descripcion,monto,tipo,categoria\n'
+            '2025-01-10,Super,-50,gasto,alimentacion\n'
+            '2025-02-10,Super,-60,gasto,alimentacion\n'
+            '2025-03-10,Super,-55,gasto,alimentacion\n'
+        )
+        self.assertEqual(len(r['filas_ok']), 3)
+        self.assertEqual(len(r['filas_error']), 0)
+
+    # -- Creacion de registros ----------------------------------------------
+
+    def test_confirmar_crea_el_modelo_correcto(self):
+        payload = {'filas': [
+            {'fecha': '2025-01-05', 'descripcion': 'Sueldo', 'monto': '1500', 'tipo': 'ingreso', 'categoria': 'otro', 'frecuencia': 'mensual'},
+            {'fecha': '2025-01-08', 'descripcion': 'Bono', 'monto': '300', 'tipo': 'ingreso', 'categoria': 'otro', 'frecuencia': ''},
+            {'fecha': '2025-01-10', 'descripcion': 'Arriendo', 'monto': '600', 'tipo': 'gasto', 'categoria': 'vivienda', 'frecuencia': 'mensual', 'tipo_monto': 'fijo'},
+            {'fecha': '2025-01-15', 'descripcion': 'Luz', 'monto': '45', 'tipo': 'gasto', 'categoria': 'servicios', 'frecuencia': 'mensual', 'tipo_monto': 'variable'},
+            {'fecha': '2025-01-20', 'descripcion': 'Tele', 'monto': '500', 'tipo': 'gasto', 'categoria': 'tecnologia', 'frecuencia': ''},
+        ]}
+
+        response = self.client.post('/api/finanzas/importar/confirmar/', payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['recurrentes_creados'], 3)
+        self.assertEqual(Ingreso.objects.filter(usuario=self.user, descripcion='Sueldo', frecuencia='mensual').count(), 1)
+        self.assertEqual(IngresoPuntual.objects.filter(usuario=self.user, descripcion='Bono').count(), 1)
+        fijo = GastoCorriente.objects.get(usuario=self.user, descripcion='Arriendo')
+        self.assertEqual(fijo.tipo_monto, 'fijo')
+        self.assertEqual(fijo.frecuencia, 'mensual')
+        var = GastoCorriente.objects.get(usuario=self.user, descripcion='Luz')
+        self.assertEqual(var.tipo_monto, 'variable')
+        self.assertEqual(GastoNoCorriente.objects.filter(usuario=self.user, descripcion='Tele').count(), 1)
+
+    def test_confirmar_rechaza_recurrente_duplicado(self):
+        payload = {'filas': [
+            {'fecha': '2025-01-10', 'descripcion': 'Arriendo', 'monto': '600', 'tipo': 'gasto', 'categoria': 'vivienda', 'frecuencia': 'mensual'},
+            {'fecha': '2025-02-10', 'descripcion': 'Arriendo', 'monto': '600', 'tipo': 'gasto', 'categoria': 'vivienda', 'frecuencia': 'mensual'},
+        ]}
+
+        response = self.client.post('/api/finanzas/importar/confirmar/', payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(GastoCorriente.objects.filter(usuario=self.user).count(), 0)
+
+    def test_el_gasto_variable_importado_entra_en_su_pestana(self):
+        payload = {'filas': [
+            {'fecha': '2025-01-15', 'descripcion': 'Agua', 'monto': '30', 'tipo': 'gasto', 'categoria': 'servicios', 'frecuencia': 'mensual', 'tipo_monto': 'variable'},
+        ]}
+        self.client.post('/api/finanzas/importar/confirmar/', payload, format='json')
+
+        response = self.client.get('/api/finanzas/gastos-corrientes/?tipo_monto=variable')
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['descripcion'], 'Agua')
