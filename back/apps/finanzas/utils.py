@@ -1,4 +1,5 @@
 import datetime
+import unicodedata
 from decimal import Decimal
 
 from django.core.cache import cache
@@ -353,6 +354,58 @@ def _estimate_premium_variable_component(monthly_values):
 
     frequency = Decimal(active_months) / Decimal(total_months)
     return (typical_amount * frequency).quantize(Decimal('0.01'))
+
+
+# Gastos que en la practica casi siempre cambian de monto mes a mes. Sirve
+# para sugerirle al usuario que los declare como variables desde el primer
+# registro, sin esperar a que se repitan tres meses.
+TERMINOS_GASTO_VARIABLE = {
+    'luz', 'energia', 'energia electrica', 'electricidad', 'planilla de luz',
+    'agua', 'alcantarillado', 'planilla de agua',
+    'internet', 'telefono', 'celular', 'plan de datos', 'recarga',
+    'gas', 'tanque de gas',
+    'gasolina', 'combustible', 'diesel', 'peaje',
+    'supermercado', 'super', 'mercado', 'viveres', 'despensa', 'feria',
+}
+
+# Categorias donde el termino es creible. Fuera de estas se ignora, para no
+# marcar "regalo para Luz" o "agua mineral para la fiesta".
+CATEGORIAS_GASTO_VARIABLE = {'servicios', 'vivienda', 'alimentacion', 'transporte', 'otro'}
+
+
+def _normalizar_termino(texto):
+    """Minusculas y sin tildes, para comparar descripciones escritas a mano."""
+    base = unicodedata.normalize('NFD', (texto or '').strip().lower())
+    return ''.join(ch for ch in base if unicodedata.category(ch) != 'Mn')
+
+
+def parece_gasto_variable(descripcion, categoria=None):
+    """
+    True si la descripcion coincide con un gasto tipicamente variable.
+
+    Exige coincidencia exacta del nombre normalizado, no que lo contenga:
+    'luz' matchea, 'regalo para luz' no. Es una sugerencia, nunca una
+    reclasificacion automatica, porque los falsos positivos existen.
+    """
+    if categoria is not None and categoria not in CATEGORIAS_GASTO_VARIABLE:
+        return False
+    return _normalizar_termino(descripcion) in TERMINOS_GASTO_VARIABLE
+
+
+def _clave_gasto(descripcion, categoria):
+    """Identidad de un gasto para cruzar puntuales con variables declarados."""
+    return ((descripcion or '').strip().lower(), categoria)
+
+
+def claves_gastos_variables(gastos_corrientes):
+    """Claves de los gastos variables declarados, para no contarlos dos veces."""
+    from .models import TIPO_MONTO_VARIABLE
+
+    return {
+        _clave_gasto(gasto.descripcion, gasto.categoria)
+        for gasto in gastos_corrientes
+        if gasto.tipo_monto == TIPO_MONTO_VARIABLE
+    }
 
 
 def mapa_ejecuciones_variables(usuario):
@@ -765,9 +818,15 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
         item for item in ingresos_puntuales
         if (item.incluir_en_proyeccion if use_manual_eligibility else True)
     ]
+    # Un puntual que ya existe como gasto variable declarado no puede alimentar
+    # el colchon de imprevistos: ese gasto ya se proyecta por su propia via.
+    # Solo se excluye del suavizado; en el historico sigue contando, porque
+    # esa plata efectivamente se gasto.
+    claves_variables = claves_gastos_variables(gastos_corrientes)
     gastos_puntuales_elegibles = [
         item for item in gastos_puntuales
         if (item.incluir_en_proyeccion if use_manual_eligibility else True)
+        and _clave_gasto(item.descripcion, item.categoria) not in claves_variables
     ]
 
     ingresos_puntuales_por_mes = {}

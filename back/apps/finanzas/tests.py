@@ -25,6 +25,7 @@ from .models import (
 )
 from .utils import (
     _monto_base_gasto_mes,
+    parece_gasto_variable,
     calcular_balance_mes,
     calcular_proyeccion_acumulada,
     detectar_puntuales_recurrentes,
@@ -2253,3 +2254,175 @@ class TestConversionManualPuntualAVariable(APITestCase):
         cache.clear()
 
         self.assertEqual(calcular_balance_mes(self.user, 2026, 3), antes)
+
+
+class TestDiccionarioGastoVariable(APITestCase):
+    """Nombres que casi siempre corresponden a un gasto variable."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            email='dicc@example.com', username='usuario_dicc', password='clave12345',
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_reconoce_terminos_tipicos(self):
+        for termino in ['luz', 'Luz', 'LUZ', 'agua', 'internet', 'gasolina', 'supermercado']:
+            self.assertTrue(
+                parece_gasto_variable(termino, 'servicios'),
+                msg='deberia reconocer {}'.format(termino),
+            )
+
+    def test_ignora_tildes(self):
+        self.assertTrue(parece_gasto_variable('energia electrica', 'servicios'))
+        self.assertTrue(parece_gasto_variable('energía eléctrica', 'servicios'))
+        self.assertTrue(parece_gasto_variable('viveres', 'alimentacion'))
+        self.assertTrue(parece_gasto_variable('víveres', 'alimentacion'))
+
+    def test_no_marca_un_nombre_de_persona(self):
+        """'Luz' tambien es nombre: solo debe matchear si es la descripcion completa."""
+        self.assertFalse(parece_gasto_variable('regalo para Luz', 'otro'))
+        self.assertFalse(parece_gasto_variable('prestamo a Luz', 'otro'))
+        self.assertFalse(parece_gasto_variable('agua mineral para la fiesta', 'alimentacion'))
+
+    def test_la_categoria_acota_el_falso_positivo(self):
+        self.assertTrue(parece_gasto_variable('agua', 'servicios'))
+        self.assertFalse(parece_gasto_variable('agua', 'entretenimiento'))
+
+    def test_no_marca_un_gasto_puntual_real(self):
+        for descripcion in ['televisor', 'reparacion del auto', 'regalo de cumpleanos']:
+            self.assertFalse(parece_gasto_variable(descripcion, 'otro'))
+
+    def test_el_serializer_expone_la_marca(self):
+        response = self.client.post('/api/finanzas/gastos-no-corrientes/', {
+            'descripcion': 'Luz', 'categoria': 'servicios',
+            'monto': '40.00', 'fecha': '2026-03-10',
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data['parece_variable'])
+
+    def test_el_serializer_no_marca_lo_que_no_corresponde(self):
+        response = self.client.post('/api/finanzas/gastos-no-corrientes/', {
+            'descripcion': 'Televisor', 'categoria': 'tecnologia',
+            'monto': '500.00', 'fecha': '2026-03-10',
+        }, format='json')
+
+        self.assertFalse(response.data['parece_variable'])
+
+    def test_endpoint_para_consultar_mientras_escribe(self):
+        response = self.client.get(
+            '/api/finanzas/gastos-no-corrientes/parece_variable/',
+            {'descripcion': 'Luz', 'categoria': 'servicios'},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['parece_variable'])
+
+        response = self.client.get(
+            '/api/finanzas/gastos-no-corrientes/parece_variable/',
+            {'descripcion': 'Televisor', 'categoria': 'tecnologia'},
+        )
+        self.assertFalse(response.data['parece_variable'])
+
+
+class TestNoDobleConteoVariableYPuntuales(APITestCase):
+    """Un variable declarado no debe ademas alimentar el colchon de imprevistos."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            email='doble@example.com', username='usuario_doble', password='clave12345',
+        )
+        self.hoy = local_today()
+
+    def _puntuales_de(self, descripcion, categoria='servicios', monto='45.00', meses=(1, 2, 3, 4)):
+        base = first_day_of_month(self.hoy)
+        for mes in meses:
+            GastoNoCorriente.objects.create(
+                usuario=self.user, descripcion=descripcion, categoria=categoria,
+                monto=Decimal(monto), fecha=add_months(base, -mes),
+            )
+
+    def _proyeccion(self):
+        cache.clear()
+        return calcular_proyeccion_acumulada(self.user, months=6)
+
+    def test_los_puntuales_alimentan_el_colchon_si_no_hay_variable(self):
+        self._puntuales_de('Luz')
+
+        data = self._proyeccion()
+
+        # Sin variable declarado, la historia de puntuales sostiene el colchon.
+        self.assertGreater(data['smoothed_variable_gastos'], Decimal('0.00'))
+
+    def test_declarar_el_variable_saca_sus_puntuales_del_colchon(self):
+        self._puntuales_de('Luz')
+        colchon_antes = self._proyeccion()['smoothed_variable_gastos']
+
+        GastoCorriente.objects.create(
+            usuario=self.user, descripcion='Luz', categoria='servicios',
+            monto=Decimal('45.00'), tipo_monto='variable',
+            frecuencia='mensual', fecha_inicio=add_months(first_day_of_month(self.hoy), -6),
+            activo=True,
+        )
+
+        colchon_despues = self._proyeccion()['smoothed_variable_gastos']
+        self.assertGreater(colchon_antes, Decimal('0.00'))
+        self.assertEqual(colchon_despues, Decimal('0.00'))
+
+    def test_el_cruce_ignora_mayusculas_al_comparar(self):
+        self._puntuales_de('luz')
+        GastoCorriente.objects.create(
+            usuario=self.user, descripcion='LUZ', categoria='servicios',
+            monto=Decimal('45.00'), tipo_monto='variable',
+            frecuencia='mensual', fecha_inicio=add_months(first_day_of_month(self.hoy), -6),
+            activo=True,
+        )
+
+        self.assertEqual(self._proyeccion()['smoothed_variable_gastos'], Decimal('0.00'))
+
+    def test_un_variable_no_saca_del_colchon_a_otros_gastos(self):
+        self._puntuales_de('Luz')
+        self._puntuales_de('Regalos', categoria='otro', monto='80.00')
+
+        GastoCorriente.objects.create(
+            usuario=self.user, descripcion='Luz', categoria='servicios',
+            monto=Decimal('45.00'), tipo_monto='variable',
+            frecuencia='mensual', fecha_inicio=add_months(first_day_of_month(self.hoy), -6),
+            activo=True,
+        )
+
+        # "Regalos" sigue siendo imprevisto y debe sostener el colchon.
+        self.assertGreater(self._proyeccion()['smoothed_variable_gastos'], Decimal('0.00'))
+
+    def test_un_gasto_fijo_homonimo_no_saca_nada_del_colchon(self):
+        """Solo los variables excluyen; un fijo con el mismo nombre no."""
+        self._puntuales_de('Luz')
+        GastoCorriente.objects.create(
+            usuario=self.user, descripcion='Luz', categoria='servicios',
+            monto=Decimal('45.00'), tipo_monto='fijo',
+            frecuencia='mensual', fecha_inicio=add_months(first_day_of_month(self.hoy), -6),
+            activo=True,
+        )
+
+        self.assertGreater(self._proyeccion()['smoothed_variable_gastos'], Decimal('0.00'))
+
+    def test_el_historico_sigue_contando_el_gasto_real(self):
+        """Excluir del colchon no debe borrar plata que si se gasto."""
+        base = first_day_of_month(self.hoy)
+        mes_pasado = add_months(base, -1)
+        GastoNoCorriente.objects.create(
+            usuario=self.user, descripcion='Luz', categoria='servicios',
+            monto=Decimal('45.00'), fecha=mes_pasado,
+        )
+        GastoCorriente.objects.create(
+            usuario=self.user, descripcion='Luz', categoria='servicios',
+            monto=Decimal('45.00'), tipo_monto='variable',
+            frecuencia='mensual', fecha_inicio=add_months(base, -6), activo=True,
+        )
+        cache.clear()
+
+        balance = calcular_balance_mes(self.user, mes_pasado.year, mes_pasado.month)
+        # 45 del puntual historico + 45 del variable proyectado en ese mes.
+        self.assertEqual(balance, Decimal('-90.00'))

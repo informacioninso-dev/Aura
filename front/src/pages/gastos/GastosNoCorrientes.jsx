@@ -62,6 +62,9 @@ export default function GastosNoCorrientes({ embedded = false }) {
   const { categorias } = useCategorias()
   const canCustomizeProjection = Boolean(user?.feature_access?.advanced_projection_enabled)
 
+  // — aviso al escribir un nombre que suele ser gasto variable (luz, agua...) —
+  const [pareceVariable, setPareceVariable] = useState(false)
+
   // — sugerencias de gastos variables mal cargados como puntuales —
   const [sugerencias, setSugerencias] = useState([])
   const [sugerenciaAplicando, setSugerenciaAplicando] = useState(null)
@@ -80,6 +83,43 @@ export default function GastosNoCorrientes({ embedded = false }) {
       setItems(data)
     } catch (err) {
       setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudieron cargar los gastos puntuales.') })
+    }
+  }
+
+  async function checkPareceVariable(descripcion, categoria) {
+    if (!descripcion?.trim()) { setPareceVariable(false); return }
+    try {
+      const { data } = await api.get('/finanzas/gastos-no-corrientes/parece_variable/', {
+        params: { descripcion, categoria },
+      })
+      setPareceVariable(Boolean(data.parece_variable))
+    } catch {
+      setPareceVariable(false)
+    }
+  }
+
+  async function crearComoVariable() {
+    if (loading) return
+    setLoading(true)
+    setFeedback({ type: '', message: '' })
+    try {
+      await api.post('/finanzas/gastos-corrientes/', {
+        descripcion: form.descripcion,
+        categoria: form.categoria,
+        monto: form.monto,
+        tipo_monto: 'variable',
+        frecuencia: 'mensual',
+        fecha_inicio: form.fecha,
+        fecha_fin: null,
+        activo: true,
+      })
+      setModal(false)
+      setPareceVariable(false)
+      setFeedback({ type: 'success', message: 'Creado como gasto variable. Lo veras en la pestana Variables.' })
+    } catch (err) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo crear como variable.') })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -121,6 +161,7 @@ export default function GastosNoCorrientes({ embedded = false }) {
     setForm(buildEmptyForm())
     setEditId(null)
     setShowAdvanced(false)
+    setPareceVariable(false)
     setModal(true)
   }
 
@@ -460,7 +501,30 @@ export default function GastosNoCorrientes({ embedded = false }) {
           )}
           <div className="form-modal-group">
             <label className="form-modal-label">En que se fue?</label>
-            <input className="form-modal-input" required placeholder="Ej: Reparacion auto, medico, ropa..." value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />
+            <input
+              className="form-modal-input"
+              required
+              placeholder="Ej: Reparacion auto, medico, ropa..."
+              value={form.descripcion}
+              onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
+              onBlur={(e) => checkPareceVariable(e.target.value, form.categoria)}
+            />
+            {pareceVariable && !editId && (
+              <div className="variable-hint">
+                <span className="variable-hint-text">
+                  Esto suele cambiar de monto cada mes. Si lo creas como <strong>variable</strong>,
+                  tu proyeccion lo tendra en cuenta todos los meses.
+                </span>
+                <div className="variable-hint-actions">
+                  <button type="button" className="btn-modal-convert" onClick={crearComoVariable} disabled={loading}>
+                    Crear como variable
+                  </button>
+                  <button type="button" className="btn-modal-cancel" onClick={() => setPareceVariable(false)}>
+                    Dejarlo puntual
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           <div className="form-modal-row">
             <div className="form-modal-group">
