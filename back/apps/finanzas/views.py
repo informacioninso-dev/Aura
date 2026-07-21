@@ -26,17 +26,21 @@ from .models import (
     CuentaPorCobrar,
     Diferido,
     GastoCorriente,
+    GastoCorrienteEjecucion,
     GastoNoCorriente,
     Ingreso,
     IngresoPuntual,
     Notificacion,
     SaldoMes,
     CATEGORIAS_DEFAULT,
+    TIPO_MONTO_FIJO,
+    TIPO_MONTO_VARIABLE,
 )
 from .utils import (
     calcular_proyeccion_acumulada,
     asegurar_saldo_mes,
     asegurar_saldos_historicos,
+    detectar_puntuales_recurrentes,
     _primera_fecha_con_movimientos,
     _restar_meses,
     invalidate_finanzas_cache,
@@ -49,6 +53,7 @@ from .serializers import (
     CategoriaSerializer,
     CuentaPorCobrarSerializer,
     DeferidoSerializer,
+    GastoCorrienteEjecucionSerializer,
     GastoCorrienteSerializer,
     GastoNoCorrienteSerializer,
     IngresoPuntualSerializer,
@@ -182,6 +187,68 @@ class GastoCorrienteViewSet(BaseFinanzasViewSet):
     queryset = GastoCorriente.objects.all()
     serializer_class = GastoCorrienteSerializer
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        tipo_monto = self.request.query_params.get('tipo_monto')
+        if tipo_monto in {TIPO_MONTO_FIJO, TIPO_MONTO_VARIABLE}:
+            qs = qs.filter(tipo_monto=tipo_monto)
+        return qs
+
+    @action(detail=True, methods=['post'])
+    def convertir_a_variable(self, request, pk=None):
+        """Marca un gasto fijo como variable; su monto pasa a ser un estimado."""
+        gasto = self.get_object()
+        gasto.tipo_monto = TIPO_MONTO_VARIABLE
+        if 'monto' in request.data:
+            serializer = self.get_serializer(gasto, data={'monto': request.data['monto']}, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save(tipo_monto=TIPO_MONTO_VARIABLE)
+            return Response(serializer.data)
+        gasto.save(update_fields=['tipo_monto'])
+        return Response(self.get_serializer(gasto).data)
+
+    @action(detail=True, methods=['post'])
+    def convertir_a_fijo(self, request, pk=None):
+        """Marca un gasto variable como fijo; descarta los montos reales cargados."""
+        gasto = self.get_object()
+        with transaction.atomic():
+            gasto.ejecuciones.all().delete()
+            gasto.tipo_monto = TIPO_MONTO_FIJO
+            gasto.save(update_fields=['tipo_monto'])
+        return Response(self.get_serializer(gasto).data)
+
+    @action(detail=True, methods=['get', 'post'], url_path='ejecuciones')
+    def ejecuciones(self, request, pk=None):
+        """Lista o registra el monto realmente pagado de un gasto variable en un mes."""
+        gasto = self.get_object()
+
+        if request.method == 'GET':
+            return Response(
+                GastoCorrienteEjecucionSerializer(gasto.ejecuciones.all(), many=True).data
+            )
+
+        if gasto.tipo_monto != TIPO_MONTO_VARIABLE:
+            return Response(
+                {'detail': 'Solo los gastos variables aceptan montos reales.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = GastoCorrienteEjecucionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        datos = serializer.validated_data
+
+        # Upsert: recargar el mismo mes reemplaza el valor anterior.
+        ejecucion, creada = GastoCorrienteEjecucion.objects.update_or_create(
+            gasto=gasto,
+            anio=datos['anio'],
+            mes=datos['mes'],
+            defaults={'monto_real': datos['monto_real']},
+        )
+        return Response(
+            GastoCorrienteEjecucionSerializer(ejecucion).data,
+            status=status.HTTP_201_CREATED if creada else status.HTTP_200_OK,
+        )
+
     @action(detail=True, methods=['post'])
     def convertir_a_puntual(self, request, pk=None):
         gasto = self.get_object()
@@ -212,6 +279,64 @@ class GastoCorrienteViewSet(BaseFinanzasViewSet):
 class GastoNoCorrienteViewSet(BaseFinanzasViewSet):
     queryset = GastoNoCorriente.objects.all()
     serializer_class = GastoNoCorrienteSerializer
+
+    @action(detail=False, methods=['get'])
+    def sugerencias_variables(self, request):
+        """Puntuales que se repiten y probablemente sean gastos variables."""
+        return Response(detectar_puntuales_recurrentes(request.user))
+
+    @action(detail=False, methods=['post'])
+    def convertir_grupo_a_variable(self, request):
+        """
+        Convierte un grupo de puntuales repetidos en un unico gasto variable.
+
+        El historial no se pierde ni se duplica: cada mes pasa a ser un monto
+        real del nuevo gasto variable y los puntuales originales se eliminan.
+        """
+        descripcion = (request.data.get('descripcion') or '').strip()
+        categoria = request.data.get('categoria') or 'otro'
+        if not descripcion:
+            return Response({'detail': 'Se requiere la descripcion del grupo.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        puntuales = list(
+            GastoNoCorriente.objects.filter(
+                usuario=request.user, categoria=categoria,
+            ).filter(descripcion__iexact=descripcion)
+        )
+        if not puntuales:
+            return Response({'detail': 'No se encontraron gastos puntuales para ese grupo.'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        por_mes = {}
+        for item in puntuales:
+            clave = (item.fecha.year, item.fecha.month)
+            por_mes[clave] = por_mes.get(clave, Decimal('0.00')) + Decimal(str(item.monto))
+
+        montos = list(por_mes.values())
+        promedio = (sum(montos) / Decimal(len(montos))).quantize(Decimal('0.01'))
+
+        with transaction.atomic():
+            gasto = GastoCorriente.objects.create(
+                usuario=request.user,
+                descripcion=descripcion,
+                categoria=categoria,
+                monto=promedio,
+                tipo_monto=TIPO_MONTO_VARIABLE,
+                frecuencia='mensual',
+                fecha_inicio=min(item.fecha for item in puntuales),
+                activo=True,
+            )
+            GastoCorrienteEjecucion.objects.bulk_create([
+                GastoCorrienteEjecucion(gasto=gasto, anio=anio, mes=mes, monto_real=monto)
+                for (anio, mes), monto in por_mes.items()
+            ])
+            GastoNoCorriente.objects.filter(id__in=[item.id for item in puntuales]).delete()
+
+        return Response(
+            GastoCorrienteSerializer(gasto, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=True, methods=['post'])
     def convertir_a_fijo(self, request, pk=None):
@@ -467,21 +592,24 @@ class AsistenteParseView(APIView):
     _PROMPT_SYSTEM = """Eres un asistente financiero. Extrae la intención del texto y devuelve SOLO un JSON válido con esta estructura:
 
 {
-  "tipo": "ingreso_fijo" | "ingreso_puntual" | "gasto_fijo" | "gasto_puntual",
+  "tipo": "ingreso_fijo" | "ingreso_puntual" | "gasto_fijo" | "gasto_variable" | "gasto_puntual",
   "monto": número positivo,
   "descripcion": "nombre corto y limpio del ítem (solo el objeto/concepto, sin verbos como gasté/compré/pagué/recibí)",
   "categoria": una de [vivienda, alimentacion, transporte, salud, educacion, entretenimiento, ropa, servicios, tecnologia, deudas, ahorro, otro],
-  "frecuencia": una de [diario, semanal, quincenal, mensual, bimestral, trimestral, semestral, anual] (solo si es fijo),
+  "frecuencia": una de [diario, semanal, quincenal, mensual, bimestral, trimestral, semestral, anual] (solo si es fijo o variable),
   "fecha": "YYYY-MM-DD" (solo si es puntual, usa la fecha de hoy si dice "hoy" o no especifica),
   "confianza": "alta" | "media" | "baja"
 }
 
 Reglas:
-- "fijo" = recurrente (salario, arriendo, suscripción, cuota mensual)
-- "puntual" = único (compré, gasté, recibí, pagué una vez)
-- descripcion debe ser el concepto limpio: "Almuerzo", "Arriendo", "Salario", "Netflix" — nunca "gasté en almuerzo" ni "pagué el arriendo"
+- "gasto_fijo" = se repite SIEMPRE POR EL MISMO MONTO (arriendo, Netflix, seguro, cuota fija)
+- "gasto_variable" = se repite pero EL MONTO CAMBIA cada vez (luz, agua, internet medido, supermercado, gasolina)
+- "gasto_puntual" = ocurrió UNA SOLA VEZ y no se repite (compré una tele, reparación del auto, un regalo)
+- Ante la duda entre variable y puntual: si es un servicio o consumo del hogar que se paga todos los meses, es variable
+- "ingreso_fijo" = recurrente (salario, arriendo que cobras); "ingreso_puntual" = único (recibí, me pagaron una vez)
+- descripcion debe ser el concepto limpio: "Almuerzo", "Arriendo", "Salario", "Netflix", "Luz" — nunca "gasté en almuerzo" ni "pagué el arriendo"
 - Si no se menciona categoría, dedúcela del contexto
-- Si no se menciona frecuencia en un fijo, usa "mensual"
+- Si no se menciona frecuencia en un fijo o variable, usa "mensual"
 - Devuelve SOLO el JSON, sin texto adicional"""
 
     def post(self, request):

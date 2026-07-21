@@ -7,6 +7,7 @@ const TIPO_LABELS = {
   ingreso_fijo: 'Ingreso fijo',
   ingreso_puntual: 'Ingreso puntual',
   gasto_fijo: 'Gasto fijo',
+  gasto_variable: 'Gasto variable',
   gasto_puntual: 'Gasto puntual',
 }
 
@@ -14,8 +15,14 @@ const ENDPOINT_MAP = {
   ingreso_fijo: '/finanzas/ingresos/',
   ingreso_puntual: '/finanzas/ingresos-puntuales/',
   gasto_fijo: '/finanzas/gastos-corrientes/',
+  gasto_variable: '/finanzas/gastos-corrientes/',
   gasto_puntual: '/finanzas/gastos-no-corrientes/',
 }
+
+// Los gastos variables viven en el mismo endpoint que los fijos; los distingue tipo_monto.
+const TIPOS_RECURRENTES = new Set(['ingreso_fijo', 'gasto_fijo', 'gasto_variable'])
+const TIPOS_INGRESO = new Set(['ingreso_fijo', 'ingreso_puntual'])
+const TIPOS_GASTO = new Set(['gasto_fijo', 'gasto_variable', 'gasto_puntual'])
 
 const FREQ_LABELS = {
   diario: 'Diario', semanal: 'Semanal', quincenal: 'Quincenal',
@@ -24,10 +31,10 @@ const FREQ_LABELS = {
 }
 
 function buildPayload(parsed) {
-  const esFijo = parsed.tipo === 'ingreso_fijo' || parsed.tipo === 'gasto_fijo'
-  const esIngreso = parsed.tipo === 'ingreso_fijo' || parsed.tipo === 'ingreso_puntual'
+  const esRecurrente = TIPOS_RECURRENTES.has(parsed.tipo)
+  const esIngreso = TIPOS_INGRESO.has(parsed.tipo)
 
-  if (esFijo) {
+  if (esRecurrente) {
     return {
       descripcion: parsed.descripcion,
       monto: parsed.monto,
@@ -35,6 +42,7 @@ function buildPayload(parsed) {
       fecha_inicio: parsed.fecha || new Date().toISOString().slice(0, 10),
       activo: true,
       ...(!esIngreso && { categoria: parsed.categoria || 'otro' }),
+      ...(parsed.tipo === 'gasto_variable' && { tipo_monto: 'variable' }),
     }
   }
   return {
@@ -151,8 +159,8 @@ export default function AuraAssistant() {
     }
   }
 
-  const esGasto = parsed?.tipo === 'gasto_fijo' || parsed?.tipo === 'gasto_puntual'
-  const esFijo = parsed?.tipo === 'ingreso_fijo' || parsed?.tipo === 'gasto_fijo'
+  const esGasto = parsed ? TIPOS_GASTO.has(parsed.tipo) : false
+  const esFijo = parsed ? TIPOS_RECURRENTES.has(parsed.tipo) : false
 
   const inputStyle = {
     width: '100%', boxSizing: 'border-box',

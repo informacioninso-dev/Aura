@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Pencil, Trash2, GitBranch } from 'lucide-react'
+import { Plus, Pencil, Trash2, GitBranch, Receipt } from 'lucide-react'
 
 import { getApiErrorMessage } from '../../api/errors'
 import api from '../../api/client'
@@ -19,6 +19,34 @@ const FRECUENCIA_STORAGE_KEY = 'gastos_corrientes_last_frecuencia'
 const CATEGORIA_STORAGE_KEY = 'gastos_corrientes_last_categoria'
 const FUTURE_EXPENSE_MESSAGE = 'Los gastos futuros no se cargan aqui. Simulalos desde el simulador con tasa 0%.'
 
+// Copys por tipo: un gasto variable se repite igual que un fijo, pero su monto
+// es un estimado que se reemplaza con lo que el usuario realmente paga.
+const COPY_POR_TIPO = {
+  fijo: {
+    titulo: 'Gastos fijos',
+    vacioTexto: 'Aun no sumas gastos fijos',
+    vacioSub: 'Agrega los pagos que se repiten con el mismo monto',
+    icono: '🏠',
+    placeholder: 'Ej: Arriendo, Netflix, gym...',
+    labelMonto: 'Monto',
+    ayudaMonto: '',
+  },
+  variable: {
+    titulo: 'Gastos variables',
+    vacioTexto: 'Aun no sumas gastos variables',
+    vacioSub: 'Agrega los pagos que se repiten pero cambian de monto',
+    icono: '💡',
+    placeholder: 'Ej: Luz, agua, super, gasolina...',
+    labelMonto: 'Monto estimado',
+    ayudaMonto: 'Lo iremos ajustando con lo que realmente pagues cada mes.',
+  },
+}
+
+function currentPeriod() {
+  const now = new Date()
+  return { anio: now.getFullYear(), mes: now.getMonth() + 1 }
+}
+
 function getTodayDate() {
   const now = new Date()
   const y = now.getFullYear()
@@ -33,13 +61,14 @@ function dayBefore(dateStr) {
   return d.toISOString().slice(0, 10)
 }
 
-function buildEmptyForm() {
+function buildEmptyForm(tipoMonto = 'fijo') {
   const savedFreq = typeof window !== 'undefined' ? window.localStorage.getItem(FRECUENCIA_STORAGE_KEY) : null
   const savedCategoria = typeof window !== 'undefined' ? window.localStorage.getItem(CATEGORIA_STORAGE_KEY) : null
   return {
     descripcion: '',
     categoria: savedCategoria || 'otro',
     monto: '',
+    tipo_monto: tipoMonto,
     frecuencia: FRECUENCIAS.includes(savedFreq) ? savedFreq : 'mensual',
     fecha_inicio: getTodayDate(),
     fecha_fin: '',
@@ -47,10 +76,12 @@ function buildEmptyForm() {
   }
 }
 
-export default function GastosCorrientes({ embedded = false }) {
+export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' }) {
   const { user } = useAuth()
   const { categorias } = useCategorias()
   const maxExpenseDate = getTodayDate()
+  const copy = COPY_POR_TIPO[tipoMonto] || COPY_POR_TIPO.fijo
+  const esVariable = tipoMonto === 'variable'
 
   // — lista y paginacion —
   const [items, setItems] = useState([])
@@ -62,7 +93,7 @@ export default function GastosCorrientes({ embedded = false }) {
 
   // — modal crear/editar —
   const [modal, setModal] = useState(false)
-  const [form, setForm] = useState(buildEmptyForm())
+  const [form, setForm] = useState(buildEmptyForm(tipoMonto))
   const [editId, setEditId] = useState(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -83,9 +114,15 @@ export default function GastosCorrientes({ embedded = false }) {
   const [versionLoading, setVersionLoading] = useState(false)
   const [confirmConvert, setConfirmConvert] = useState(false)
 
+  // — monto real del mes (solo gastos variables) —
+  const [realItem, setRealItem] = useState(null)
+  const [realForm, setRealForm] = useState({ ...currentPeriod(), monto_real: '' })
+  const [realLoading, setRealLoading] = useState(false)
+  const [realHistory, setRealHistory] = useState([])
+
   const [feedback, setFeedback] = useState({ type: '', message: '' })
 
-  useEffect(() => { fetchItems() }, [])
+  useEffect(() => { fetchItems() }, [tipoMonto])
 
   function clampExpenseDate(value) {
     if (!value) return value
@@ -108,16 +145,16 @@ export default function GastosCorrientes({ embedded = false }) {
 
   async function fetchItems() {
     try {
-      const { data } = await api.get('/finanzas/gastos-corrientes/')
+      const { data } = await api.get(`/finanzas/gastos-corrientes/?tipo_monto=${tipoMonto}`)
       setItems(data)
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudieron cargar los gastos corrientes.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudieron cargar los gastos.') })
     }
   }
 
   // — crear / editar —
   function openNew() {
-    setForm(buildEmptyForm())
+    setForm(buildEmptyForm(tipoMonto))
     setEditId(null)
     setShowAdvanced(false)
     setModal(true)
@@ -128,6 +165,7 @@ export default function GastosCorrientes({ embedded = false }) {
       descripcion: item.descripcion,
       categoria: item.categoria,
       monto: item.monto,
+      tipo_monto: item.tipo_monto || tipoMonto,
       frecuencia: item.frecuencia,
       fecha_inicio: item.fecha_inicio,
       fecha_fin: item.fecha_fin || '',
@@ -136,6 +174,60 @@ export default function GastosCorrientes({ embedded = false }) {
     setEditId(item.id)
     setShowAdvanced(true)
     setModal(true)
+  }
+
+  // — monto real del mes (gastos variables) —
+  async function openReal(item) {
+    setRealItem(item)
+    setRealForm({ ...currentPeriod(), monto_real: '' })
+    setRealHistory([])
+    try {
+      const { data } = await api.get(`/finanzas/gastos-corrientes/${item.id}/ejecuciones/`)
+      setRealHistory(data)
+    } catch {
+      // El historial es informativo: si falla igual se puede cargar el monto.
+    }
+  }
+
+  async function handleSubmitReal(e) {
+    e.preventDefault()
+    if (realLoading || !realItem) return
+    setRealLoading(true)
+    setFeedback({ type: '', message: '' })
+    try {
+      await api.post(`/finanzas/gastos-corrientes/${realItem.id}/ejecuciones/`, {
+        anio: Number(realForm.anio),
+        mes: Number(realForm.mes),
+        monto_real: realForm.monto_real,
+      })
+      setRealItem(null)
+      await fetchItems()
+      setFeedback({ type: 'success', message: 'Monto real guardado. Tu proyeccion ya lo tiene en cuenta.' })
+    } catch (err) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo guardar el monto real.') })
+    } finally {
+      setRealLoading(false)
+    }
+  }
+
+  async function handleConvertTipoMonto() {
+    if (!editId || converting) return
+    const destino = esVariable ? 'convertir_a_fijo' : 'convertir_a_variable'
+    setConverting(true)
+    setFeedback({ type: '', message: '' })
+    try {
+      await api.post(`/finanzas/gastos-corrientes/${editId}/${destino}/`, {})
+      setModal(false)
+      await fetchItems()
+      setFeedback({
+        type: 'success',
+        message: esVariable ? 'Listo. Ahora lo veras en Gastos fijos.' : 'Listo. Ahora lo veras en Gastos variables.',
+      })
+    } catch (err) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo cambiar el tipo de gasto.') })
+    } finally {
+      setConverting(false)
+    }
   }
 
   async function handleSubmit(e) {
@@ -338,9 +430,9 @@ export default function GastosCorrientes({ embedded = false }) {
       {embedded ? (
         <div className="finance-panel-header">
           <div>
-            <h2 className="finance-panel-kicker">Gastos fijos</h2>
+            <h2 className="finance-panel-kicker">{copy.titulo}</h2>
             <p className="finance-panel-kpi">
-              Total al mes:&nbsp;
+              {esVariable ? 'Estimado al mes:' : 'Total al mes:'}&nbsp;
               <span style={{ color: '#F87171', fontWeight: 700 }}>
                 ${formatAmount(total)}
               </span>
@@ -351,9 +443,9 @@ export default function GastosCorrientes({ embedded = false }) {
       ) : (
         <div className="page-header page-header-actions">
           <div className="page-header-main">
-            <h1 className="page-title">Gastos fijos</h1>
+            <h1 className="page-title">{copy.titulo}</h1>
             <p className="page-subtitle">
-              Total al mes:&nbsp;
+              {esVariable ? 'Estimado al mes:' : 'Total al mes:'}&nbsp;
               <span style={{ color: '#F87171', fontWeight: 700 }}>
                 ${formatAmount(total)}
               </span>
@@ -368,9 +460,9 @@ export default function GastosCorrientes({ embedded = false }) {
       <div className="card" style={{ padding: 0 }}>
         {items.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">🛒</div>
-            <p className="empty-text">Aun no sumas gastos fijos</p>
-            <p className="empty-sub">Agrega los pagos que se repiten</p>
+            <div className="empty-icon">{copy.icono}</div>
+            <p className="empty-text">{copy.vacioTexto}</p>
+            <p className="empty-sub">{copy.vacioSub}</p>
           </div>
         ) : (
           <>
@@ -418,7 +510,7 @@ export default function GastosCorrientes({ embedded = false }) {
                     <th style={{ width: 36, paddingRight: 0 }}>
                       <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAll} style={{ cursor: 'pointer', accentColor: '#C487F6' }} />
                     </th>
-                    {['Nombre', 'Categoria', 'Monto', 'Frecuencia', 'Desde', 'Hasta', 'Estado', ''].map((h) => <th key={h}>{h}</th>)}
+                    {['Nombre', 'Categoria', esVariable ? 'Estimado' : 'Monto', 'Frecuencia', 'Desde', 'Hasta', 'Estado', ''].map((h) => <th key={h}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -436,6 +528,9 @@ export default function GastosCorrientes({ embedded = false }) {
                       <td><span className={item.activo ? 'badge badge-green' : 'badge badge-gray'}>{item.activo ? 'Activo' : 'Inactivo'}</span></td>
                       <td className="table-actions-cell">
                         <div className="table-actions-row">
+                          {esVariable && (
+                            <button className="btn-icon" title="Registrar lo que pagaste" style={{ color: '#4ADE80' }} onClick={() => openReal(item)}><Receipt size={15} /></button>
+                          )}
                           <button className="btn-icon edit" title="Editar" onClick={() => openEdit(item)}><Pencil size={15} /></button>
                           <button className="btn-icon" title="Nueva version" style={{ color: '#FBBF24' }} onClick={() => openVersion(item)}><GitBranch size={15} /></button>
                           <button className="btn-icon danger" title="Eliminar" disabled={deletingId === item.id} onClick={() => openDeleteConfirm(item.id)}><Trash2 size={15} /></button>
@@ -460,7 +555,7 @@ export default function GastosCorrientes({ embedded = false }) {
           )}
           <div className="form-modal-group">
             <label className="form-modal-label">En que se va?</label>
-            <input className="form-modal-input" required placeholder="Ej: Arriendo, Netflix, gym..." value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />
+            <input className="form-modal-input" required placeholder={copy.placeholder} value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />
           </div>
 
           <div className="form-modal-row">
@@ -473,8 +568,13 @@ export default function GastosCorrientes({ embedded = false }) {
               </select>
             </div>
             <div className="form-modal-group">
-              <label className="form-modal-label">Monto</label>
+              <label className="form-modal-label">{copy.labelMonto}</label>
               <input className="form-modal-input" type="number" required min="0" step="0.01" placeholder="0" value={form.monto} onChange={(e) => setForm({ ...form, monto: e.target.value })} />
+              {copy.ayudaMonto && (
+                <p style={{ marginTop: 6, fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45 }}>
+                  {copy.ayudaMonto}
+                </p>
+              )}
             </div>
           </div>
 
@@ -524,17 +624,29 @@ export default function GastosCorrientes({ embedded = false }) {
               <div className="form-modal-convert-copy">
                 <span className="form-modal-convert-title">Cambiar tipo de movimiento</span>
                 <span className="form-modal-convert-text">
-                  Si esto no era fijo, puedes pasarlo a puntual sin perder el nombre, monto ni fecha.
+                  {esVariable
+                    ? 'Si el monto en realidad no cambia, pasalo a fijo. Se descartan los montos reales que cargaste.'
+                    : 'Si el monto cambia cada mes pasalo a variable, y si fue una sola vez pasalo a puntual.'}
                 </span>
               </div>
-              <button
-                type="button"
-                className="btn-modal-convert"
-                onClick={() => setConfirmConvert(true)}
-                disabled={loading || converting}
-              >
-                {converting ? 'Convirtiendo...' : 'Pasar a puntual'}
-              </button>
+              <div className="form-modal-convert-actions">
+                <button
+                  type="button"
+                  className="btn-modal-convert"
+                  onClick={handleConvertTipoMonto}
+                  disabled={loading || converting}
+                >
+                  {converting ? 'Convirtiendo...' : esVariable ? 'Pasar a fijo' : 'Pasar a variable'}
+                </button>
+                <button
+                  type="button"
+                  className="btn-modal-convert"
+                  onClick={() => setConfirmConvert(true)}
+                  disabled={loading || converting}
+                >
+                  Pasar a puntual
+                </button>
+              </div>
             </div>
           )}
 
@@ -603,6 +715,51 @@ export default function GastosCorrientes({ embedded = false }) {
               <button type="button" className="btn-modal-cancel" onClick={() => setVersioningItem(null)}>Cancelar</button>
               <button type="submit" className="btn-modal-save" disabled={versionLoading}>
                 {versionLoading ? 'Guardando...' : 'Crear nueva version'}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* Modal monto real del mes (gastos variables) */}
+      <Modal open={realItem !== null} onClose={() => setRealItem(null)} title="Cuanto pagaste?">
+        {realItem && (
+          <form onSubmit={handleSubmitReal}>
+            <p style={{ marginTop: -8, marginBottom: 16, fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+              Registra lo que realmente pagaste de <strong>{realItem.descripcion}</strong>. Con esto tu proyeccion
+              deja de usar el estimado de ${formatAmount(parseFloat(realItem.monto))}.
+            </p>
+
+            <div className="form-modal-row">
+              <div className="form-modal-group">
+                <label className="form-modal-label">Mes</label>
+                <select className="form-modal-select" value={realForm.mes} onChange={(e) => setRealForm({ ...realForm, mes: e.target.value })}>
+                  {['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+                    .map((nombre, index) => <option key={nombre} value={index + 1}>{nombre}</option>)}
+                </select>
+              </div>
+              <div className="form-modal-group">
+                <label className="form-modal-label">Anio</label>
+                <input className="form-modal-input" type="number" required value={realForm.anio} onChange={(e) => setRealForm({ ...realForm, anio: e.target.value })} />
+              </div>
+            </div>
+
+            <div className="form-modal-group">
+              <label className="form-modal-label">Monto real</label>
+              <input className="form-modal-input" type="number" required min="0" step="0.01" placeholder="0" autoFocus value={realForm.monto_real} onChange={(e) => setRealForm({ ...realForm, monto_real: e.target.value })} />
+            </div>
+
+            {realHistory.length > 0 && (
+              <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
+                <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>Ya registrado: </span>
+                {realHistory.slice(0, 4).map((e) => `${e.mes}/${e.anio}: $${formatAmount(parseFloat(e.monto_real))}`).join(' · ')}
+              </div>
+            )}
+
+            <div className="form-modal-actions">
+              <button type="button" className="btn-modal-cancel" onClick={() => setRealItem(null)}>Cancelar</button>
+              <button type="submit" className="btn-modal-save" disabled={realLoading}>
+                {realLoading ? 'Guardando...' : 'Guardar monto real'}
               </button>
             </div>
           </form>

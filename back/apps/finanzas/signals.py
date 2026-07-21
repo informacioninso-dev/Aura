@@ -13,6 +13,7 @@ from .models import (
     Categoria,
     Diferido,
     GastoCorriente,
+    GastoCorrienteEjecucion,
     GastoNoCorriente,
     Ingreso,
     IngresoPuntual,
@@ -206,5 +207,18 @@ def on_gasto_nc_cambiado(sender, instance, **kwargs):
 def on_ingreso_puntual_cambiado(sender, instance, **kwargs):
     try:
         transaction.on_commit(partial(_recalcular_e_invalidar, instance.usuario.pk, instance.fecha, instance.fecha))
+    except Exception:
+        pass
+
+
+@receiver(post_save, sender=GastoCorrienteEjecucion)
+@receiver(post_delete, sender=GastoCorrienteEjecucion)
+def on_ejecucion_variable_cambiada(sender, instance, **kwargs):
+    """Cargar el monto real de un mes cambia ese mes y arrastra a los siguientes."""
+    try:
+        fecha = datetime.date(instance.anio, instance.mes, 1)
+        transaction.on_commit(
+            partial(_recalcular_e_invalidar, instance.gasto.usuario.pk, fecha, None)
+        )
     except Exception:
         pass

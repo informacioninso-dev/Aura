@@ -11,6 +11,7 @@ from .models import (
     CuentaPorCobrar,
     Diferido,
     GastoCorriente,
+    GastoCorrienteEjecucion,
     GastoNoCorriente,
     Ingreso,
     IngresoPuntual,
@@ -189,6 +190,33 @@ class GastoCorrienteSerializer(serializers.ModelSerializer):
         model = GastoCorriente
         fields = '__all__'
         read_only_fields = ('usuario', 'creado_en')
+
+
+class GastoCorrienteEjecucionSerializer(serializers.ModelSerializer):
+    """Monto realmente pagado de un gasto variable en un mes."""
+
+    def validate(self, attrs):
+        monto_real = attrs.get('monto_real', getattr(self.instance, 'monto_real', None))
+        mes        = attrs.get('mes',        getattr(self.instance, 'mes',        None))
+        anio       = attrs.get('anio',       getattr(self.instance, 'anio',       None))
+
+        errors = {}
+        if monto_real is not None and monto_real <= 0:
+            errors['monto_real'] = 'El monto debe ser mayor que 0.'
+        if mes is not None and not (1 <= mes <= 12):
+            errors['mes'] = 'El mes debe estar entre 1 y 12.'
+        if anio is not None and mes is not None and 1 <= mes <= 12:
+            hoy = local_today()
+            if (anio, mes) > (hoy.year, hoy.month):
+                errors['mes'] = 'No se puede registrar un monto real de un mes futuro.'
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
+
+    class Meta:
+        model = GastoCorrienteEjecucion
+        fields = '__all__'
+        read_only_fields = ('gasto', 'creado_en', 'actualizado_en')
 
 
 class GastoNoCorrienteSerializer(ProjectionEligibilitySerializerMixin, serializers.ModelSerializer):
