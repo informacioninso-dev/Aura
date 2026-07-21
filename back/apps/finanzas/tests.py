@@ -2164,3 +2164,92 @@ class TestDeteccionPuntualesRecurrentes(APITestCase):
             )
 
         self.assertEqual(detectar_puntuales_recurrentes(self.user), [])
+
+
+class TestConversionManualPuntualAVariable(APITestCase):
+    """Un puntual suelto se puede pasar a variable sin esperar la deteccion."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            email='conv@example.com',
+            username='usuario_conv',
+            password='clave12345',
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def _puntual(self, descripcion='Luz', monto='40.00', fecha='2026-03-10'):
+        return GastoNoCorriente.objects.create(
+            usuario=self.user, descripcion=descripcion, categoria='servicios',
+            monto=Decimal(monto), fecha=fecha,
+        )
+
+    def test_convierte_un_puntual_suelto_a_variable(self):
+        gasto = self._puntual()
+
+        response = self.client.post(
+            '/api/finanzas/gastos-no-corrientes/{}/convertir_a_variable/'.format(gasto.id),
+            {}, format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['tipo_monto'], 'variable')
+        self.assertEqual(response.data['descripcion'], 'Luz')
+        self.assertFalse(GastoNoCorriente.objects.filter(pk=gasto.id).exists())
+
+    def test_el_monto_del_puntual_queda_como_pago_real_de_su_mes(self):
+        gasto = self._puntual(monto='40.00', fecha='2026-03-10')
+
+        response = self.client.post(
+            '/api/finanzas/gastos-no-corrientes/{}/convertir_a_variable/'.format(gasto.id),
+            {}, format='json',
+        )
+
+        nuevo = GastoCorriente.objects.get(id=response.data['id'])
+        ejecucion = nuevo.ejecuciones.get()
+        self.assertEqual(ejecucion.anio, 2026)
+        self.assertEqual(ejecucion.mes, 3)
+        self.assertEqual(ejecucion.monto_real, Decimal('40.00'))
+
+    def test_convertir_a_fijo_no_crea_ejecuciones(self):
+        gasto = self._puntual()
+
+        response = self.client.post(
+            '/api/finanzas/gastos-no-corrientes/{}/convertir_a_fijo/'.format(gasto.id),
+            {}, format='json',
+        )
+
+        nuevo = GastoCorriente.objects.get(id=response.data['id'])
+        self.assertEqual(nuevo.tipo_monto, 'fijo')
+        self.assertEqual(nuevo.ejecuciones.count(), 0)
+
+    def test_no_convierte_el_puntual_de_otro_usuario(self):
+        otro = User.objects.create_user(
+            email='ajeno@example.com', username='ajeno', password='clave12345',
+        )
+        gasto = GastoNoCorriente.objects.create(
+            usuario=otro, descripcion='Luz', categoria='servicios',
+            monto=Decimal('40.00'), fecha='2026-03-10',
+        )
+
+        response = self.client.post(
+            '/api/finanzas/gastos-no-corrientes/{}/convertir_a_variable/'.format(gasto.id),
+            {}, format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertTrue(GastoNoCorriente.objects.filter(pk=gasto.id).exists())
+
+    def test_el_balance_del_mes_no_cambia_al_convertir(self):
+        """Convertir no debe alterar lo ya gastado en ese mes."""
+        self._puntual(monto='40.00', fecha='2026-03-10')
+        antes = calcular_balance_mes(self.user, 2026, 3)
+
+        gasto = GastoNoCorriente.objects.get(usuario=self.user)
+        self.client.post(
+            '/api/finanzas/gastos-no-corrientes/{}/convertir_a_variable/'.format(gasto.id),
+            {}, format='json',
+        )
+        cache.clear()
+
+        self.assertEqual(calcular_balance_mes(self.user, 2026, 3), antes)

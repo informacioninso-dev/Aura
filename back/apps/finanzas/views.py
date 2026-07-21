@@ -340,11 +340,24 @@ class GastoNoCorrienteViewSet(BaseFinanzasViewSet):
 
     @action(detail=True, methods=['post'])
     def convertir_a_fijo(self, request, pk=None):
+        return self._convertir_a_recurrente(request, TIPO_MONTO_FIJO)
+
+    @action(detail=True, methods=['post'])
+    def convertir_a_variable(self, request, pk=None):
+        """
+        Convierte un puntual suelto en variable, sin esperar a que el sistema
+        lo detecte. El monto pasa a ser el estimado y su fecha queda como el
+        primer monto real conocido, para no perder el dato ya cargado.
+        """
+        return self._convertir_a_recurrente(request, TIPO_MONTO_VARIABLE)
+
+    def _convertir_a_recurrente(self, request, tipo_monto):
         gasto = self.get_object()
         payload = {
             'descripcion': request.data.get('descripcion', gasto.descripcion),
             'categoria': request.data.get('categoria', gasto.categoria),
             'monto': request.data.get('monto', gasto.monto),
+            'tipo_monto': tipo_monto,
             'frecuencia': request.data.get('frecuencia', 'mensual'),
             'fecha_inicio': request.data.get('fecha_inicio', gasto.fecha),
             'fecha_fin': request.data.get('fecha_fin', None),
@@ -354,12 +367,24 @@ class GastoNoCorrienteViewSet(BaseFinanzasViewSet):
         serializer = GastoCorrienteSerializer(data=payload, context={'request': request})
         serializer.is_valid(raise_exception=True)
 
+        fecha_original = gasto.fecha
+        monto_original = gasto.monto
+
         with transaction.atomic():
-            gasto_fijo = serializer.save(usuario=request.user)
+            recurrente = serializer.save(usuario=request.user)
+            if tipo_monto == TIPO_MONTO_VARIABLE:
+                # El puntual ya era un pago real de ese mes: se conserva como
+                # ejecucion en vez de perderse al borrar el registro.
+                GastoCorrienteEjecucion.objects.create(
+                    gasto=recurrente,
+                    anio=fecha_original.year,
+                    mes=fecha_original.month,
+                    monto_real=monto_original,
+                )
             gasto.delete()
 
         return Response(
-            GastoCorrienteSerializer(gasto_fijo, context={'request': request}).data,
+            GastoCorrienteSerializer(recurrente, context={'request': request}).data,
             status=status.HTTP_201_CREATED,
         )
 
