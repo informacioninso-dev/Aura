@@ -140,11 +140,15 @@ export default function GastosNoCorrientes({ embedded = false }) {
       await api.post('/finanzas/gastos-no-corrientes/convertir_grupo_a_variable/', {
         descripcion: sugerencia.descripcion,
         categoria: sugerencia.categoria,
+        destino: sugerencia.destino,
+        frecuencia_sugerida: sugerencia.frecuencia_sugerida,
       })
       await Promise.all([fetchItems(), fetchSugerencias()])
       setFeedback({
         type: 'success',
-        message: `"${sugerencia.descripcion}" ahora es un gasto variable. Tu historial se conservo.`,
+        message: sugerencia.destino === 'fijo'
+          ? `"${sugerencia.descripcion}" ahora es un gasto fijo ${sugerencia.frecuencia_sugerida}.`
+          : `"${sugerencia.descripcion}" ahora es un gasto variable. Tu historial se conservo.`,
       })
     } catch (err) {
       setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo convertir el grupo.') })
@@ -367,20 +371,35 @@ export default function GastosNoCorrientes({ embedded = false }) {
 
       <FeedbackAlert type={feedback.type || 'error'} message={feedback.message} />
 
-      {sugerencias
-        .filter((s) => !sugerenciasOcultas.has(s.descripcion))
-        .map((sugerencia) => (
-          <div key={`${sugerencia.descripcion}-${sugerencia.categoria}`} className="variable-suggestion">
+      {(() => {
+        // Se muestra una sugerencia a la vez para no tapar la lista en movil.
+        // El resto queda contado; al resolver o descartar una, aparece la siguiente.
+        const visibles = sugerencias.filter((s) => !sugerenciasOcultas.has(s.descripcion))
+        if (visibles.length === 0) return null
+        const sugerencia = visibles[0]
+        const restantes = visibles.length - 1
+        return (
+          <div className="variable-suggestion">
             <div className="variable-suggestion-copy">
               <span className="variable-suggestion-title">
-                Parece que &quot;{sugerencia.descripcion}&quot; se repite cada mes
+                {sugerencia.motivo}
               </span>
               <span className="variable-suggestion-text">
-                Lo cargaste en {sugerencia.meses_detectados} meses distintos, entre $
-                {formatAmount(parseFloat(sugerencia.monto_minimo))} y $
-                {formatAmount(parseFloat(sugerencia.monto_maximo))}. Si lo pasas a gasto variable,
-                tu proyeccion lo tendra en cuenta hacia adelante y tu historial se conserva.
+                {sugerencia.meses_detectados > 1 && (
+                  <>
+                    Entre ${formatAmount(parseFloat(sugerencia.monto_minimo))} y $
+                    {formatAmount(parseFloat(sugerencia.monto_maximo))}.{' '}
+                  </>
+                )}
+                {sugerencia.destino === 'fijo'
+                  ? `Si lo pasas a gasto fijo ${sugerencia.frecuencia_sugerida}, tu proyeccion lo esperara en su mes.`
+                  : 'Si lo pasas a gasto variable, tu proyeccion lo tendra en cuenta cada mes y tu historial se conserva.'}
               </span>
+              {restantes > 0 && (
+                <span className="variable-suggestion-counter">
+                  y {restantes} sugerencia{restantes !== 1 ? 's' : ''} mas
+                </span>
+              )}
             </div>
             <div className="variable-suggestion-actions">
               <button
@@ -389,7 +408,9 @@ export default function GastosNoCorrientes({ embedded = false }) {
                 disabled={sugerenciaAplicando !== null}
                 onClick={() => aplicarSugerencia(sugerencia)}
               >
-                {sugerenciaAplicando === sugerencia.descripcion ? 'Convirtiendo...' : 'Pasar a variable'}
+                {sugerenciaAplicando === sugerencia.descripcion
+                  ? 'Convirtiendo...'
+                  : sugerencia.destino === 'fijo' ? 'Pasar a fijo anual' : 'Pasar a variable'}
               </button>
               <button
                 type="button"
@@ -400,7 +421,8 @@ export default function GastosNoCorrientes({ embedded = false }) {
               </button>
             </div>
           </div>
-        ))}
+        )
+      })()}
 
       <div className="card" style={{ padding: 0 }}>
         {items.length === 0 ? (
@@ -466,6 +488,11 @@ export default function GastosNoCorrientes({ embedded = false }) {
                       <td>
                         <div className="table-title-stack">
                           <span style={{ fontWeight: 600 }}>{item.descripcion}</span>
+                          {item.parece_variable && (
+                            <span className="table-row-badge is-suggestion" title="Este gasto suele cambiar de monto cada mes">
+                              Suele ser variable
+                            </span>
+                          )}
                           {canCustomizeProjection && (
                             <span className={`table-row-badge ${item.incluir_en_proyeccion === false ? 'is-muted' : 'is-active'}`}>
                               {projectionStatusLabel(item)}

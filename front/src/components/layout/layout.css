@@ -308,10 +308,12 @@
     right: 12px;
   }
 
-  /* Main content — no left margin, top padding for topbar */
+  /* Main content — no left margin, top padding for topbar.
+     Bottom padding deja aire para que el boton flotante de Aura AI no tape
+     el ultimo contenido (fila, boton o banner) en pantallas chicas. */
   .app-main {
     margin-left: 0;
-    padding: 72px 16px 24px;
+    padding: 72px 16px 96px;
   }
 
   /* Page header */
@@ -322,7 +324,7 @@
 
 @media (max-width: 480px) {
   .app-main {
-    padding: 68px 12px 20px;
+    padding: 68px 12px 92px;
   }
   .page-title { font-size: 18px; }
 }
