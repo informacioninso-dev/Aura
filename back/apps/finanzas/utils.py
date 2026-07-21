@@ -517,7 +517,7 @@ def _senal_estacionalidad(grupo):
         if len(anios) >= ANIOS_MINIMOS_ESTACIONALIDAD:
             return {
                 'senal': SENAL_ESTACIONALIDAD,
-                'motivo': 'Lo pagas cada {} desde hace {} anios'.format(NOMBRE_MES[mes], len(anios)),
+                'motivo': 'Lo pagas cada {} desde hace {} años'.format(NOMBRE_MES[mes], len(anios)),
                 'destino': 'fijo',
                 'frecuencia_sugerida': 'anual',
                 'mes_tipico': mes,
