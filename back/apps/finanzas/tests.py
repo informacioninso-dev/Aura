@@ -12,8 +12,24 @@ from rest_framework.test import APITestCase
 
 from apps.usuarios.models import Plan
 from apps.usuarios.plans import assign_plan_to_user
-from .models import CuentaPorCobrar, Diferido, GastoCorriente, GastoNoCorriente, Ingreso, IngresoPuntual, SaldoMes
-from .utils import calcular_proyeccion_acumulada
+from .dates import local_today
+from .models import (
+    CuentaPorCobrar,
+    Diferido,
+    GastoCorriente,
+    GastoCorrienteEjecucion,
+    GastoNoCorriente,
+    Ingreso,
+    IngresoPuntual,
+    SaldoMes,
+)
+from .utils import (
+    _monto_base_gasto_mes,
+    calcular_balance_mes,
+    calcular_proyeccion_acumulada,
+    detectar_puntuales_recurrentes,
+    mapa_ejecuciones_variables,
+)
 
 
 User = get_user_model()
@@ -1744,3 +1760,407 @@ class TestFinanzasAPI(APITestCase):
         self.assertEqual(len(response.data['series']), 8)
         self.assertTrue(all(point['is_real'] for point in response.data['series'][:7]))
         self.assertTrue(all(not point['is_real'] for point in response.data['series'][7:]))
+
+
+class TestGastosVariables(APITestCase):
+    """Gastos recurrentes cuyo monto cambia mes a mes (luz, super, gasolina)."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            email='var@example.com',
+            username='usuario_var',
+            password='clave12345',
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def _crear_variable(self, monto='50.00', descripcion='Luz'):
+        return GastoCorriente.objects.create(
+            usuario=self.user,
+            descripcion=descripcion,
+            categoria='servicios',
+            monto=Decimal(monto),
+            tipo_monto='variable',
+            frecuencia='mensual',
+            fecha_inicio='2026-01-01',
+            activo=True,
+        )
+
+    # -- Modelo y compatibilidad hacia atras ---------------------------------
+
+    def test_gasto_corriente_es_fijo_por_defecto(self):
+        gasto = GastoCorriente.objects.create(
+            usuario=self.user,
+            descripcion='Arriendo',
+            monto=Decimal('500.00'),
+            frecuencia='mensual',
+            fecha_inicio='2026-01-01',
+        )
+        self.assertEqual(gasto.tipo_monto, 'fijo')
+        self.assertFalse(gasto.es_variable)
+
+    def test_se_puede_crear_gasto_variable_por_api(self):
+        response = self.client.post('/api/finanzas/gastos-corrientes/', {
+            'descripcion': 'Luz',
+            'categoria': 'servicios',
+            'monto': '45.00',
+            'tipo_monto': 'variable',
+            'frecuencia': 'mensual',
+            'fecha_inicio': '2026-01-01',
+            'activo': True,
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['tipo_monto'], 'variable')
+
+    def test_filtro_por_tipo_monto(self):
+        self._crear_variable()
+        GastoCorriente.objects.create(
+            usuario=self.user, descripcion='Arriendo', monto=Decimal('500.00'),
+            frecuencia='mensual', fecha_inicio='2026-01-01',
+        )
+
+        response = self.client.get('/api/finanzas/gastos-corrientes/?tipo_monto=variable')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['descripcion'], 'Luz')
+
+    # -- Resolucion de monto: real -> promedio -> estimado --------------------
+
+    def test_sin_historial_usa_el_monto_estimado(self):
+        gasto = self._crear_variable(monto='50.00')
+        self.assertEqual(
+            _monto_base_gasto_mes(gasto.id, gasto.monto, gasto.tipo_monto,
+                                  datetime.date(2026, 3, 1), {}),
+            Decimal('50.00'),
+        )
+
+    def test_usa_el_monto_real_del_mes_cuando_existe(self):
+        gasto = self._crear_variable(monto='50.00')
+        GastoCorrienteEjecucion.objects.create(
+            gasto=gasto, anio=2026, mes=3, monto_real=Decimal('72.00'),
+        )
+        ejecuciones = mapa_ejecuciones_variables(self.user)
+
+        self.assertEqual(
+            _monto_base_gasto_mes(gasto.id, gasto.monto, gasto.tipo_monto,
+                                  datetime.date(2026, 3, 1), ejecuciones),
+            Decimal('72.00'),
+        )
+
+    def test_sin_real_del_mes_promedia_los_ultimos_tres(self):
+        gasto = self._crear_variable(monto='50.00')
+        for mes, monto in [(1, '30.00'), (2, '60.00'), (3, '90.00')]:
+            GastoCorrienteEjecucion.objects.create(
+                gasto=gasto, anio=2026, mes=mes, monto_real=Decimal(monto),
+            )
+        ejecuciones = mapa_ejecuciones_variables(self.user)
+
+        # Abril no tiene real: promedio de enero/febrero/marzo = 60.00
+        self.assertEqual(
+            _monto_base_gasto_mes(gasto.id, gasto.monto, gasto.tipo_monto,
+                                  datetime.date(2026, 4, 1), ejecuciones),
+            Decimal('60.00'),
+        )
+
+    def test_el_promedio_solo_mira_meses_anteriores(self):
+        gasto = self._crear_variable(monto='50.00')
+        for mes, monto in [(1, '30.00'), (5, '900.00')]:
+            GastoCorrienteEjecucion.objects.create(
+                gasto=gasto, anio=2026, mes=mes, monto_real=Decimal(monto),
+            )
+        ejecuciones = mapa_ejecuciones_variables(self.user)
+
+        # Febrero solo puede usar enero; mayo (posterior) no debe contaminar.
+        self.assertEqual(
+            _monto_base_gasto_mes(gasto.id, gasto.monto, gasto.tipo_monto,
+                                  datetime.date(2026, 2, 1), ejecuciones),
+            Decimal('30.00'),
+        )
+
+    def test_un_gasto_fijo_ignora_las_ejecuciones(self):
+        gasto = GastoCorriente.objects.create(
+            usuario=self.user, descripcion='Arriendo', monto=Decimal('500.00'),
+            frecuencia='mensual', fecha_inicio='2026-01-01',
+        )
+        ejecuciones = {gasto.id: {(2026, 3): Decimal('9.00')}}
+
+        self.assertEqual(
+            _monto_base_gasto_mes(gasto.id, gasto.monto, gasto.tipo_monto,
+                                  datetime.date(2026, 3, 1), ejecuciones),
+            Decimal('500.00'),
+        )
+
+    # -- Impacto en el balance -----------------------------------------------
+
+    def test_balance_del_mes_usa_el_monto_real(self):
+        gasto = self._crear_variable(monto='50.00')
+        Ingreso.objects.create(
+            usuario=self.user, descripcion='Sueldo', monto=Decimal('1000.00'),
+            frecuencia='mensual', fecha_inicio='2026-01-01', activo=True,
+        )
+        GastoCorrienteEjecucion.objects.create(
+            gasto=gasto, anio=2026, mes=3, monto_real=Decimal('80.00'),
+        )
+
+        # 1000 - 80 (real), no 1000 - 50 (estimado)
+        self.assertEqual(calcular_balance_mes(self.user, 2026, 3), Decimal('920.00'))
+
+    def test_variable_no_se_cuenta_dos_veces_con_puntuales(self):
+        """Un variable declarado se cuenta una sola vez, aunque existan puntuales."""
+        gasto = self._crear_variable(monto='50.00')
+        GastoCorrienteEjecucion.objects.create(
+            gasto=gasto, anio=2026, mes=3, monto_real=Decimal('80.00'),
+        )
+        GastoNoCorriente.objects.create(
+            usuario=self.user, descripcion='Tele', categoria='tecnologia',
+            monto=Decimal('300.00'), fecha='2026-03-10',
+        )
+
+        # 80 del variable + 300 del puntual = 380. Ni mas (doble conteo) ni menos.
+        self.assertEqual(calcular_balance_mes(self.user, 2026, 3), Decimal('-380.00'))
+
+    # -- Endpoints -----------------------------------------------------------
+
+    def test_registrar_monto_real_por_api(self):
+        gasto = self._crear_variable()
+
+        response = self.client.post(
+            '/api/finanzas/gastos-corrientes/{}/ejecuciones/'.format(gasto.id),
+            {'anio': 2026, 'mes': 3, 'monto_real': '77.50'}, format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Decimal(response.data['monto_real']), Decimal('77.50'))
+
+    def test_recargar_el_mismo_mes_reemplaza_el_valor(self):
+        gasto = self._crear_variable()
+        url = '/api/finanzas/gastos-corrientes/{}/ejecuciones/'.format(gasto.id)
+        self.client.post(url, {'anio': 2026, 'mes': 3, 'monto_real': '77.50'}, format='json')
+
+        response = self.client.post(url, {'anio': 2026, 'mes': 3, 'monto_real': '90.00'}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(gasto.ejecuciones.count(), 1)
+        self.assertEqual(gasto.ejecuciones.first().monto_real, Decimal('90.00'))
+
+    def test_un_gasto_fijo_rechaza_montos_reales(self):
+        gasto = GastoCorriente.objects.create(
+            usuario=self.user, descripcion='Arriendo', monto=Decimal('500.00'),
+            frecuencia='mensual', fecha_inicio='2026-01-01',
+        )
+
+        response = self.client.post(
+            '/api/finanzas/gastos-corrientes/{}/ejecuciones/'.format(gasto.id),
+            {'anio': 2026, 'mes': 3, 'monto_real': '77.50'}, format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_rechaza_monto_real_de_mes_futuro(self):
+        gasto = self._crear_variable()
+        futuro = local_today() + datetime.timedelta(days=400)
+
+        response = self.client.post(
+            '/api/finanzas/gastos-corrientes/{}/ejecuciones/'.format(gasto.id),
+            {'anio': futuro.year, 'mes': futuro.month, 'monto_real': '10.00'}, format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_convertir_fijo_a_variable(self):
+        gasto = GastoCorriente.objects.create(
+            usuario=self.user, descripcion='Luz', monto=Decimal('50.00'),
+            frecuencia='mensual', fecha_inicio='2026-01-01',
+        )
+
+        response = self.client.post(
+            '/api/finanzas/gastos-corrientes/{}/convertir_a_variable/'.format(gasto.id),
+            {}, format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        gasto.refresh_from_db()
+        self.assertEqual(gasto.tipo_monto, 'variable')
+
+    def test_convertir_variable_a_fijo_descarta_los_reales(self):
+        gasto = self._crear_variable()
+        GastoCorrienteEjecucion.objects.create(
+            gasto=gasto, anio=2026, mes=3, monto_real=Decimal('80.00'),
+        )
+
+        response = self.client.post(
+            '/api/finanzas/gastos-corrientes/{}/convertir_a_fijo/'.format(gasto.id),
+            {}, format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        gasto.refresh_from_db()
+        self.assertEqual(gasto.tipo_monto, 'fijo')
+        self.assertEqual(gasto.ejecuciones.count(), 0)
+
+    def test_no_se_puede_cargar_monto_real_en_gasto_de_otro_usuario(self):
+        otro = User.objects.create_user(
+            email='otro@example.com', username='otro', password='clave12345',
+        )
+        gasto = GastoCorriente.objects.create(
+            usuario=otro, descripcion='Luz', monto=Decimal('50.00'),
+            tipo_monto='variable', frecuencia='mensual', fecha_inicio='2026-01-01',
+        )
+
+        response = self.client.post(
+            '/api/finanzas/gastos-corrientes/{}/ejecuciones/'.format(gasto.id),
+            {'anio': 2026, 'mes': 3, 'monto_real': '77.50'}, format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class TestDeteccionPuntualesRecurrentes(APITestCase):
+    """Puntuales repetidos que en realidad son gastos variables."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            email='det@example.com',
+            username='usuario_det',
+            password='clave12345',
+        )
+        self.client.force_authenticate(user=self.user)
+        self.hoy = local_today()
+
+    def _puntual_hace(self, meses_atras, descripcion='Luz', monto='40.00', categoria='servicios'):
+        base = first_day_of_month(self.hoy)
+        fecha = add_months(base, -meses_atras)
+        return GastoNoCorriente.objects.create(
+            usuario=self.user, descripcion=descripcion, categoria=categoria,
+            monto=Decimal(monto), fecha=fecha,
+        )
+
+    def test_no_sugiere_con_menos_de_tres_meses(self):
+        self._puntual_hace(1)
+        self._puntual_hace(2)
+
+        self.assertEqual(detectar_puntuales_recurrentes(self.user), [])
+
+    def test_sugiere_cuando_se_repite_tres_meses(self):
+        self._puntual_hace(1, monto='40.00')
+        self._puntual_hace(2, monto='50.00')
+        self._puntual_hace(3, monto='60.00')
+
+        sugerencias = detectar_puntuales_recurrentes(self.user)
+
+        self.assertEqual(len(sugerencias), 1)
+        self.assertEqual(sugerencias[0]['descripcion'], 'Luz')
+        self.assertEqual(sugerencias[0]['meses_detectados'], 3)
+        self.assertEqual(sugerencias[0]['monto_promedio'], Decimal('50.00'))
+
+    def test_agrupa_ignorando_mayusculas(self):
+        self._puntual_hace(1, descripcion='Luz')
+        self._puntual_hace(2, descripcion='luz')
+        self._puntual_hace(3, descripcion='LUZ')
+
+        sugerencias = detectar_puntuales_recurrentes(self.user)
+
+        self.assertEqual(len(sugerencias), 1)
+        self.assertEqual(sugerencias[0]['meses_detectados'], 3)
+
+    def test_tres_cargas_del_mismo_mes_no_cuentan_como_tres_meses(self):
+        for _ in range(3):
+            self._puntual_hace(1)
+
+        self.assertEqual(detectar_puntuales_recurrentes(self.user), [])
+
+    def test_no_mezcla_grupos_distintos(self):
+        self._puntual_hace(1, descripcion='Luz')
+        self._puntual_hace(2, descripcion='Luz')
+        self._puntual_hace(3, descripcion='Luz')
+        self._puntual_hace(1, descripcion='Tele', categoria='tecnologia')
+
+        sugerencias = detectar_puntuales_recurrentes(self.user)
+
+        self.assertEqual(len(sugerencias), 1)
+        self.assertEqual(sugerencias[0]['descripcion'], 'Luz')
+
+    def test_endpoint_de_sugerencias(self):
+        for mes in (1, 2, 3):
+            self._puntual_hace(mes)
+
+        response = self.client.get('/api/finanzas/gastos-no-corrientes/sugerencias_variables/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['descripcion'], 'Luz')
+
+    def test_convertir_grupo_absorbe_el_historial_sin_duplicar(self):
+        self._puntual_hace(1, monto='40.00')
+        self._puntual_hace(2, monto='50.00')
+        self._puntual_hace(3, monto='60.00')
+
+        response = self.client.post(
+            '/api/finanzas/gastos-no-corrientes/convertir_grupo_a_variable/',
+            {'descripcion': 'Luz', 'categoria': 'servicios'}, format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['tipo_monto'], 'variable')
+
+        # Los puntuales ya no existen: no pueden alimentar el suavizado.
+        self.assertEqual(GastoNoCorriente.objects.filter(usuario=self.user).count(), 0)
+
+        # Su historial sobrevive como montos reales del nuevo gasto variable.
+        gasto = GastoCorriente.objects.get(id=response.data['id'])
+        self.assertEqual(gasto.ejecuciones.count(), 3)
+        self.assertEqual(
+            sorted(e.monto_real for e in gasto.ejecuciones.all()),
+            [Decimal('40.00'), Decimal('50.00'), Decimal('60.00')],
+        )
+        self.assertEqual(gasto.monto, Decimal('50.00'))
+
+    def test_convertir_grupo_inexistente_devuelve_404(self):
+        response = self.client.post(
+            '/api/finanzas/gastos-no-corrientes/convertir_grupo_a_variable/',
+            {'descripcion': 'No existe', 'categoria': 'otro'}, format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_convertir_grupo_requiere_descripcion(self):
+        response = self.client.post(
+            '/api/finanzas/gastos-no-corrientes/convertir_grupo_a_variable/',
+            {'categoria': 'servicios'}, format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_no_toca_los_puntuales_de_otro_usuario(self):
+        otro = User.objects.create_user(
+            email='otro2@example.com', username='otro2', password='clave12345',
+        )
+        GastoNoCorriente.objects.create(
+            usuario=otro, descripcion='Luz', categoria='servicios',
+            monto=Decimal('40.00'), fecha=self.hoy,
+        )
+        for mes in (1, 2, 3):
+            self._puntual_hace(mes)
+
+        self.client.post(
+            '/api/finanzas/gastos-no-corrientes/convertir_grupo_a_variable/',
+            {'descripcion': 'Luz', 'categoria': 'servicios'}, format='json',
+        )
+
+        self.assertEqual(GastoNoCorriente.objects.filter(usuario=otro).count(), 1)
+
+    def test_las_sugerencias_solo_ven_lo_del_usuario_autenticado(self):
+        otro = User.objects.create_user(
+            email='otro3@example.com', username='otro3', password='clave12345',
+        )
+        base = first_day_of_month(self.hoy)
+        for mes in (1, 2, 3):
+            GastoNoCorriente.objects.create(
+                usuario=otro, descripcion='Luz', categoria='servicios',
+                monto=Decimal('40.00'), fecha=add_months(base, -mes),
+            )
+
+        self.assertEqual(detectar_puntuales_recurrentes(self.user), [])

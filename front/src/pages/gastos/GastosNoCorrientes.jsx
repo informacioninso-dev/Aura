@@ -62,7 +62,12 @@ export default function GastosNoCorrientes({ embedded = false }) {
   const { categorias } = useCategorias()
   const canCustomizeProjection = Boolean(user?.feature_access?.advanced_projection_enabled)
 
-  useEffect(() => { fetchItems() }, [])
+  // — sugerencias de gastos variables mal cargados como puntuales —
+  const [sugerencias, setSugerencias] = useState([])
+  const [sugerenciaAplicando, setSugerenciaAplicando] = useState(null)
+  const [sugerenciasOcultas, setSugerenciasOcultas] = useState(new Set())
+
+  useEffect(() => { fetchItems(); fetchSugerencias() }, [])
 
   function clampExpenseDate(value) {
     if (!value) return value
@@ -76,6 +81,40 @@ export default function GastosNoCorrientes({ embedded = false }) {
     } catch (err) {
       setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudieron cargar los gastos puntuales.') })
     }
+  }
+
+  async function fetchSugerencias() {
+    try {
+      const { data } = await api.get('/finanzas/gastos-no-corrientes/sugerencias_variables/')
+      setSugerencias(data)
+    } catch {
+      // Las sugerencias son un extra: si fallan, la pantalla funciona igual.
+    }
+  }
+
+  async function aplicarSugerencia(sugerencia) {
+    if (sugerenciaAplicando) return
+    setSugerenciaAplicando(sugerencia.descripcion)
+    setFeedback({ type: '', message: '' })
+    try {
+      await api.post('/finanzas/gastos-no-corrientes/convertir_grupo_a_variable/', {
+        descripcion: sugerencia.descripcion,
+        categoria: sugerencia.categoria,
+      })
+      await Promise.all([fetchItems(), fetchSugerencias()])
+      setFeedback({
+        type: 'success',
+        message: `"${sugerencia.descripcion}" ahora es un gasto variable. Tu historial se conservo.`,
+      })
+    } catch (err) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo convertir el grupo.') })
+    } finally {
+      setSugerenciaAplicando(null)
+    }
+  }
+
+  function descartarSugerencia(descripcion) {
+    setSugerenciasOcultas((prev) => new Set(prev).add(descripcion))
   }
 
   function openNew() {
@@ -277,6 +316,41 @@ export default function GastosNoCorrientes({ embedded = false }) {
       )}
 
       <FeedbackAlert type={feedback.type || 'error'} message={feedback.message} />
+
+      {sugerencias
+        .filter((s) => !sugerenciasOcultas.has(s.descripcion))
+        .map((sugerencia) => (
+          <div key={`${sugerencia.descripcion}-${sugerencia.categoria}`} className="variable-suggestion">
+            <div className="variable-suggestion-copy">
+              <span className="variable-suggestion-title">
+                Parece que &quot;{sugerencia.descripcion}&quot; se repite cada mes
+              </span>
+              <span className="variable-suggestion-text">
+                Lo cargaste en {sugerencia.meses_detectados} meses distintos, entre $
+                {formatAmount(parseFloat(sugerencia.monto_minimo))} y $
+                {formatAmount(parseFloat(sugerencia.monto_maximo))}. Si lo pasas a gasto variable,
+                tu proyeccion lo tendra en cuenta hacia adelante y tu historial se conserva.
+              </span>
+            </div>
+            <div className="variable-suggestion-actions">
+              <button
+                type="button"
+                className="btn-modal-convert"
+                disabled={sugerenciaAplicando !== null}
+                onClick={() => aplicarSugerencia(sugerencia)}
+              >
+                {sugerenciaAplicando === sugerencia.descripcion ? 'Convirtiendo...' : 'Pasar a variable'}
+              </button>
+              <button
+                type="button"
+                className="btn-modal-cancel"
+                onClick={() => descartarSugerencia(sugerencia.descripcion)}
+              >
+                Ahora no
+              </button>
+            </div>
+          </div>
+        ))}
 
       <div className="card" style={{ padding: 0 }}>
         {items.length === 0 ? (

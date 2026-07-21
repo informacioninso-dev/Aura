@@ -14,6 +14,13 @@ FRECUENCIA_CHOICES = [
     ('anual', 'Anual'),
 ]
 
+TIPO_MONTO_FIJO = 'fijo'
+TIPO_MONTO_VARIABLE = 'variable'
+TIPO_MONTO_CHOICES = [
+    (TIPO_MONTO_FIJO, 'Fijo'),
+    (TIPO_MONTO_VARIABLE, 'Variable'),
+]
+
 CATEGORIAS_DEFAULT = [
     {'nombre': 'vivienda',        'icono': '🏠'},
     {'nombre': 'alimentacion',    'icono': '🛒'},
@@ -96,6 +103,9 @@ class GastoCorriente(models.Model):
     descripcion  = models.CharField(max_length=200)
     categoria    = models.CharField(max_length=50, default='otro')
     monto        = models.DecimalField(max_digits=12, decimal_places=2)
+    # Con tipo_monto='fijo' el monto es exacto; con 'variable' es solo un estimado
+    # que se reemplaza por el real de GastoCorrienteEjecucion cuando existe.
+    tipo_monto   = models.CharField(max_length=10, choices=TIPO_MONTO_CHOICES, default=TIPO_MONTO_FIJO)
     frecuencia   = models.CharField(max_length=20, choices=FRECUENCIA_CHOICES, default='mensual')
     fecha_inicio = models.DateField()
     fecha_fin    = models.DateField(null=True, blank=True)
@@ -111,8 +121,34 @@ class GastoCorriente(models.Model):
             models.Index(fields=['usuario', 'fecha_fin'], name='gc_usr_fin_idx'),
         ]
 
+    @property
+    def es_variable(self):
+        return self.tipo_monto == TIPO_MONTO_VARIABLE
+
     def __str__(self):
         return f"{self.descripcion} - ${self.monto} ({self.frecuencia})"
+
+
+class GastoCorrienteEjecucion(models.Model):
+    """Monto realmente pagado de un gasto variable en un mes concreto."""
+    gasto      = models.ForeignKey(GastoCorriente, on_delete=models.CASCADE, related_name='ejecuciones')
+    anio       = models.PositiveIntegerField()
+    mes        = models.PositiveSmallIntegerField()   # 1–12
+    monto_real = models.DecimalField(max_digits=12, decimal_places=2)
+    creado_en  = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('gasto', 'anio', 'mes')
+        ordering = ['-anio', '-mes']
+        verbose_name = 'Ejecución de gasto variable'
+        verbose_name_plural = 'Ejecuciones de gastos variables'
+        indexes = [
+            models.Index(fields=['gasto', 'anio', 'mes'], name='gce_gasto_periodo_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.gasto.descripcion} {self.mes}/{self.anio}: ${self.monto_real}"
 
 
 class GastoNoCorriente(models.Model):

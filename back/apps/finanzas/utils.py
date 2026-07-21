@@ -18,6 +18,10 @@ FINANZAS_CACHE_VERSION_PREFIX = 'finanzas:version'
 FINANZAS_DIRTY_FROM_PREFIX = 'finanzas:dirty-from'
 MIN_VARIABLE_HISTORY_MONTHS = 3
 
+# Meses de historial real que se promedian para estimar un gasto variable
+# cuando el mes consultado todavia no tiene monto real cargado.
+MESES_PROMEDIO_VARIABLE = 3
+
 FREQ_FACTOR = {
     'diario': 30,
     'semanal': Decimal('4.33'),
@@ -351,6 +355,95 @@ def _estimate_premium_variable_component(monthly_values):
     return (typical_amount * frequency).quantize(Decimal('0.01'))
 
 
+def mapa_ejecuciones_variables(usuario):
+    """{gasto_id: {(anio, mes): monto_real}} de los gastos variables del usuario."""
+    from .models import TIPO_MONTO_VARIABLE, GastoCorrienteEjecucion
+
+    mapa = {}
+    filas = GastoCorrienteEjecucion.objects.filter(
+        gasto__usuario=usuario,
+        gasto__tipo_monto=TIPO_MONTO_VARIABLE,
+    ).values('gasto_id', 'anio', 'mes', 'monto_real')
+    for fila in filas:
+        mapa.setdefault(fila['gasto_id'], {})[(fila['anio'], fila['mes'])] = _money(fila['monto_real'])
+    return mapa
+
+
+def _monto_base_gasto_mes(gasto_id, monto_estimado, tipo_monto, month_start, ejecuciones):
+    """
+    Monto base de un gasto recurrente en un mes.
+
+    Los fijos usan siempre su monto. Los variables resuelven en cascada:
+    monto real del mes -> promedio de los ultimos meses con real -> estimado.
+    """
+    from .models import TIPO_MONTO_VARIABLE
+
+    if tipo_monto != TIPO_MONTO_VARIABLE:
+        return monto_estimado
+
+    reales = ejecuciones.get(gasto_id) or {}
+    clave = (month_start.year, month_start.month)
+    if clave in reales:
+        return reales[clave]
+
+    previos = sorted(periodo for periodo in reales if periodo < clave)
+    if previos:
+        ultimos = [reales[periodo] for periodo in previos[-MESES_PROMEDIO_VARIABLE:]]
+        return (sum(ultimos) / Decimal(len(ultimos))).quantize(Decimal('0.01'))
+
+    return monto_estimado
+
+
+def detectar_puntuales_recurrentes(usuario, min_meses=MESES_PROMEDIO_VARIABLE, meses_ventana=12):
+    """
+    Gastos puntuales que en realidad se repiten mes a mes (luz, super, gasolina).
+
+    Se agrupan por descripcion normalizada + categoria. Si el grupo aparece en
+    min_meses distintos dentro de la ventana, se sugiere convertirlo a variable.
+    Solo sugiere: nunca reclasifica por su cuenta.
+    """
+    from .models import GastoNoCorriente
+
+    hoy = local_today()
+    desde = _primer_dia_mes(_restar_meses(_primer_dia_mes(hoy), meses_ventana - 1))
+
+    grupos = {}
+    puntuales = GastoNoCorriente.objects.filter(
+        usuario=usuario, fecha__gte=desde,
+    ).values('id', 'descripcion', 'categoria', 'monto', 'fecha')
+
+    for item in puntuales:
+        clave = (item['descripcion'].strip().lower(), item['categoria'])
+        grupo = grupos.setdefault(clave, {
+            'descripcion': item['descripcion'].strip(),
+            'categoria': item['categoria'],
+            'ids': [],
+            'por_mes': {},
+        })
+        grupo['ids'].append(item['id'])
+        periodo = (item['fecha'].year, item['fecha'].month)
+        grupo['por_mes'][periodo] = grupo['por_mes'].get(periodo, Decimal('0.00')) + _money(item['monto'])
+
+    sugerencias = []
+    for grupo in grupos.values():
+        meses = len(grupo['por_mes'])
+        if meses < min_meses:
+            continue
+        montos = list(grupo['por_mes'].values())
+        sugerencias.append({
+            'descripcion': grupo['descripcion'],
+            'categoria': grupo['categoria'],
+            'meses_detectados': meses,
+            'monto_promedio': (sum(montos) / Decimal(len(montos))).quantize(Decimal('0.01')),
+            'monto_minimo': min(montos),
+            'monto_maximo': max(montos),
+            'ids': grupo['ids'],
+        })
+
+    sugerencias.sort(key=lambda s: s['meses_detectados'], reverse=True)
+    return sugerencias
+
+
 def calcular_balance_mes(usuario, anio, mes):
     """Calcula ingresos - gastos para un mes/anio dado. Puede ser negativo."""
     import calendar as cal
@@ -377,7 +470,14 @@ def calcular_balance_mes(usuario, anio, mes):
         activo=True,
         fecha_inicio__lte=ultimo_dia,
     ).filter(db_models.Q(fecha_fin__isnull=True) | db_models.Q(fecha_fin__gte=primer_dia))
-    total_gc = sum(_monto_efectivo_mes(g.monto, g.frecuencia, g.fecha_inicio, primer_dia) for g in gastos_c)
+    ejecuciones = mapa_ejecuciones_variables(usuario)
+    total_gc = sum(
+        _monto_efectivo_mes(
+            _monto_base_gasto_mes(g.id, g.monto, g.tipo_monto, primer_dia, ejecuciones),
+            g.frecuencia, g.fecha_inicio, primer_dia,
+        )
+        for g in gastos_c
+    )
 
     diferidos = Diferido.objects.filter(
         usuario=usuario,
@@ -448,11 +548,15 @@ def _calcular_neto_mensual_en_rango(usuario, desde_mes, hasta_mes):
         fecha_inicio__lte=hasta_dia,
     ).filter(
         db_models.Q(fecha_fin__isnull=True) | db_models.Q(fecha_fin__gte=desde_mes)
-    ).values('monto', 'frecuencia', 'fecha_inicio', 'fecha_fin')
+    ).values('id', 'monto', 'tipo_monto', 'frecuencia', 'fecha_inicio', 'fecha_fin')
+    ejecuciones = mapa_ejecuciones_variables(usuario)
     add_recurrente(
         gastos_corrientes,
         amount_fn=lambda item, month_date: -_monto_efectivo_mes(
-            item['monto'], item['frecuencia'], item['fecha_inicio'], month_date,
+            _monto_base_gasto_mes(
+                item['id'], item['monto'], item['tipo_monto'], month_date, ejecuciones,
+            ),
+            item['frecuencia'], item['fecha_inicio'], month_date,
         ),
     )
 
@@ -624,6 +728,7 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
             fecha_fin__gte=real_start,
         )
     )
+    ejecuciones_variables = mapa_ejecuciones_variables(usuario)
     # Fetch desde el mínimo entre history_start y real_start para cubrir toda la
     # ventana visible del gráfico histórico (real_past_months puede superar history_months).
     puntuales_start = min(history_start, real_start)
@@ -732,7 +837,11 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
 
     def _gastos_fijos_mes(month_start, month_end):
         return sum(
-            (_monto_efectivo_mes(item.monto, item.frecuencia, item.fecha_inicio, month_start)
+            (_monto_efectivo_mes(
+                _monto_base_gasto_mes(
+                    item.id, item.monto, item.tipo_monto, month_start, ejecuciones_variables,
+                ),
+                item.frecuencia, item.fecha_inicio, month_start)
              for item in gastos_corrientes
              if item.fecha_inicio <= month_end and (item.fecha_fin is None or item.fecha_fin >= month_start)),
             Decimal('0.00'),
