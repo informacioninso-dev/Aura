@@ -41,6 +41,7 @@ from .utils import (
     asegurar_saldo_mes,
     asegurar_saldos_historicos,
     detectar_puntuales_recurrentes,
+    parece_gasto_variable,
     _primera_fecha_con_movimientos,
     _restar_meses,
     invalidate_finanzas_cache,
@@ -279,6 +280,16 @@ class GastoCorrienteViewSet(BaseFinanzasViewSet):
 class GastoNoCorrienteViewSet(BaseFinanzasViewSet):
     queryset = GastoNoCorriente.objects.all()
     serializer_class = GastoNoCorrienteSerializer
+
+    @action(detail=False, methods=['get'])
+    def parece_variable(self, request):
+        """
+        Dice si una descripcion suele ser un gasto variable, para avisar al
+        usuario mientras escribe y que el dato nazca bien clasificado.
+        """
+        descripcion = request.query_params.get('descripcion', '')
+        categoria = request.query_params.get('categoria') or None
+        return Response({'parece_variable': parece_gasto_variable(descripcion, categoria)})
 
     @action(detail=False, methods=['get'])
     def sugerencias_variables(self, request):

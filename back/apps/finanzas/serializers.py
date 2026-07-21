@@ -6,6 +6,7 @@ from rest_framework import serializers
 from apps.usuarios.plans import FEATURE_ADVANCED_PROJECTION_ENABLED, get_user_feature_value
 
 from .dates import local_today
+from .utils import parece_gasto_variable
 from .models import (
     Categoria,
     CuentaPorCobrar,
@@ -220,6 +221,13 @@ class GastoCorrienteEjecucionSerializer(serializers.ModelSerializer):
 
 
 class GastoNoCorrienteSerializer(ProjectionEligibilitySerializerMixin, serializers.ModelSerializer):
+    # Marca los que por su nombre suelen ser variables (luz, agua, super), para
+    # que la UI pueda sugerir el cambio sin esperar a que se repitan 3 meses.
+    parece_variable = serializers.SerializerMethodField()
+
+    def get_parece_variable(self, obj):
+        return parece_gasto_variable(obj.descripcion, obj.categoria)
+
     def validate(self, attrs):
         monto = attrs.get('monto', getattr(self.instance, 'monto', None))
         fecha = attrs.get('fecha', getattr(self.instance, 'fecha', None))
