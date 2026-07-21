@@ -6,12 +6,12 @@ import { useAuth } from '../../context/useAuth'
 import { formatAmount, formatNumber } from '../../utils/formatters'
 import '../../components/ui/app.css'
 
-const TEMPLATE_CSV = `fecha,descripcion,monto,tipo,categoria
-2025-12-01,Sueldo diciembre,1500000,ingreso,
-2025-12-05,Supermercado,-85000,gasto,alimentacion
-2025-12-10,Arriendo,-600000,gasto,vivienda
-2025-12-15,Freelance,200000,ingreso,
-2025-12-20,Farmacia,-32000,gasto,salud`
+const TEMPLATE_CSV = `fecha,descripcion,monto,tipo,categoria,frecuencia,tipo_monto
+2025-12-01,Sueldo,1500000,ingreso,,mensual,
+2025-12-10,Arriendo,-600000,gasto,vivienda,mensual,fijo
+2025-12-01,Luz,-45000,gasto,servicios,mensual,variable
+2025-12-05,Supermercado,-85000,gasto,alimentacion,,
+2025-12-20,Farmacia,-32000,gasto,salud,,`
 
 const PREVIEW_PAGE_SIZE = 100
 
@@ -293,7 +293,7 @@ export default function Importar() {
                 <thead>
                   <tr>
                     <th style={{ width: 36 }}></th>
-                    {['Fecha', 'Descripcion', 'Monto', 'Tipo', 'Categoria'].map((header) => (
+                    {['Fecha', 'Descripcion', 'Monto', 'Tipo', 'Categoria', 'Clase'].map((header) => (
                       <th key={header}>{header}</th>
                     ))}
                   </tr>
@@ -327,6 +327,11 @@ export default function Importar() {
                         </td>
                         <td style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', textTransform: 'capitalize' }}>
                           {fila.categoria}
+                        </td>
+                        <td style={{ fontSize: 12 }}>
+                          {fila.frecuencia
+                            ? `${fila.tipo === 'gasto' && fila.tipo_monto === 'variable' ? 'Variable' : 'Fijo'} · ${fila.frecuencia}`
+                            : <span style={{ color: 'rgba(255,255,255,0.4)' }}>Puntual</span>}
                         </td>
                       </tr>
                     )
@@ -451,6 +456,8 @@ export default function Importar() {
             { col: 'monto', desc: 'Positivo para ingreso, negativo para gasto.' },
             { col: 'tipo', desc: '"ingreso" o "gasto" si ya lo conoces. Es opcional.' },
             { col: 'categoria', desc: 'Nombre libre de la categoria. Es opcional.' },
+            { col: 'frecuencia', desc: 'mensual, quincenal, anual... si se repite. Vacio = una sola vez (puntual). Opcional.' },
+            { col: 'tipo_monto', desc: 'Para gastos que se repiten: "fijo" (mismo monto) o "variable" (cambia). Opcional.' },
           ].map((item) => (
             <div key={item.col} style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
               <span style={{ fontWeight: 700, color: '#C487F6', minWidth: 90, fontSize: 12 }}>{item.col}</span>
@@ -474,10 +481,10 @@ export default function Importar() {
             </div>
 
             {[
-              'Los ingresos se importan como ingresos puntuales en la fecha original del archivo.',
-              'Los gastos se importan como gastos puntuales del historial.',
+              'Sin columna frecuencia, todo entra como puntual (movimiento de una sola vez).',
+              'Con frecuencia (mensual, anual...) se crea un ingreso o gasto recurrente. Ponlo una sola vez, no uno por mes.',
+              'En gastos que se repiten, "variable" es para los que cambian de monto (luz, agua); "fijo" para los que no (arriendo).',
               `Tu plan permite hasta ${formatNumber(maxFilasPlan)} filas por importacion.`,
-              'La vista previa se pagina para mantener una carga rapida aun con archivos grandes.',
             ].map((text, index) => (
               <div key={`${index}-${text}`} style={{ display: 'flex', gap: 8, marginBottom: 7, alignItems: 'flex-start' }}>
                 <span style={{ color: '#C487F6', marginTop: 1 }}>·</span>

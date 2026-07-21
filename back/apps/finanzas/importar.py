@@ -7,6 +7,8 @@ Columnas esperadas (insensible a mayusculas/tildes):
   monto        -> numero (positivo = ingreso, negativo = gasto)
   tipo         -> 'ingreso' | 'gasto'  (opcional, se infiere del signo)
   categoria    -> nombre de categoria (opcional, default 'otro')
+  frecuencia   -> mensual/quincenal/... si es recurrente; vacio = puntual (opcional)
+  tipo_monto   -> 'fijo' | 'variable' para gastos recurrentes; default fijo (opcional)
 """
 
 import csv
@@ -26,12 +28,49 @@ ALIAS_COLUMNAS = {
     'monto': ['monto', 'importe', 'valor', 'amount', 'value', 'total'],
     'tipo': ['tipo', 'type', 'movimiento', 'movement'],
     'categoria': ['categoria', 'categoria', 'category', 'cat'],
+    'frecuencia': ['frecuencia', 'frequency', 'periodicidad', 'repite', 'recurrencia'],
+    'tipo_monto': ['tipo_monto', 'tipo monto', 'tipomonto', 'clase', 'fijo_variable', 'fijo o variable'],
 }
 
 FORMATOS_FECHA = ['%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y', '%m/%d/%Y', '%Y/%m/%d']
 MAX_FILAS = 2000
 MIN_ALLOWED_YEAR = 2000
 MAX_ALLOWED_YEAR = 2100
+
+FRECUENCIAS_VALIDAS = {
+    'diario', 'semanal', 'quincenal', 'mensual',
+    'bimestral', 'trimestral', 'semestral', 'anual',
+}
+# Valores que significan "no es recurrente" en la columna frecuencia.
+FRECUENCIA_PUNTUAL = {'', 'puntual', 'unica', 'unico', 'una vez', 'once', 'no'}
+# Sinonimos que normalizan a una frecuencia valida.
+ALIAS_FRECUENCIA = {
+    'diaria': 'diario', 'daily': 'diario',
+    'semana': 'semanal', 'weekly': 'semanal',
+    'quincena': 'quincenal', 'catorcenal': 'quincenal',
+    'mes': 'mensual', 'mensualmente': 'mensual', 'monthly': 'mensual',
+    'bimensual': 'bimestral', 'bimestralmente': 'bimestral',
+    'trimestralmente': 'trimestral', 'quarterly': 'trimestral',
+    'semestralmente': 'semestral',
+    'anio': 'anual', 'año': 'anual', 'yearly': 'anual', 'anualmente': 'anual',
+}
+
+
+def _parse_frecuencia(raw):
+    """Devuelve la frecuencia normalizada, o None si es puntual."""
+    valor = _normalizar(raw)
+    if valor in FRECUENCIA_PUNTUAL:
+        return None
+    valor = ALIAS_FRECUENCIA.get(valor, valor)
+    return valor if valor in FRECUENCIAS_VALIDAS else None
+
+
+def _parse_tipo_monto(raw):
+    """Devuelve 'fijo' o 'variable' (default fijo) para gastos recurrentes."""
+    valor = _normalizar(raw)
+    if valor in ('variable', 'var', 'cambia', 'cambiante'):
+        return 'variable'
+    return 'fijo'
 
 
 def _normalizar(s: str) -> str:
@@ -218,6 +257,8 @@ def parsear_archivo(nombre: str, file_bytes: bytes, max_filas: int = MAX_FILAS) 
             continue
 
         categoria = (get('categoria') or 'otro').lower().strip()[:50]
+        frecuencia = _parse_frecuencia(get('frecuencia'))
+        tipo_monto = _parse_tipo_monto(get('tipo_monto')) if frecuencia else 'fijo'
 
         filas_ok.append(
             {
@@ -226,8 +267,12 @@ def parsear_archivo(nombre: str, file_bytes: bytes, max_filas: int = MAX_FILAS) 
                 'monto': str(abs(monto)),
                 'tipo': tipo,
                 'categoria': categoria,
+                'frecuencia': frecuencia or '',   # vacio = puntual
+                'tipo_monto': tipo_monto,
             }
         )
+
+    _marcar_recurrentes_duplicados(filas_ok, filas_error)
 
     return {
         'columnas_detectadas': cabeceras,
@@ -236,6 +281,43 @@ def parsear_archivo(nombre: str, file_bytes: bytes, max_filas: int = MAX_FILAS) 
         'filas_error': filas_error,
         'total': len(filas_ok) + len(filas_error),
     }
+
+
+def _marcar_recurrentes_duplicados(filas_ok, filas_error):
+    """
+    Evita el error clasico: subir 12 filas de 'Arriendo mensual' (una por mes)
+    crearia 12 gastos recurrentes = 12x el arriendo proyectado para siempre.
+
+    Un recurrente se declara UNA vez. Si aparece repetido (misma descripcion,
+    categoria, tipo y frecuencia), se conserva la primera fila y las demas se
+    mueven a errores con una explicacion, en vez de duplicar en silencio.
+    """
+    vistos = {}
+    conservadas = []
+    for fila in filas_ok:
+        if not fila['frecuencia']:
+            conservadas.append(fila)
+            continue
+        clave = (
+            fila['tipo'],
+            _normalizar(fila['descripcion']),
+            fila['categoria'],
+            fila['frecuencia'],
+        )
+        if clave in vistos:
+            filas_error.append({
+                'fila': '-',
+                'raw': [fila['fecha'], fila['descripcion'], fila['monto']],
+                'error': (
+                    'Recurrente repetido: "{}" {} ya se declaro antes. Un gasto o '
+                    'ingreso recurrente se pone una sola vez, no uno por mes.'
+                ).format(fila['descripcion'], fila['frecuencia']),
+            })
+            continue
+        vistos[clave] = True
+        conservadas.append(fila)
+
+    filas_ok[:] = conservadas
 
 
 def validar_filas_confirmacion(filas: list[dict], max_filas: int = MAX_FILAS) -> list[dict]:
@@ -272,6 +354,8 @@ def validar_filas_confirmacion(filas: list[dict], max_filas: int = MAX_FILAS) ->
 
         descripcion = (str(fila.get('descripcion', '')).strip() or '(sin descripcion)')[:200]
         categoria = (str(fila.get('categoria', 'otro')).strip().lower() or 'otro')[:50]
+        frecuencia = _parse_frecuencia(str(fila.get('frecuencia', '')))
+        tipo_monto = _parse_tipo_monto(str(fila.get('tipo_monto', ''))) if frecuencia else 'fijo'
 
         filas_ok.append(
             {
@@ -280,51 +364,89 @@ def validar_filas_confirmacion(filas: list[dict], max_filas: int = MAX_FILAS) ->
                 'monto': str(abs(monto)),
                 'tipo': tipo,
                 'categoria': categoria,
+                'frecuencia': frecuencia or '',
+                'tipo_monto': tipo_monto,
             }
+        )
+
+    # En la confirmacion, un recurrente duplicado es un error duro: el usuario ya
+    # vio el aviso en el preview, no debe colarse un 12x arriendo.
+    descartes = []
+    _marcar_recurrentes_duplicados(filas_ok, descartes)
+    if descartes:
+        raise ValueError(
+            'Hay {} registro(s) recurrente(s) repetido(s). Deja una sola fila por '
+            'cada gasto o ingreso recurrente.'.format(len(descartes))
         )
 
     return filas_ok
 
 
 def crear_registros(usuario, filas: list[dict]) -> dict:
-    """Crea ingresos y gastos puntuales a partir de filas parseadas y validadas."""
-    from .models import GastoNoCorriente, IngresoPuntual
+    """
+    Crea los registros segun su tipo y frecuencia:
+      - ingreso  sin frecuencia -> IngresoPuntual
+      - ingreso  con frecuencia -> Ingreso (recurrente)
+      - gasto    sin frecuencia -> GastoNoCorriente (puntual)
+      - gasto    con frecuencia -> GastoCorriente (fijo o variable)
+    """
+    from .models import (
+        GastoCorriente, GastoNoCorriente, Ingreso, IngresoPuntual,
+    )
     from .utils import invalidate_finanzas_cache
 
-    ingresos = []
-    gastos = []
+    ingresos_puntuales = []
+    ingresos_recurrentes = []
+    gastos_puntuales = []
+    gastos_recurrentes = []
     fechas_afectadas = []
 
-    with transaction.atomic():
-        for f in filas:
-            if f['tipo'] == 'ingreso':
-                ingresos.append(
-                    IngresoPuntual(
-                        usuario=usuario,
-                        descripcion=f['descripcion'],
-                        monto=Decimal(f['monto']),
-                        fecha=f['fecha'],
-                        notas='Importado desde archivo',
-                    )
-                )
-                fechas_afectadas.append(datetime.date.fromisoformat(f['fecha']))
+    for f in filas:
+        fecha = f['fecha']
+        monto = Decimal(f['monto'])
+        frecuencia = f.get('frecuencia') or ''
+        fechas_afectadas.append(datetime.date.fromisoformat(fecha))
+
+        if f['tipo'] == 'ingreso':
+            if frecuencia:
+                ingresos_recurrentes.append(Ingreso(
+                    usuario=usuario, descripcion=f['descripcion'], monto=monto,
+                    frecuencia=frecuencia, fecha_inicio=fecha, activo=True,
+                ))
             else:
-                gastos.append(
-                    GastoNoCorriente(
-                        usuario=usuario,
-                        descripcion=f['descripcion'],
-                        categoria=f['categoria'],
-                        monto=Decimal(f['monto']),
-                        fecha=f['fecha'],
-                        notas='Importado desde archivo',
-                    )
-                )
-                fechas_afectadas.append(datetime.date.fromisoformat(f['fecha']))
-        if ingresos:
-            IngresoPuntual.objects.bulk_create(ingresos, batch_size=500)
-        if gastos:
-            GastoNoCorriente.objects.bulk_create(gastos, batch_size=500)
+                ingresos_puntuales.append(IngresoPuntual(
+                    usuario=usuario, descripcion=f['descripcion'], monto=monto,
+                    fecha=fecha, notas='Importado desde archivo',
+                ))
+        else:
+            if frecuencia:
+                gastos_recurrentes.append(GastoCorriente(
+                    usuario=usuario, descripcion=f['descripcion'], categoria=f['categoria'],
+                    monto=monto, tipo_monto=f.get('tipo_monto') or 'fijo',
+                    frecuencia=frecuencia, fecha_inicio=fecha, activo=True,
+                ))
+            else:
+                gastos_puntuales.append(GastoNoCorriente(
+                    usuario=usuario, descripcion=f['descripcion'], categoria=f['categoria'],
+                    monto=monto, fecha=fecha, notas='Importado desde archivo',
+                ))
+
+    with transaction.atomic():
+        if ingresos_puntuales:
+            IngresoPuntual.objects.bulk_create(ingresos_puntuales, batch_size=500)
+        if ingresos_recurrentes:
+            Ingreso.objects.bulk_create(ingresos_recurrentes, batch_size=500)
+        if gastos_puntuales:
+            GastoNoCorriente.objects.bulk_create(gastos_puntuales, batch_size=500)
+        if gastos_recurrentes:
+            GastoCorriente.objects.bulk_create(gastos_recurrentes, batch_size=500)
         if fechas_afectadas:
             invalidate_finanzas_cache(usuario.pk, min(fechas_afectadas))
 
-    return {'ingresos_creados': len(ingresos), 'gastos_creados': len(gastos)}
+    total_ingresos = len(ingresos_puntuales) + len(ingresos_recurrentes)
+    total_gastos = len(gastos_puntuales) + len(gastos_recurrentes)
+    return {
+        'ingresos_creados': total_ingresos,
+        'gastos_creados': total_gastos,
+        'recurrentes_creados': len(ingresos_recurrentes) + len(gastos_recurrentes),
+    }
