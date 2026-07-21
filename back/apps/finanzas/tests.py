@@ -28,7 +28,7 @@ from .utils import (
     parece_gasto_variable,
     calcular_balance_mes,
     calcular_proyeccion_acumulada,
-    detectar_puntuales_recurrentes,
+    detectar_sugerencias,
     mapa_ejecuciones_variables,
 )
 
@@ -2040,17 +2040,18 @@ class TestDeteccionPuntualesRecurrentes(APITestCase):
         )
 
     def test_no_sugiere_con_menos_de_tres_meses(self):
-        self._puntual_hace(1)
-        self._puntual_hace(2)
+        # Nombre fuera del diccionario, para aislar la señal de repeticion.
+        self._puntual_hace(1, descripcion='Peluqueria')
+        self._puntual_hace(2, descripcion='Peluqueria')
 
-        self.assertEqual(detectar_puntuales_recurrentes(self.user), [])
+        self.assertEqual(detectar_sugerencias(self.user), [])
 
     def test_sugiere_cuando_se_repite_tres_meses(self):
         self._puntual_hace(1, monto='40.00')
         self._puntual_hace(2, monto='50.00')
         self._puntual_hace(3, monto='60.00')
 
-        sugerencias = detectar_puntuales_recurrentes(self.user)
+        sugerencias = detectar_sugerencias(self.user)
 
         self.assertEqual(len(sugerencias), 1)
         self.assertEqual(sugerencias[0]['descripcion'], 'Luz')
@@ -2062,16 +2063,16 @@ class TestDeteccionPuntualesRecurrentes(APITestCase):
         self._puntual_hace(2, descripcion='luz')
         self._puntual_hace(3, descripcion='LUZ')
 
-        sugerencias = detectar_puntuales_recurrentes(self.user)
+        sugerencias = detectar_sugerencias(self.user)
 
         self.assertEqual(len(sugerencias), 1)
         self.assertEqual(sugerencias[0]['meses_detectados'], 3)
 
     def test_tres_cargas_del_mismo_mes_no_cuentan_como_tres_meses(self):
         for _ in range(3):
-            self._puntual_hace(1)
+            self._puntual_hace(1, descripcion='Peluqueria')
 
-        self.assertEqual(detectar_puntuales_recurrentes(self.user), [])
+        self.assertEqual(detectar_sugerencias(self.user), [])
 
     def test_no_mezcla_grupos_distintos(self):
         self._puntual_hace(1, descripcion='Luz')
@@ -2079,7 +2080,7 @@ class TestDeteccionPuntualesRecurrentes(APITestCase):
         self._puntual_hace(3, descripcion='Luz')
         self._puntual_hace(1, descripcion='Tele', categoria='tecnologia')
 
-        sugerencias = detectar_puntuales_recurrentes(self.user)
+        sugerencias = detectar_sugerencias(self.user)
 
         self.assertEqual(len(sugerencias), 1)
         self.assertEqual(sugerencias[0]['descripcion'], 'Luz')
@@ -2164,7 +2165,7 @@ class TestDeteccionPuntualesRecurrentes(APITestCase):
                 monto=Decimal('40.00'), fecha=add_months(base, -mes),
             )
 
-        self.assertEqual(detectar_puntuales_recurrentes(self.user), [])
+        self.assertEqual(detectar_sugerencias(self.user), [])
 
 
 class TestConversionManualPuntualAVariable(APITestCase):
@@ -2426,3 +2427,181 @@ class TestNoDobleConteoVariableYPuntuales(APITestCase):
         balance = calcular_balance_mes(self.user, mes_pasado.year, mes_pasado.month)
         # 45 del puntual historico + 45 del variable proyectado en ese mes.
         self.assertEqual(balance, Decimal('-90.00'))
+
+
+class TestMotorDeSenales(APITestCase):
+    """Cada señal propone un destino distinto; gana la de mas evidencia."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            email='senal@example.com', username='usuario_senal', password='clave12345',
+        )
+        self.client.force_authenticate(user=self.user)
+        self.hoy = local_today()
+
+    def _puntual(self, meses_atras, descripcion, categoria='otro', monto='100.00'):
+        base = first_day_of_month(self.hoy)
+        return GastoNoCorriente.objects.create(
+            usuario=self.user, descripcion=descripcion, categoria=categoria,
+            monto=Decimal(monto), fecha=add_months(base, -meses_atras),
+        )
+
+    def _sugerencia_de(self, descripcion):
+        for s in detectar_sugerencias(self.user):
+            if s['descripcion'].lower() == descripcion.lower():
+                return s
+        return None
+
+    # -- Señal: nombre -------------------------------------------------------
+
+    def test_el_nombre_basta_con_un_solo_registro(self):
+        self._puntual(1, 'Luz', 'servicios', '40.00')
+
+        sugerencia = self._sugerencia_de('Luz')
+
+        self.assertIsNotNone(sugerencia)
+        self.assertEqual(sugerencia['senal'], 'nombre')
+        self.assertEqual(sugerencia['destino'], 'variable')
+        self.assertEqual(sugerencia['frecuencia_sugerida'], 'mensual')
+        self.assertEqual(sugerencia['confianza'], 'media')
+
+    def test_un_puntual_normal_no_genera_señal(self):
+        self._puntual(1, 'Televisor', 'tecnologia', '500.00')
+
+        self.assertIsNone(self._sugerencia_de('Televisor'))
+
+    # -- Señal: repeticion ---------------------------------------------------
+
+    def test_la_repeticion_gana_sobre_el_nombre(self):
+        """Con evidencia observada se reporta esa, no la heuristica."""
+        for mes in (1, 2, 3):
+            self._puntual(mes, 'Luz', 'servicios', '40.00')
+
+        sugerencia = self._sugerencia_de('Luz')
+
+        self.assertEqual(sugerencia['senal'], 'repeticion')
+        self.assertEqual(sugerencia['confianza'], 'alta')
+        self.assertIn('3 meses distintos', sugerencia['motivo'])
+
+    # -- Señal: estacionalidad ----------------------------------------------
+
+    def test_detecta_lo_que_vuelve_cada_anio_en_el_mismo_mes(self):
+        base = first_day_of_month(self.hoy)
+        for anios in (1, 2):
+            GastoNoCorriente.objects.create(
+                usuario=self.user, descripcion='Matricula', categoria='educacion',
+                monto=Decimal('300.00'), fecha=add_months(base, -12 * anios),
+            )
+
+        sugerencia = self._sugerencia_de('Matricula')
+
+        self.assertIsNotNone(sugerencia)
+        self.assertEqual(sugerencia['senal'], 'estacionalidad')
+        self.assertEqual(sugerencia['destino'], 'fijo')
+        self.assertEqual(sugerencia['frecuencia_sugerida'], 'anual')
+
+    def test_un_solo_anio_no_es_estacionalidad(self):
+        self._puntual(12, 'Matricula', 'educacion', '300.00')
+
+        self.assertIsNone(self._sugerencia_de('Matricula'))
+
+    def test_lo_que_aparece_todos_los_meses_no_es_estacional(self):
+        """Doce meses seguidos es mensual, no estacional."""
+        for mes in range(1, 13):
+            self._puntual(mes, 'Peluqueria', 'otro', '20.00')
+
+        sugerencia = self._sugerencia_de('Peluqueria')
+
+        self.assertEqual(sugerencia['senal'], 'repeticion')
+        self.assertEqual(sugerencia['destino'], 'variable')
+
+    # -- Ya declarados -------------------------------------------------------
+
+    def test_no_sugiere_lo_que_ya_esta_declarado_como_variable(self):
+        for mes in (1, 2, 3):
+            self._puntual(mes, 'Luz', 'servicios', '40.00')
+        GastoCorriente.objects.create(
+            usuario=self.user, descripcion='Luz', categoria='servicios',
+            monto=Decimal('40.00'), tipo_monto='variable',
+            frecuencia='mensual', fecha_inicio=add_months(first_day_of_month(self.hoy), -6),
+            activo=True,
+        )
+
+        self.assertIsNone(self._sugerencia_de('Luz'))
+
+    # -- Orden y endpoint ----------------------------------------------------
+
+    def test_las_mas_fundamentadas_van_primero(self):
+        base = first_day_of_month(self.hoy)
+        self._puntual(1, 'Agua', 'servicios', '20.00')          # nombre
+        for mes in (1, 2, 3):
+            self._puntual(mes, 'Peluqueria', 'otro', '20.00')   # repeticion
+        for anios in (1, 2):                                     # estacionalidad
+            GastoNoCorriente.objects.create(
+                usuario=self.user, descripcion='Matricula', categoria='educacion',
+                monto=Decimal('300.00'), fecha=add_months(base, -12 * anios),
+            )
+
+        senales = [s['senal'] for s in detectar_sugerencias(self.user)]
+
+        self.assertEqual(senales, ['estacionalidad', 'repeticion', 'nombre'])
+
+    def test_el_endpoint_devuelve_el_motivo(self):
+        self._puntual(1, 'Luz', 'servicios', '40.00')
+
+        response = self.client.get('/api/finanzas/gastos-no-corrientes/sugerencias_variables/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('motivo', response.data[0])
+        self.assertIn('destino', response.data[0])
+
+    # -- Conversion segun destino -------------------------------------------
+
+    def test_convertir_un_estacional_crea_un_fijo_anual(self):
+        base = first_day_of_month(self.hoy)
+        for anios in (1, 2):
+            GastoNoCorriente.objects.create(
+                usuario=self.user, descripcion='Matricula', categoria='educacion',
+                monto=Decimal('300.00'), fecha=add_months(base, -12 * anios),
+            )
+
+        response = self.client.post(
+            '/api/finanzas/gastos-no-corrientes/convertir_grupo_a_variable/',
+            {'descripcion': 'Matricula', 'categoria': 'educacion',
+             'destino': 'fijo', 'frecuencia_sugerida': 'anual'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        gasto = GastoCorriente.objects.get(id=response.data['id'])
+        self.assertEqual(gasto.tipo_monto, 'fijo')
+        self.assertEqual(gasto.frecuencia, 'anual')
+        # Un fijo no lleva montos reales: su monto es el declarado.
+        self.assertEqual(gasto.ejecuciones.count(), 0)
+        self.assertEqual(GastoNoCorriente.objects.filter(usuario=self.user).count(), 0)
+
+    def test_el_destino_por_defecto_sigue_siendo_variable_mensual(self):
+        for mes in (1, 2, 3):
+            self._puntual(mes, 'Peluqueria', 'otro', '20.00')
+
+        response = self.client.post(
+            '/api/finanzas/gastos-no-corrientes/convertir_grupo_a_variable/',
+            {'descripcion': 'Peluqueria', 'categoria': 'otro'}, format='json',
+        )
+
+        gasto = GastoCorriente.objects.get(id=response.data['id'])
+        self.assertEqual(gasto.tipo_monto, 'variable')
+        self.assertEqual(gasto.frecuencia, 'mensual')
+        self.assertEqual(gasto.ejecuciones.count(), 3)
+
+    def test_rechaza_un_destino_invalido(self):
+        self._puntual(1, 'Luz', 'servicios', '40.00')
+
+        response = self.client.post(
+            '/api/finanzas/gastos-no-corrientes/convertir_grupo_a_variable/',
+            {'descripcion': 'Luz', 'categoria': 'servicios', 'destino': 'cualquiera'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

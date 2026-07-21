@@ -164,6 +164,17 @@
   gap: 16px;
 }
 
+/* Sin esto, una tabla ancha (min-width) infla el grid y provoca scroll
+   horizontal de toda la pantalla en movil, en vez de scrollear dentro de
+   .table-wrap. Deja que cada contenedor de la cadena pueda encoger. */
+.finance-shell > *,
+.finance-tab-panel,
+.finance-tab-panel > *,
+.finance-tab-panel .card,
+.finance-tab-panel .table-wrap {
+  min-width: 0;
+}
+
 .finance-panel-copy {
   display: grid;
   gap: 4px;
@@ -370,6 +381,13 @@
   background: rgba(255,255,255,0.05);
   border-color: rgba(255,255,255,0.08);
   color: rgba(255,255,255,0.52);
+}
+
+/* Aviso de que este puntual probablemente deberia ser variable */
+.table-row-badge.is-suggestion {
+  background: rgba(251,191,36,0.10);
+  border-color: rgba(251,191,36,0.26);
+  color: rgba(252,211,77,0.95);
 }
 
 .table-bulk-bar {
@@ -746,6 +764,13 @@
   font-size: 12.5px;
   line-height: 1.5;
   color: rgba(255,255,255,0.55);
+}
+
+.variable-suggestion-counter {
+  margin-top: 2px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: rgba(252,211,77,0.85);
 }
 
 .variable-suggestion-actions {

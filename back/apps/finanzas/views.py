@@ -40,7 +40,7 @@ from .utils import (
     calcular_proyeccion_acumulada,
     asegurar_saldo_mes,
     asegurar_saldos_historicos,
-    detectar_puntuales_recurrentes,
+    detectar_sugerencias,
     parece_gasto_variable,
     _primera_fecha_con_movimientos,
     _restar_meses,
@@ -293,22 +293,30 @@ class GastoNoCorrienteViewSet(BaseFinanzasViewSet):
 
     @action(detail=False, methods=['get'])
     def sugerencias_variables(self, request):
-        """Puntuales que se repiten y probablemente sean gastos variables."""
-        return Response(detectar_puntuales_recurrentes(request.user))
+        """Puntuales que deberian ser recurrentes, con el motivo de cada uno."""
+        return Response(detectar_sugerencias(request.user))
 
     @action(detail=False, methods=['post'])
     def convertir_grupo_a_variable(self, request):
         """
-        Convierte un grupo de puntuales repetidos en un unico gasto variable.
+        Convierte un grupo de puntuales repetidos en un unico gasto recurrente.
+
+        El destino depende de la señal: lo que se repite mes a mes va a
+        variable mensual, y lo estacional (matricula de cada septiembre) va a
+        fijo con frecuencia anual, que el modelo ya proyecta en su mes.
 
         El historial no se pierde ni se duplica: cada mes pasa a ser un monto
-        real del nuevo gasto variable y los puntuales originales se eliminan.
+        real del nuevo gasto y los puntuales originales se eliminan.
         """
         descripcion = (request.data.get('descripcion') or '').strip()
         categoria = request.data.get('categoria') or 'otro'
+        destino = request.data.get('destino') or TIPO_MONTO_VARIABLE
+        frecuencia = request.data.get('frecuencia_sugerida') or 'mensual'
         if not descripcion:
             return Response({'detail': 'Se requiere la descripcion del grupo.'},
                             status=status.HTTP_400_BAD_REQUEST)
+        if destino not in {TIPO_MONTO_FIJO, TIPO_MONTO_VARIABLE}:
+            return Response({'detail': 'Destino invalido.'}, status=status.HTTP_400_BAD_REQUEST)
 
         puntuales = list(
             GastoNoCorriente.objects.filter(
@@ -327,21 +335,27 @@ class GastoNoCorrienteViewSet(BaseFinanzasViewSet):
         montos = list(por_mes.values())
         promedio = (sum(montos) / Decimal(len(montos))).quantize(Decimal('0.01'))
 
+        # Un anual debe arrancar en el mes en que realmente toca, porque la
+        # proyeccion cuenta cada N meses desde fecha_inicio.
+        fecha_inicio = max(item.fecha for item in puntuales) if frecuencia != 'mensual' \
+            else min(item.fecha for item in puntuales)
+
         with transaction.atomic():
             gasto = GastoCorriente.objects.create(
                 usuario=request.user,
                 descripcion=descripcion,
                 categoria=categoria,
                 monto=promedio,
-                tipo_monto=TIPO_MONTO_VARIABLE,
-                frecuencia='mensual',
-                fecha_inicio=min(item.fecha for item in puntuales),
+                tipo_monto=destino,
+                frecuencia=frecuencia,
+                fecha_inicio=fecha_inicio,
                 activo=True,
             )
-            GastoCorrienteEjecucion.objects.bulk_create([
-                GastoCorrienteEjecucion(gasto=gasto, anio=anio, mes=mes, monto_real=monto)
-                for (anio, mes), monto in por_mes.items()
-            ])
+            if destino == TIPO_MONTO_VARIABLE:
+                GastoCorrienteEjecucion.objects.bulk_create([
+                    GastoCorrienteEjecucion(gasto=gasto, anio=anio, mes=mes, monto_real=monto)
+                    for (anio, mes), monto in por_mes.items()
+                ])
             GastoNoCorriente.objects.filter(id__in=[item.id for item in puntuales]).delete()
 
         return Response(

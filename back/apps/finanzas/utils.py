@@ -408,6 +408,16 @@ def claves_gastos_variables(gastos_corrientes):
     }
 
 
+def claves_gastos_variables_usuario(usuario):
+    """Igual que claves_gastos_variables, pero consultando a la base."""
+    from .models import TIPO_MONTO_VARIABLE, GastoCorriente
+
+    filas = GastoCorriente.objects.filter(
+        usuario=usuario, tipo_monto=TIPO_MONTO_VARIABLE,
+    ).values('descripcion', 'categoria')
+    return {_clave_gasto(fila['descripcion'], fila['categoria']) for fila in filas}
+
+
 def mapa_ejecuciones_variables(usuario):
     """{gasto_id: {(anio, mes): monto_real}} de los gastos variables del usuario."""
     from .models import TIPO_MONTO_VARIABLE, GastoCorrienteEjecucion
@@ -447,14 +457,27 @@ def _monto_base_gasto_mes(gasto_id, monto_estimado, tipo_monto, month_start, eje
     return monto_estimado
 
 
-def detectar_puntuales_recurrentes(usuario, min_meses=MESES_PROMEDIO_VARIABLE, meses_ventana=12):
-    """
-    Gastos puntuales que en realidad se repiten mes a mes (luz, super, gasolina).
+SENAL_ESTACIONALIDAD = 'estacionalidad'
+SENAL_REPETICION = 'repeticion'
+SENAL_NOMBRE = 'nombre'
 
-    Se agrupan por descripcion normalizada + categoria. Si el grupo aparece en
-    min_meses distintos dentro de la ventana, se sugiere convertirlo a variable.
-    Solo sugiere: nunca reclasifica por su cuenta.
-    """
+# Un gasto es estacional si vuelve el mismo mes del calendario en al menos dos
+# anios distintos y no aparece durante casi todo el ano (eso seria mensual).
+ANIOS_MINIMOS_ESTACIONALIDAD = 2
+MAX_MESES_CALENDARIO_ESTACIONAL = 4
+
+# Las señales se evaluan de mas a menos evidencia: la observacion del propio
+# historial del usuario pesa mas que una heuristica sobre el nombre.
+ORDEN_SENALES = [SENAL_ESTACIONALIDAD, SENAL_REPETICION, SENAL_NOMBRE]
+
+NOMBRE_MES = [
+    '', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+]
+
+
+def _agrupar_puntuales(usuario, meses_ventana):
+    """Agrupa los puntuales por descripcion normalizada + categoria."""
     from .models import GastoNoCorriente
 
     hoy = local_today()
@@ -466,7 +489,7 @@ def detectar_puntuales_recurrentes(usuario, min_meses=MESES_PROMEDIO_VARIABLE, m
     ).values('id', 'descripcion', 'categoria', 'monto', 'fecha')
 
     for item in puntuales:
-        clave = (item['descripcion'].strip().lower(), item['categoria'])
+        clave = _clave_gasto(item['descripcion'], item['categoria'])
         grupo = grupos.setdefault(clave, {
             'descripcion': item['descripcion'].strip(),
             'categoria': item['categoria'],
@@ -477,23 +500,105 @@ def detectar_puntuales_recurrentes(usuario, min_meses=MESES_PROMEDIO_VARIABLE, m
         periodo = (item['fecha'].year, item['fecha'].month)
         grupo['por_mes'][periodo] = grupo['por_mes'].get(periodo, Decimal('0.00')) + _money(item['monto'])
 
+    return grupos
+
+
+def _senal_estacionalidad(grupo):
+    """Vuelve cada anio por la misma epoca: matricula, matriculacion, navidad."""
+    meses_calendario = {mes for _, mes in grupo['por_mes']}
+    if len(meses_calendario) > MAX_MESES_CALENDARIO_ESTACIONAL:
+        return None
+
+    anios_por_mes = {}
+    for anio, mes in grupo['por_mes']:
+        anios_por_mes.setdefault(mes, set()).add(anio)
+
+    for mes, anios in sorted(anios_por_mes.items()):
+        if len(anios) >= ANIOS_MINIMOS_ESTACIONALIDAD:
+            return {
+                'senal': SENAL_ESTACIONALIDAD,
+                'motivo': 'Lo pagas cada {} desde hace {} anios'.format(NOMBRE_MES[mes], len(anios)),
+                'destino': 'fijo',
+                'frecuencia_sugerida': 'anual',
+                'mes_tipico': mes,
+                'confianza': 'alta',
+            }
+    return None
+
+
+def _senal_repeticion(grupo, min_meses):
+    """Aparece en varios meses distintos: es recurrente aunque no lo declararan."""
+    meses = len(grupo['por_mes'])
+    if meses < min_meses:
+        return None
+    return {
+        'senal': SENAL_REPETICION,
+        'motivo': 'Se repite: lo cargaste en {} meses distintos'.format(meses),
+        'destino': 'variable',
+        'frecuencia_sugerida': 'mensual',
+        'mes_tipico': None,
+        'confianza': 'alta',
+    }
+
+
+def _senal_nombre(grupo):
+    """El nombre corresponde a un servicio que casi siempre es variable."""
+    if not parece_gasto_variable(grupo['descripcion'], grupo['categoria']):
+        return None
+    return {
+        'senal': SENAL_NOMBRE,
+        'motivo': '{} suele cambiar de monto cada mes'.format(grupo['descripcion']),
+        'destino': 'variable',
+        'frecuencia_sugerida': 'mensual',
+        'mes_tipico': None,
+        'confianza': 'media',
+    }
+
+
+# Tres anios: para ver dos ocurrencias anuales hace falta pasar de 24 meses,
+# porque una ventana de 24 solo alcanza hasta el mes -23.
+MESES_VENTANA_SUGERENCIAS = 36
+
+
+def detectar_sugerencias(usuario, min_meses=MESES_PROMEDIO_VARIABLE, meses_ventana=MESES_VENTANA_SUGERENCIAS):
+    """
+    Puntuales que probablemente deberian ser recurrentes, con el motivo.
+
+    Cada señal propone un destino; gana la de mas evidencia. Siempre sugiere,
+    nunca reclasifica: los falsos positivos existen y el dato es del usuario.
+    """
+    grupos = _agrupar_puntuales(usuario, meses_ventana)
+    declarados = claves_gastos_variables_usuario(usuario)
+
     sugerencias = []
-    for grupo in grupos.values():
-        meses = len(grupo['por_mes'])
-        if meses < min_meses:
+    for clave, grupo in grupos.items():
+        # Si ya existe declarado, no hay nada que sugerir.
+        if clave in declarados:
             continue
+
+        evaluadas = {
+            SENAL_ESTACIONALIDAD: _senal_estacionalidad(grupo),
+            SENAL_REPETICION: _senal_repeticion(grupo, min_meses),
+            SENAL_NOMBRE: _senal_nombre(grupo),
+        }
+        detalle = next((evaluadas[nombre] for nombre in ORDEN_SENALES if evaluadas[nombre]), None)
+        if detalle is None:
+            continue
+
         montos = list(grupo['por_mes'].values())
         sugerencias.append({
             'descripcion': grupo['descripcion'],
             'categoria': grupo['categoria'],
-            'meses_detectados': meses,
+            'meses_detectados': len(grupo['por_mes']),
             'monto_promedio': (sum(montos) / Decimal(len(montos))).quantize(Decimal('0.01')),
             'monto_minimo': min(montos),
             'monto_maximo': max(montos),
             'ids': grupo['ids'],
+            **detalle,
         })
 
-    sugerencias.sort(key=lambda s: s['meses_detectados'], reverse=True)
+    # Primero lo mas fundamentado, y dentro de eso lo mas observado.
+    sugerencias.sort(key=lambda s: (ORDEN_SENALES.index(s['senal']), -s['meses_detectados']))
     return sugerencias
 
 
