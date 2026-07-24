@@ -42,6 +42,7 @@ from .utils import (
     asegurar_saldos_historicos,
     detectar_sugerencias,
     parece_gasto_variable,
+    resumen_variables_mes,
     _primera_fecha_con_movimientos,
     _restar_meses,
     invalidate_finanzas_cache,
@@ -96,6 +97,11 @@ class DashboardResumenView(APIView):
 
     def get(self, request):
         user = request.user
+        try:
+            from .utils import asegurar_notificacion_variables
+            asegurar_notificacion_variables(user)
+        except Exception:
+            pass  # el aviso es secundario: nunca debe tumbar el dashboard
         return Response({
             'ingresos': IngresoSerializer(
                 Ingreso.objects.filter(usuario=user),
@@ -217,6 +223,65 @@ class GastoCorrienteViewSet(BaseFinanzasViewSet):
             gasto.tipo_monto = TIPO_MONTO_FIJO
             gasto.save(update_fields=['tipo_monto'])
         return Response(self.get_serializer(gasto).data)
+
+    @action(detail=False, methods=['get'])
+    def resumen_variables(self, request):
+        """Estimado vs real del mes para cada gasto variable (vista mensual)."""
+        try:
+            anio, mes = _parse_anio_mes(
+                request.query_params.get('anio'), request.query_params.get('mes'),
+            )
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(resumen_variables_mes(request.user, anio, mes))
+
+    @action(detail=False, methods=['post'])
+    def crear_mes_variables(self, request):
+        """
+        Crea de una vez los registros del mes para los variables aun pendientes,
+        usando el valor que el sistema ya estima (mes anterior / promedio). El
+        usuario luego edita los que cambiaron. Lo dispara el usuario, no el
+        sistema, y solo toca los que faltan (no pisa lo ya registrado).
+        """
+        import datetime
+        from .utils import _monto_base_gasto_mes, mapa_ejecuciones_variables, recalcular_saldo_mes_para
+
+        try:
+            anio, mes = _parse_anio_mes(request.data.get('anio'), request.data.get('mes'))
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        hoy = local_today()
+        if (anio, mes) > (hoy.year, hoy.month):
+            return Response({'detail': 'No se puede registrar un mes futuro.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        variables = list(GastoCorriente.objects.filter(
+            usuario=request.user, tipo_monto=TIPO_MONTO_VARIABLE, activo=True,
+        ))
+        ya_registrados = set(
+            GastoCorrienteEjecucion.objects.filter(
+                gasto__usuario=request.user, anio=anio, mes=mes,
+            ).values_list('gasto_id', flat=True)
+        )
+        ejec_map = mapa_ejecuciones_variables(request.user)
+        month_start = datetime.date(anio, mes, 1)
+
+        nuevos = [
+            GastoCorrienteEjecucion(
+                gasto=g, anio=anio, mes=mes,
+                monto_real=_monto_base_gasto_mes(g.id, g.monto, TIPO_MONTO_VARIABLE, month_start, ejec_map),
+            )
+            for g in variables if g.id not in ya_registrados
+        ]
+
+        if nuevos:
+            with transaction.atomic():
+                GastoCorrienteEjecucion.objects.bulk_create(nuevos)
+                # bulk_create no dispara señales: recalcular e invalidar a mano.
+                recalcular_saldo_mes_para(request.user, month_start)
+                invalidate_finanzas_cache(request.user.pk, month_start)
+
+        return Response({'creados': len(nuevos)}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['get', 'post'], url_path='ejecuciones')
     def ejecuciones(self, request, pk=None):
@@ -634,6 +699,15 @@ class ProyeccionAcumuladaView(APIView):
         data['starting_balance_seeded'] = created
         cache.set(cache_key, data, getattr(settings, 'FINANZAS_PROJECTION_CACHE_TTL', 300))
         return Response(data)
+
+
+class CatalogoView(APIView):
+    """Catalogo de gastos e ingresos comunes para guiar al usuario al crear."""
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request):
+        from .catalogo import catalogo_completo
+        return Response(catalogo_completo())
 
 
 class AsistenteParseView(APIView):

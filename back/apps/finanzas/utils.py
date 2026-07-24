@@ -418,6 +418,112 @@ def claves_gastos_variables_usuario(usuario):
     return {_clave_gasto(fila['descripcion'], fila['categoria']) for fila in filas}
 
 
+def resumen_variables_mes(usuario, anio, mes):
+    """
+    Para cada gasto variable, su estimado vs lo realmente pagado en el mes.
+
+    Estados: 'pendiente' (aun sin registrar), 'sin_gasto' (registrado en 0),
+    'en_estimado', 'sobre', 'menos'. El delta viene en monto y en porcentaje.
+    """
+    from .models import GastoCorriente, GastoCorrienteEjecucion, TIPO_MONTO_VARIABLE
+
+    variables = list(
+        GastoCorriente.objects.filter(
+            usuario=usuario, tipo_monto=TIPO_MONTO_VARIABLE, activo=True,
+        ).order_by('descripcion')
+    )
+    ejec = {
+        e.gasto_id: e
+        for e in GastoCorrienteEjecucion.objects.filter(
+            gasto__usuario=usuario, anio=anio, mes=mes,
+        )
+    }
+    # Para los pendientes: el valor que el sistema ya usa (promedio 3 meses o
+    # estimado). Se muestra para que el usuario vea que el mes ya esta cubierto
+    # y solo confirme o corrija, sin arrancar de cero.
+    todas_ejec = mapa_ejecuciones_variables(usuario)
+    month_start = datetime.date(anio, mes, 1)
+
+    filas = []
+    for g in variables:
+        estimado = _money(g.monto)
+        sugerido = _monto_base_gasto_mes(g.id, estimado, TIPO_MONTO_VARIABLE, month_start, todas_ejec)
+        fila = {
+            'id': g.id,
+            'descripcion': g.descripcion,
+            'categoria': g.categoria,
+            'estimado': str(estimado),
+            'sugerido': str(sugerido),
+            'real': None,
+            'fecha_registro': None,
+            'situacion': 'pendiente',
+            'delta_abs': None,
+            'delta_pct': None,
+        }
+        e = ejec.get(g.id)
+        if e is not None:
+            real = _money(e.monto_real)
+            fila['real'] = str(real)
+            fila['fecha_registro'] = e.actualizado_en.date().isoformat()
+            if real == 0:
+                fila['situacion'] = 'sin_gasto'
+                fila['delta_abs'] = str(-estimado)
+                fila['delta_pct'] = -100.0 if estimado > 0 else 0.0
+            else:
+                delta = (real - estimado).quantize(Decimal('0.01'))
+                fila['delta_abs'] = str(delta)
+                fila['delta_pct'] = (
+                    round(float(delta / estimado * 100), 1) if estimado > 0 else None
+                )
+                fila['situacion'] = 'sobre' if delta > 0 else 'menos' if delta < 0 else 'en_estimado'
+        filas.append(fila)
+
+    return filas
+
+
+def asegurar_notificacion_variables(usuario):
+    """
+    Aviso in-app perezoso: si el mes en curso tiene gastos variables sin
+    registrar, deja una notificacion (una por mes). Si ya no quedan pendientes,
+    la borra. Se llama al entrar al dashboard, sin cron.
+    """
+    from .models import (
+        GastoCorriente, GastoCorrienteEjecucion, Notificacion, TIPO_MONTO_VARIABLE,
+    )
+
+    hoy = local_today()
+    total = GastoCorriente.objects.filter(
+        usuario=usuario, tipo_monto=TIPO_MONTO_VARIABLE, activo=True,
+    ).count()
+    if total == 0:
+        return
+
+    registrados = GastoCorrienteEjecucion.objects.filter(
+        gasto__usuario=usuario, gasto__tipo_monto=TIPO_MONTO_VARIABLE,
+        gasto__activo=True, anio=hoy.year, mes=hoy.month,
+    ).values('gasto_id').distinct().count()
+    pendientes = total - registrados
+
+    filtro = dict(
+        usuario=usuario, tipo='variables_pendientes', categoria='',
+        anio=hoy.year, mes=hoy.month,
+    )
+    if pendientes <= 0:
+        Notificacion.objects.filter(**filtro).delete()
+        return
+
+    Notificacion.objects.update_or_create(
+        **filtro,
+        defaults={
+            'titulo': 'Registra tus gastos variables',
+            'mensaje': (
+                'Tienes {} gasto{} variable{} sin registrar este mes. '
+                'Puedes crearlos con el valor del mes anterior y ajustar lo que cambio.'
+            ).format(pendientes, 's' if pendientes != 1 else '', 's' if pendientes != 1 else ''),
+        },
+    )
+
+
 def mapa_ejecuciones_variables(usuario):
     """{gasto_id: {(anio, mes): monto_real}} de los gastos variables del usuario."""
     from .models import TIPO_MONTO_VARIABLE, GastoCorrienteEjecucion

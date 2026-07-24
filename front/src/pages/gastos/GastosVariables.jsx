@@ -1,0 +1,380 @@
+import { useEffect, useState, useCallback } from 'react'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
+
+import { getApiErrorMessage } from '../../api/errors'
+import api from '../../api/client'
+import FeedbackAlert from '../../components/ui/FeedbackAlert'
+import ConfirmDialog from '../../components/ui/ConfirmDialog'
+import Modal from '../../components/ui/Modal'
+import MonthNavigator from '../../components/ui/MonthNavigator'
+import { useCategorias } from '../../hooks/useCategorias'
+import { formatAmount } from '../../utils/formatters'
+import { startOfMonth } from '../../utils/months'
+import '../../components/ui/app.css'
+
+// Estado del gasto real vs el estimado, con color y etiqueta para el usuario.
+const SITUACION = {
+  pendiente:   { label: 'Pendiente',           color: '#FBBF24' },
+  en_estimado: { label: 'En el estimado',      color: '#4ADE80' },
+  sobre:       { label: 'Sobre el estimado',   color: '#F87171' },
+  menos:       { label: 'Menos de lo estimado', color: '#4ADE80' },
+  sin_gasto:   { label: 'Sin gasto este mes',  color: '#60A5FA' },
+}
+
+function buildEmptyForm() {
+  return { descripcion: '', categoria: 'servicios', monto: '' }
+}
+
+export default function GastosVariables() {
+  const { categorias } = useCategorias()
+
+  const [selectedMonth, setSelectedMonth] = useState(() => startOfMonth(new Date()))
+  const [filas, setFilas] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [feedback, setFeedback] = useState({ type: '', message: '' })
+
+  // catalogo de sugerencias para el "Agregar"
+  const [catalogo, setCatalogo] = useState([])
+
+  // modal crear/editar definicion
+  const [modal, setModal] = useState(false)
+  const [form, setForm] = useState(buildEmptyForm())
+  const [editId, setEditId] = useState(null)
+  const [saving, setSaving] = useState(false)
+
+  // modal registrar monto real
+  const [realItem, setRealItem] = useState(null)
+  const [realMonto, setRealMonto] = useState('')
+  const [savingReal, setSavingReal] = useState(false)
+
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
+
+  const [creandoMes, setCreandoMes] = useState(false)
+
+  const anio = selectedMonth.getFullYear()
+  const mes = selectedMonth.getMonth() + 1
+
+  const now = new Date()
+  const esMesActual = anio === now.getFullYear() && mes === now.getMonth() + 1
+  const pendientes = filas.filter((f) => f.situacion === 'pendiente').length
+
+  const fetchResumen = useCallback(async () => {
+    setLoading(true)
+    try {
+      const { data } = await api.get(`/finanzas/gastos-corrientes/resumen_variables/?anio=${anio}&mes=${mes}`)
+      setFilas(data)
+    } catch (err) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo cargar el resumen.') })
+    } finally {
+      setLoading(false)
+    }
+  }, [anio, mes])
+
+  useEffect(() => { fetchResumen() }, [fetchResumen])
+
+  useEffect(() => {
+    api.get('/finanzas/catalogo/')
+      .then(({ data }) => setCatalogo(data.gasto_variable || []))
+      .catch(() => {})
+  }, [])
+
+  const totalEstimado = filas.reduce((s, f) => s + parseFloat(f.estimado || 0), 0)
+
+  // — crear / editar definicion —
+  function openNew() {
+    setForm(buildEmptyForm())
+    setEditId(null)
+    setModal(true)
+  }
+
+  function openEdit(fila) {
+    setForm({ descripcion: fila.descripcion, categoria: fila.categoria, monto: fila.estimado })
+    setEditId(fila.id)
+    setModal(true)
+  }
+
+  function elegirDelCatalogo(item) {
+    setForm((prev) => ({ ...prev, descripcion: item.label, categoria: item.categoria }))
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (saving) return
+    setSaving(true)
+    setFeedback({ type: '', message: '' })
+    try {
+      const payload = {
+        descripcion: form.descripcion,
+        categoria: form.categoria,
+        monto: form.monto,
+        tipo_monto: 'variable',
+        frecuencia: 'mensual',
+        fecha_inicio: new Date().toISOString().slice(0, 10),
+      }
+      if (editId) await api.patch(`/finanzas/gastos-corrientes/${editId}/`, { descripcion: form.descripcion, categoria: form.categoria, monto: form.monto })
+      else await api.post('/finanzas/gastos-corrientes/', payload)
+      setModal(false)
+      await fetchResumen()
+      setFeedback({ type: 'success', message: editId ? 'Gasto variable actualizado.' : 'Gasto variable creado.' })
+    } catch (err) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo guardar.') })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    const id = confirmDeleteId
+    if (!id) return
+    setConfirmDeleteId(null)
+    try {
+      await api.delete(`/finanzas/gastos-corrientes/${id}/`)
+      await fetchResumen()
+      setFeedback({ type: 'success', message: 'Gasto eliminado.' })
+    } catch (err) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo eliminar.') })
+    }
+  }
+
+  async function crearMes() {
+    if (creandoMes) return
+    setCreandoMes(true)
+    setFeedback({ type: '', message: '' })
+    try {
+      const { data } = await api.post('/finanzas/gastos-corrientes/crear_mes_variables/', { anio, mes })
+      await fetchResumen()
+      setFeedback({
+        type: 'success',
+        message: `Se crearon ${data.creados} gasto(s) con el valor estimado. Edita los que hayan cambiado.`,
+      })
+    } catch (err) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudieron crear los gastos del mes.') })
+    } finally {
+      setCreandoMes(false)
+    }
+  }
+
+  // — registrar monto real del mes —
+  function openReal(fila) {
+    setRealItem(fila)
+    // Prellena con lo ya registrado, o con el estimado del sistema, para que
+    // confirmar sea un toque en vez de escribir de cero.
+    setRealMonto(fila.real ?? fila.sugerido ?? '')
+  }
+
+  async function handleSubmitReal(e) {
+    e.preventDefault()
+    if (savingReal || !realItem) return
+    setSavingReal(true)
+    setFeedback({ type: '', message: '' })
+    try {
+      await api.post(`/finanzas/gastos-corrientes/${realItem.id}/ejecuciones/`, {
+        anio, mes, monto_real: realMonto === '' ? '0' : realMonto,
+      })
+      setRealItem(null)
+      await fetchResumen()
+      setFeedback({ type: 'success', message: 'Monto real guardado.' })
+    } catch (err) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo guardar el monto real.') })
+    } finally {
+      setSavingReal(false)
+    }
+  }
+
+  function renderSituacion(fila) {
+    const s = SITUACION[fila.situacion] || SITUACION.pendiente
+    const pct = fila.delta_pct
+    return (
+      <div>
+        <span style={{ color: s.color, fontWeight: 600, fontSize: 13 }}>● {s.label}</span>
+        {fila.situacion !== 'pendiente' && fila.situacion !== 'sin_gasto' && fila.delta_abs != null && (
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
+            {parseFloat(fila.delta_abs) >= 0 ? '+' : ''}${formatAmount(Math.abs(parseFloat(fila.delta_abs)))}
+            {pct != null ? ` (${pct >= 0 ? '+' : ''}${pct}%)` : ''}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div className="finance-panel-header">
+        <div>
+          <h2 className="finance-panel-kicker">Gastos variables</h2>
+          <p className="finance-panel-kpi">
+            Estimado al mes:&nbsp;
+            <span style={{ color: '#F87171', fontWeight: 700 }}>${formatAmount(totalEstimado)}</span>
+          </p>
+        </div>
+        <button className="btn-add page-primary-action" onClick={openNew}><Plus size={16} /> Agregar</button>
+      </div>
+
+      <MonthNavigator value={selectedMonth} onChange={setSelectedMonth} />
+
+      <FeedbackAlert type={feedback.type || 'error'} message={feedback.message} />
+
+      {esMesActual && pendientes > 0 && filas.length > 0 && (
+        <div className="variable-suggestion" style={{ marginBottom: 14 }}>
+          <div className="variable-suggestion-copy">
+            <span className="variable-suggestion-title">
+              Tienes {pendientes} gasto{pendientes !== 1 ? 's' : ''} variable{pendientes !== 1 ? 's' : ''} sin registrar este mes
+            </span>
+            <span className="variable-suggestion-text">
+              Puedes crearlos de una vez con el valor del mes anterior (o tu promedio) y luego editar los que cambiaron.
+            </span>
+          </div>
+          <div className="variable-suggestion-actions">
+            <button type="button" className="btn-modal-convert" disabled={creandoMes} onClick={crearMes}>
+              {creandoMes ? 'Creando...' : 'Crear gastos del mes'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="card" style={{ padding: 0 }}>
+        {loading ? (
+          <div className="empty-state"><p className="empty-text">Cargando...</p></div>
+        ) : filas.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">💡</div>
+            <p className="empty-text">Aun no sumas gastos variables</p>
+            <p className="empty-sub">Agrega los pagos que se repiten pero cambian de monto</p>
+          </div>
+        ) : (
+          <div className="table-wrap" style={{ border: 'none', borderRadius: 20 }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  {['Gasto', 'Categoria', 'Estimado', 'Real del mes', 'Situacion vs. estimado', 'Accion'].map((h) => <th key={h}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {filas.map((fila) => (
+                  <tr key={fila.id}>
+                    <td style={{ fontWeight: 600 }}>{fila.descripcion}</td>
+                    <td><span className="badge badge-gray" style={{ textTransform: 'capitalize' }}>{fila.categoria}</span></td>
+                    <td className="table-amount">${formatAmount(parseFloat(fila.estimado))}</td>
+                    <td>
+                      {fila.real != null ? (
+                        <span className="table-amount negative">${formatAmount(parseFloat(fila.real))}</span>
+                      ) : (
+                        <div>
+                          <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>~${formatAmount(parseFloat(fila.sugerido))}</span>
+                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>estimado</div>
+                        </div>
+                      )}
+                    </td>
+                    <td>{renderSituacion(fila)}</td>
+                    <td className="table-actions-cell">
+                      <div className="table-actions-row">
+                        <button
+                          className="btn-modal-convert"
+                          style={{ minWidth: 0, padding: '7px 12px', fontSize: 12 }}
+                          onClick={() => openReal(fila)}
+                        >
+                          {fila.real != null ? 'Editar' : 'Registrar gasto'}
+                        </button>
+                        <button className="btn-icon edit" title="Editar gasto" onClick={() => openEdit(fila)}><Pencil size={15} /></button>
+                        <button className="btn-icon danger" title="Eliminar" onClick={() => setConfirmDeleteId(fila.id)}><Trash2 size={15} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Modal crear / editar definicion */}
+      <Modal open={modal} onClose={() => setModal(false)} title={editId ? 'Editar gasto variable' : '+ Nuevo gasto variable'}>
+        <form onSubmit={handleSubmit}>
+          {!editId && catalogo.length > 0 && (
+            <div className="form-modal-group">
+              <label className="form-modal-label">Sugerencias</label>
+              <div className="catalogo-grid">
+                {catalogo.map((item) => (
+                  <button
+                    key={item.clave}
+                    type="button"
+                    className={`catalogo-chip ${form.descripcion === item.label ? 'is-active' : ''}`}
+                    onClick={() => elegirDelCatalogo(item)}
+                  >
+                    <span className="catalogo-emoji">{item.emoji}</span>
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+              <p style={{ marginTop: 6, fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
+                Elige uno o escribe el tuyo abajo.
+              </p>
+            </div>
+          )}
+
+          <div className="form-modal-group">
+            <label className="form-modal-label">En que se va?</label>
+            <input className="form-modal-input" required placeholder="Ej: Luz, agua, super, gasolina..." value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />
+          </div>
+
+          <div className="form-modal-row">
+            <div className="form-modal-group">
+              <label className="form-modal-label">Categoria</label>
+              <select className="form-modal-select" value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })}>
+                {categorias.length > 0
+                  ? categorias.map((c) => <option key={c.nombre} value={c.nombre}>{c.icono} {c.nombre}</option>)
+                  : <option value="servicios">servicios</option>}
+              </select>
+            </div>
+            <div className="form-modal-group">
+              <label className="form-modal-label">Monto estimado</label>
+              <input className="form-modal-input" type="number" required min="0" step="0.01" placeholder="0" value={form.monto} onChange={(e) => setForm({ ...form, monto: e.target.value })} />
+              <p style={{ marginTop: 6, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
+                Lo iremos ajustando con lo que realmente pagues cada mes.
+              </p>
+            </div>
+          </div>
+
+          <div className="form-modal-actions">
+            <button type="button" className="btn-modal-cancel" onClick={() => setModal(false)}>Cancelar</button>
+            <button type="submit" className="btn-modal-save" disabled={saving}>
+              {saving ? 'Guardando...' : editId ? 'Guardar cambios' : 'Agregar gasto'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal registrar monto real */}
+      <Modal open={realItem !== null} onClose={() => setRealItem(null)} title="Cuanto pagaste?">
+        {realItem && (
+          <form onSubmit={handleSubmitReal}>
+            <p style={{ marginTop: -8, marginBottom: 16, fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+              Registra lo que pagaste de <strong>{realItem.descripcion}</strong> este mes.
+              Si este mes no gastaste en esto, pon <strong>0</strong>.
+            </p>
+            <div className="form-modal-group">
+              <label className="form-modal-label">Monto real</label>
+              <input className="form-modal-input" type="number" min="0" step="0.01" placeholder="0" autoFocus value={realMonto} onChange={(e) => setRealMonto(e.target.value)} />
+            </div>
+            <div className="form-modal-actions">
+              <button type="button" className="btn-modal-cancel" onClick={() => setRealItem(null)}>Cancelar</button>
+              <button type="submit" className="btn-modal-save" disabled={savingReal}>
+                {savingReal ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="Eliminar gasto variable"
+        message="Se eliminara el gasto y sus montos reales registrados."
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        onConfirm={handleDelete}
+        onClose={() => setConfirmDeleteId(null)}
+      />
+    </div>
+  )
+}

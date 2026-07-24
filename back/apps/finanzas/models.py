@@ -180,6 +180,7 @@ class Notificacion(models.Model):
     TIPO_CHOICES = [
         ('limite_cercano',      'Cerca del límite (≥75%)'),
         ('presupuesto_superado','Presupuesto superado (≥100%)'),
+        ('variables_pendientes','Gastos variables por registrar este mes'),
     ]
     usuario   = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notificaciones')
     tipo      = models.CharField(max_length=30, choices=TIPO_CHOICES)
