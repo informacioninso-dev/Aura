@@ -96,7 +96,7 @@ class TestUsuarioAPI(APITestCase):
 
         response = self.client.patch(
             '/api/usuarios/perfil/',
-            {'projection_mode': 'personalizada'},
+            {'projection_mode': 'conservadora'},
             format='json',
         )
 
@@ -117,14 +117,14 @@ class TestUsuarioAPI(APITestCase):
 
         response = self.client.patch(
             '/api/usuarios/perfil/',
-            {'projection_mode': 'personalizada'},
+            {'projection_mode': 'conservadora'},
             format='json',
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         user.refresh_from_db()
-        self.assertEqual(user.projection_mode, 'personalizada')
-        self.assertEqual(response.data['projection_mode'], 'personalizada')
+        self.assertEqual(user.projection_mode, 'conservadora')
+        self.assertEqual(response.data['projection_mode'], 'conservadora')
 
     @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend', FRONTEND_URL='https://app.aura.test')
     def test_password_forgot_devuelve_ok_y_envia_correo_si_usuario_existe(self):

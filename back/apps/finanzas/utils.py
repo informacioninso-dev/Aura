@@ -8,7 +8,7 @@ from django.db import models as db_models
 from .dates import local_today
 from apps.usuarios.models import (
     PROJECTION_MODE_AUTOMATICA,
-    PROJECTION_MODE_PERSONALIZADA,
+    PROJECTION_MODE_CONSERVADORA,
 )
 from apps.usuarios.plans import (
     get_user_projection_mode,
@@ -329,6 +329,23 @@ def _ewma_decimal(values, alpha=Decimal('0.35')):
     for value in series[1:]:
         smoothed = ((alpha * value) + ((Decimal('1.00') - alpha) * smoothed)).quantize(Decimal('0.01'))
     return smoothed
+
+
+def _estimate_conservative_cushion(monthly_values):
+    """
+    Colchon de imprevistos del modo conservador.
+
+    Reparte el total de gastos puntuales de la ventana (12 meses) entre todos
+    los meses, para prever imprevistos futuros y amortiguar el saldo. Solo
+    aplica si hubo al menos MIN_VARIABLE_HISTORY_MONTHS meses con puntuales.
+    Ej: $500 en el ultimo ano con >=3 meses -> ~$41.67/mes.
+    """
+    series = [_money(value) for value in monthly_values]
+    total_meses = len(series)
+    meses_con_gasto = sum(1 for value in series if value != Decimal('0.00'))
+    if total_meses == 0 or meses_con_gasto < MIN_VARIABLE_HISTORY_MONTHS:
+        return Decimal('0.00')
+    return (sum(series) / Decimal(total_meses)).quantize(Decimal('0.01'))
 
 
 def _estimate_premium_variable_component(monthly_values):
@@ -1024,7 +1041,7 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
         ingresos_puntuales_futuros_por_mes[key] = (
             ingresos_puntuales_futuros_por_mes.get(key, Decimal('0.00')) + _money(item.monto)
         )
-    use_manual_eligibility = projection_mode == PROJECTION_MODE_PERSONALIZADA
+    use_manual_eligibility = projection_mode == PROJECTION_MODE_CONSERVADORA
     ingresos_puntuales_elegibles = [
         item for item in ingresos_puntuales
         if (item.incluir_en_proyeccion if use_manual_eligibility else True)
@@ -1080,20 +1097,16 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
         history_cursor = _sumar_meses_fecha(history_cursor, 1)
 
     variable_projection_applied = history_months_used >= MIN_VARIABLE_HISTORY_MONTHS
-    if projection_mode in {PROJECTION_MODE_AUTOMATICA, PROJECTION_MODE_PERSONALIZADA}:
-        # Los ingresos puntuales solo cuentan en su mes real (caja acumulada),
-        # no se proyectan hacia adelante para evitar falsa sensación de ingresos futuros.
-        # Los gastos puntuales sí se proyectan: los imprevistos siempre van a existir.
-        smoothed_variable_ingresos = Decimal('0.00')
-        smoothed_variable_gastos = _estimate_premium_variable_component(variable_gastos)
+    # Los ingresos puntuales nunca se proyectan (evita falsa sensacion de ingresos
+    # futuros). Los gastos puntuales solo se proyectan como colchon de imprevistos
+    # en el modo CONSERVADORA; en simple e inteligente cuentan solo en su mes real.
+    smoothed_variable_ingresos = Decimal('0.00')
+    if projection_mode == PROJECTION_MODE_CONSERVADORA:
+        smoothed_variable_gastos = _estimate_conservative_cushion(variable_gastos)
     else:
-        # Simple: igual que automática en ingresos (no proyectar puntuales),
-        # pero sin estimar gastos puntuales futuros (usuario básico, vista conservadora simple).
-        smoothed_variable_ingresos = Decimal('0.00')
-        smoothed_variable_gastos = _winsorized_weighted_average(variable_gastos)
+        smoothed_variable_gastos = Decimal('0.00')
 
     if not variable_projection_applied:
-        smoothed_variable_ingresos = Decimal('0.00')
         smoothed_variable_gastos = Decimal('0.00')
     smoothed_variable_gap = (smoothed_variable_ingresos - smoothed_variable_gastos).quantize(Decimal('0.01'))
 

@@ -11,11 +11,14 @@ FEATURE_VALUE_TYPE_CHOICES = [
 
 PROJECTION_MODE_AUTOMATICA = 'automatica'
 PROJECTION_MODE_SIMPLE = 'simple'
+PROJECTION_MODE_CONSERVADORA = 'conservadora'
+# 'personalizada' quedo obsoleto: lo reemplaza 'conservadora'. Se mantiene la
+# constante solo para migrar los valores viejos.
 PROJECTION_MODE_PERSONALIZADA = 'personalizada'
 PROJECTION_MODE_CHOICES = [
-    (PROJECTION_MODE_AUTOMATICA, 'Automatica'),
     (PROJECTION_MODE_SIMPLE, 'Simple'),
-    (PROJECTION_MODE_PERSONALIZADA, 'Personalizada'),
+    (PROJECTION_MODE_AUTOMATICA, 'Inteligente'),
+    (PROJECTION_MODE_CONSERVADORA, 'Conservadora'),
 ]
 
 
