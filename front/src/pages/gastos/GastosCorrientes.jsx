@@ -114,6 +114,9 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
   const [versionLoading, setVersionLoading] = useState(false)
   const [confirmConvert, setConfirmConvert] = useState(false)
 
+  // — catalogo de sugerencias para el "Agregar" —
+  const [catalogo, setCatalogo] = useState([])
+
   // — monto real del mes (solo gastos variables) —
   const [realItem, setRealItem] = useState(null)
   const [realForm, setRealForm] = useState({ ...currentPeriod(), monto_real: '' })
@@ -123,6 +126,12 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
   const [feedback, setFeedback] = useState({ type: '', message: '' })
 
   useEffect(() => { fetchItems() }, [tipoMonto])
+
+  useEffect(() => {
+    api.get('/finanzas/catalogo/')
+      .then(({ data }) => setCatalogo(data[`gasto_${tipoMonto}`] || []))
+      .catch(() => {})
+  }, [tipoMonto])
 
   function clampExpenseDate(value) {
     if (!value) return value
@@ -553,6 +562,28 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
               Carga rapida: nombre, categoria y monto.
             </p>
           )}
+          {!editId && catalogo.length > 0 && (
+            <div className="form-modal-group">
+              <label className="form-modal-label">Sugerencias</label>
+              <div className="catalogo-grid">
+                {catalogo.map((item) => (
+                  <button
+                    key={item.clave}
+                    type="button"
+                    className={`catalogo-chip ${form.descripcion === item.label ? 'is-active' : ''}`}
+                    onClick={() => setForm((prev) => ({ ...prev, descripcion: item.label, categoria: item.categoria }))}
+                  >
+                    <span className="catalogo-emoji">{item.emoji}</span>
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+              <p style={{ marginTop: 6, fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
+                Elige uno o escribe el tuyo abajo.
+              </p>
+            </div>
+          )}
+
           <div className="form-modal-group">
             <label className="form-modal-label">En que se va?</label>
             <input className="form-modal-input" required placeholder={copy.placeholder} value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />

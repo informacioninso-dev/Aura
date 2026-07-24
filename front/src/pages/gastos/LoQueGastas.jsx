@@ -2,6 +2,7 @@ import { useSearchParams } from 'react-router-dom'
 
 import GastosCorrientes from './GastosCorrientes'
 import GastosNoCorrientes from './GastosNoCorrientes'
+import GastosVariables from './GastosVariables'
 import '../../components/ui/app.css'
 
 const TAB_OPTIONS = [
@@ -24,7 +25,7 @@ const TAB_OPTIONS = [
 
 function renderPanel(tab) {
   if (tab === 'puntuales') return <GastosNoCorrientes embedded />
-  if (tab === 'variables') return <GastosCorrientes embedded tipoMonto="variable" />
+  if (tab === 'variables') return <GastosVariables />
   return <GastosCorrientes embedded tipoMonto="fijo" />
 }
 

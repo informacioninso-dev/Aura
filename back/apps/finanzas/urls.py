@@ -17,6 +17,7 @@ from .views import (
     DashboardResumenView,
     AsistenteParseView,
     AsistenteTranscribirView,
+    CatalogoView,
 )
 
 router = DefaultRouter()
@@ -37,6 +38,7 @@ urlpatterns = [
     path('proyeccion-acumulada/', ProyeccionAcumuladaView.as_view(), name='proyeccion-acumulada'),
     path('reporte/', ReporteView.as_view(), name='reporte'),
     path('reporte/pdf/', ReportePDFView.as_view(), name='reporte-pdf'),
+    path('catalogo/', CatalogoView.as_view(), name='catalogo'),
     path('asistente/parsear/', AsistenteParseView.as_view(), name='asistente-parsear'),
     path('asistente/transcribir/', AsistenteTranscribirView.as_view(), name='asistente-transcribir'),
 ]

@@ -30,6 +30,7 @@ from .utils import (
     calcular_proyeccion_acumulada,
     detectar_sugerencias,
     mapa_ejecuciones_variables,
+    resumen_variables_mes,
 )
 
 
@@ -2733,3 +2734,271 @@ class TestImportacionRecurrentes(APITestCase):
         response = self.client.get('/api/finanzas/gastos-corrientes/?tipo_monto=variable')
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['descripcion'], 'Agua')
+
+
+class TestResumenVariablesMes(APITestCase):
+    """Vista mensual: estimado vs real de cada gasto variable."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            email='res@example.com', username='usuario_res', password='clave12345',
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def _variable(self, descripcion='Luz', estimado='50.00'):
+        return GastoCorriente.objects.create(
+            usuario=self.user, descripcion=descripcion, categoria='servicios',
+            monto=Decimal(estimado), tipo_monto='variable',
+            frecuencia='mensual', fecha_inicio='2026-01-01', activo=True,
+        )
+
+    def _resumen(self, anio=2026, mes=6):
+        return {f['descripcion']: f for f in resumen_variables_mes(self.user, anio, mes)}
+
+    def test_sin_registro_queda_pendiente(self):
+        self._variable('Luz', '50.00')
+        fila = self._resumen()['Luz']
+        self.assertEqual(fila['situacion'], 'pendiente')
+        self.assertIsNone(fila['real'])
+        self.assertEqual(fila['estimado'], '50.00')
+
+    def test_real_sobre_el_estimado(self):
+        g = self._variable('Luz', '50.00')
+        GastoCorrienteEjecucion.objects.create(gasto=g, anio=2026, mes=6, monto_real=Decimal('60.00'))
+        fila = self._resumen()['Luz']
+        self.assertEqual(fila['situacion'], 'sobre')
+        self.assertEqual(fila['delta_abs'], '10.00')
+        self.assertEqual(fila['delta_pct'], 20.0)
+
+    def test_real_menos_del_estimado(self):
+        g = self._variable('Luz', '50.00')
+        GastoCorrienteEjecucion.objects.create(gasto=g, anio=2026, mes=6, monto_real=Decimal('40.00'))
+        fila = self._resumen()['Luz']
+        self.assertEqual(fila['situacion'], 'menos')
+        self.assertEqual(fila['delta_pct'], -20.0)
+
+    def test_real_igual_al_estimado(self):
+        g = self._variable('Luz', '50.00')
+        GastoCorrienteEjecucion.objects.create(gasto=g, anio=2026, mes=6, monto_real=Decimal('50.00'))
+        self.assertEqual(self._resumen()['Luz']['situacion'], 'en_estimado')
+
+    def test_cero_es_sin_gasto_este_mes(self):
+        g = self._variable('Consulta', '50.00')
+        GastoCorrienteEjecucion.objects.create(gasto=g, anio=2026, mes=6, monto_real=Decimal('0.00'))
+        fila = self._resumen()['Consulta']
+        self.assertEqual(fila['situacion'], 'sin_gasto')
+        self.assertEqual(fila['real'], '0.00')
+
+    def test_es_por_mes(self):
+        g = self._variable('Luz', '50.00')
+        GastoCorrienteEjecucion.objects.create(gasto=g, anio=2026, mes=6, monto_real=Decimal('60.00'))
+        # En julio no hay registro: pendiente
+        self.assertEqual(self._resumen(2026, 7)['Luz']['situacion'], 'pendiente')
+
+    def test_endpoint_responde(self):
+        self._variable('Luz', '50.00')
+        response = self.client.get('/api/finanzas/gastos-corrientes/resumen_variables/?anio=2026&mes=6')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data[0]['descripcion'], 'Luz')
+
+    def test_endpoint_rechaza_mes_invalido(self):
+        response = self.client.get('/api/finanzas/gastos-corrientes/resumen_variables/?anio=abc&mes=6')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class TestMontoRealCero(APITestCase):
+    """Se permite registrar 0 = sin gasto este mes."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            email='cero@example.com', username='usuario_cero', password='clave12345',
+        )
+        self.client.force_authenticate(user=self.user)
+        self.gasto = GastoCorriente.objects.create(
+            usuario=self.user, descripcion='Consulta', categoria='salud',
+            monto=Decimal('50.00'), tipo_monto='variable',
+            frecuencia='mensual', fecha_inicio='2026-01-01', activo=True,
+        )
+
+    def test_acepta_cero(self):
+        response = self.client.post(
+            '/api/finanzas/gastos-corrientes/{}/ejecuciones/'.format(self.gasto.id),
+            {'anio': 2026, 'mes': 6, 'monto_real': '0'}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Decimal(response.data['monto_real']), Decimal('0.00'))
+
+    def test_rechaza_negativo(self):
+        response = self.client.post(
+            '/api/finanzas/gastos-corrientes/{}/ejecuciones/'.format(self.gasto.id),
+            {'anio': 2026, 'mes': 6, 'monto_real': '-5'}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_cero_cuenta_como_cero_en_el_balance(self):
+        GastoCorrienteEjecucion.objects.create(gasto=self.gasto, anio=2026, mes=6, monto_real=Decimal('0.00'))
+        Ingreso.objects.create(
+            usuario=self.user, descripcion='Sueldo', monto=Decimal('1000.00'),
+            frecuencia='mensual', fecha_inicio='2026-01-01', activo=True,
+        )
+        cache.clear()
+        # 1000 - 0 (registro real de 0), no 1000 - 50 (estimado)
+        self.assertEqual(calcular_balance_mes(self.user, 2026, 6), Decimal('1000.00'))
+
+
+class TestCatalogo(APITestCase):
+    """Catalogo de opciones comunes para guiar al crear."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            email='cat@example.com', username='usuario_cat', password='clave12345',
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_endpoint_devuelve_las_tres_listas(self):
+        response = self.client.get('/api/finanzas/catalogo/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('gasto_fijo', response.data)
+        self.assertIn('gasto_variable', response.data)
+        self.assertIn('ingreso', response.data)
+        self.assertTrue(any(i['label'] == 'Luz' for i in response.data['gasto_variable']))
+        self.assertTrue(any(i['label'] == 'Arriendo' for i in response.data['gasto_fijo']))
+
+    def test_las_categorias_del_catalogo_son_validas(self):
+        from apps.finanzas.catalogo import catalogo_completo
+        from apps.finanzas.models import CATEGORIAS_DEFAULT
+        validas = {c['nombre'] for c in CATEGORIAS_DEFAULT}
+        cat = catalogo_completo()
+        for grupo in cat.values():
+            for item in grupo:
+                self.assertIn(item['categoria'], validas, msg='categoria invalida: ' + item['categoria'])
+
+
+class TestCrearMesVariables(APITestCase):
+    """Boton bulk: crear los registros del mes desde el estimado."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            email='mes@example.com', username='usuario_mes', password='clave12345',
+        )
+        self.client.force_authenticate(user=self.user)
+        self.hoy = local_today()
+
+    def _var(self, desc, est='40.00'):
+        return GastoCorriente.objects.create(
+            usuario=self.user, descripcion=desc, categoria='servicios',
+            monto=Decimal(est), tipo_monto='variable', frecuencia='mensual',
+            fecha_inicio='2026-01-01', activo=True,
+        )
+
+    def test_crea_los_pendientes_del_mes(self):
+        self._var('Luz', '40.00')
+        self._var('Agua', '20.00')
+
+        response = self.client.post('/api/finanzas/gastos-corrientes/crear_mes_variables/',
+                                    {'anio': self.hoy.year, 'mes': self.hoy.month}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['creados'], 2)
+        self.assertEqual(
+            GastoCorrienteEjecucion.objects.filter(gasto__usuario=self.user, anio=self.hoy.year, mes=self.hoy.month).count(),
+            2,
+        )
+
+    def test_usa_el_estimado_cuando_no_hay_historial(self):
+        self._var('Luz', '40.00')
+        self.client.post('/api/finanzas/gastos-corrientes/crear_mes_variables/',
+                         {'anio': self.hoy.year, 'mes': self.hoy.month}, format='json')
+        e = GastoCorrienteEjecucion.objects.get(gasto__usuario=self.user)
+        self.assertEqual(e.monto_real, Decimal('40.00'))
+
+    def test_no_pisa_lo_ya_registrado(self):
+        g = self._var('Luz', '40.00')
+        GastoCorrienteEjecucion.objects.create(gasto=g, anio=self.hoy.year, mes=self.hoy.month, monto_real=Decimal('99.00'))
+
+        response = self.client.post('/api/finanzas/gastos-corrientes/crear_mes_variables/',
+                                    {'anio': self.hoy.year, 'mes': self.hoy.month}, format='json')
+
+        self.assertEqual(response.data['creados'], 0)
+        self.assertEqual(GastoCorrienteEjecucion.objects.get(gasto=g).monto_real, Decimal('99.00'))
+
+    def test_rechaza_mes_futuro(self):
+        self._var('Luz')
+        futuro = self.hoy.year + 1
+        response = self.client.post('/api/finanzas/gastos-corrientes/crear_mes_variables/',
+                                    {'anio': futuro, 'mes': 1}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_es_editable_despues(self):
+        g = self._var('Luz', '40.00')
+        self.client.post('/api/finanzas/gastos-corrientes/crear_mes_variables/',
+                         {'anio': self.hoy.year, 'mes': self.hoy.month}, format='json')
+        # Editar via upsert
+        self.client.post(f'/api/finanzas/gastos-corrientes/{g.id}/ejecuciones/',
+                         {'anio': self.hoy.year, 'mes': self.hoy.month, 'monto_real': '55.00'}, format='json')
+        self.assertEqual(GastoCorrienteEjecucion.objects.get(gasto=g).monto_real, Decimal('55.00'))
+
+
+class TestNotificacionVariables(APITestCase):
+    """Aviso perezoso de variables pendientes del mes."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            email='notif@example.com', username='usuario_notif', password='clave12345',
+        )
+        self.hoy = local_today()
+
+    def _var(self, desc='Luz'):
+        return GastoCorriente.objects.create(
+            usuario=self.user, descripcion=desc, categoria='servicios',
+            monto=Decimal('40.00'), tipo_monto='variable', frecuencia='mensual',
+            fecha_inicio='2026-01-01', activo=True,
+        )
+
+    def test_crea_aviso_si_hay_pendientes(self):
+        from apps.finanzas.utils import asegurar_notificacion_variables
+        from apps.finanzas.models import Notificacion
+        self._var('Luz')
+
+        asegurar_notificacion_variables(self.user)
+
+        n = Notificacion.objects.filter(usuario=self.user, tipo='variables_pendientes')
+        self.assertEqual(n.count(), 1)
+        self.assertEqual(n.first().mes, self.hoy.month)
+
+    def test_no_duplica_el_aviso(self):
+        from apps.finanzas.utils import asegurar_notificacion_variables
+        from apps.finanzas.models import Notificacion
+        self._var('Luz')
+        asegurar_notificacion_variables(self.user)
+        asegurar_notificacion_variables(self.user)
+        self.assertEqual(Notificacion.objects.filter(usuario=self.user, tipo='variables_pendientes').count(), 1)
+
+    def test_borra_el_aviso_cuando_ya_no_hay_pendientes(self):
+        from apps.finanzas.utils import asegurar_notificacion_variables
+        from apps.finanzas.models import Notificacion
+        g = self._var('Luz')
+        asegurar_notificacion_variables(self.user)
+        self.assertEqual(Notificacion.objects.filter(usuario=self.user, tipo='variables_pendientes').count(), 1)
+
+        GastoCorrienteEjecucion.objects.create(gasto=g, anio=self.hoy.year, mes=self.hoy.month, monto_real=Decimal('40.00'))
+        asegurar_notificacion_variables(self.user)
+        self.assertEqual(Notificacion.objects.filter(usuario=self.user, tipo='variables_pendientes').count(), 0)
+
+    def test_sin_variables_no_crea_nada(self):
+        from apps.finanzas.utils import asegurar_notificacion_variables
+        from apps.finanzas.models import Notificacion
+        asegurar_notificacion_variables(self.user)
+        self.assertEqual(Notificacion.objects.filter(usuario=self.user).count(), 0)
+
+    def test_el_dashboard_dispara_el_aviso(self):
+        from apps.finanzas.models import Notificacion
+        self._var('Luz')
+        self.client.force_authenticate(user=self.user)
+        self.client.get('/api/finanzas/dashboard/')
+        self.assertEqual(Notificacion.objects.filter(usuario=self.user, tipo='variables_pendientes').count(), 1)

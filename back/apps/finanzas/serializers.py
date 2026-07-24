@@ -202,8 +202,10 @@ class GastoCorrienteEjecucionSerializer(serializers.ModelSerializer):
         anio       = attrs.get('anio',       getattr(self.instance, 'anio',       None))
 
         errors = {}
-        if monto_real is not None and monto_real <= 0:
-            errors['monto_real'] = 'El monto debe ser mayor que 0.'
+        # Se permite 0: significa "este mes no gaste en esto", distinto de
+        # "pendiente" (aun no lo registro). Negativo si es invalido.
+        if monto_real is not None and monto_real < 0:
+            errors['monto_real'] = 'El monto no puede ser negativo.'
         if mes is not None and not (1 <= mes <= 12):
             errors['mes'] = 'El mes debe estar entre 1 y 12.'
         if anio is not None and mes is not None and 1 <= mes <= 12:

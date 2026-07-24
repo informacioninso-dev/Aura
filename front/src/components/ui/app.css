@@ -1707,6 +1707,90 @@
   gap: 6px;
 }
 
+/* Grilla de sugerencias del catalogo al crear un gasto */
+.catalogo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.catalogo-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.75);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.catalogo-chip:hover {
+  background: rgba(196,135,246,0.12);
+  border-color: rgba(196,135,246,0.35);
+}
+.catalogo-chip.is-active {
+  background: rgba(196,135,246,0.18);
+  border-color: rgba(196,135,246,0.55);
+  color: #fff;
+}
+.catalogo-emoji {
+  font-size: 22px;
+  line-height: 1;
+}
+
+/* Navegador de mes compartido (componente MonthNavigator) */
+.month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 0 18px;
+}
+
+.month-nav-label {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  min-width: 160px;
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+.month-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.65);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.month-nav-btn:hover:not(:disabled) {
+  background: rgba(196,135,246,0.14);
+  border-color: rgba(196,135,246,0.40);
+  color: #C487F6;
+}
+.month-nav-btn:disabled {
+  opacity: 0.28;
+  cursor: default;
+}
+
+@media (max-width: 480px) {
+  .month-nav-label {
+    font-size: 15px;
+    min-width: 130px;
+  }
+}
+
 .presupuesto-month-bar {
   display: flex;
   align-items: center;
