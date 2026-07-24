@@ -1,23 +1,15 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, Pencil, Trash2, Check, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Pencil, Trash2, Check, X } from 'lucide-react'
 
 import api from '../../api/client'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import Modal from '../../components/ui/Modal'
+import MonthNavigator from '../../components/ui/MonthNavigator'
 import { formatAmount } from '../../utils/formatters'
 import { montoEfectivoMes } from '../../utils/frecuencias'
+import { MESES_FULL, startOfMonth } from '../../utils/months'
 import '../../components/ui/app.css'
-
-const MESES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
-
-function startOfMonth(date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1)
-}
-
-function addMonths(date, n) {
-  return new Date(date.getFullYear(), date.getMonth() + n, 1)
-}
 
 const ICONOS_SUGERIDOS = ['📦', '🏠', '🛒', '🚗', '💊', '📚', '🎬', '👕', '💡', '💻', '💳', '🐷', '✈️', '🏋️', '🎵', '🍔', '☕', '🎮', '🐾', '🌿', '💰', '🎁', '🔧', '📱']
 const EMPTY_FORM = { nombre: '', icono: '📦', limite_mensual: '' }
@@ -243,8 +235,6 @@ export default function Presupuesto() {
   const visibleIcons = showAllIcons ? ICONOS_SUGERIDOS : ICONOS_SUGERIDOS.slice(0, ICON_PREVIEW_COUNT)
   const categoriasConMovimiento = resumenCategorias.length
 
-  const handlePrevMonth = useCallback(() => setSelectedMonth((m) => addMonths(m, -1)), [])
-  const handleNextMonth = useCallback(() => setSelectedMonth((m) => addMonths(m, 1)), [])
   const handleQueryChange = useCallback((e) => setQuery(e.target.value), [])
 
   return (
@@ -262,26 +252,7 @@ export default function Presupuesto() {
 
       <FeedbackAlert type={feedback.type || 'error'} message={feedback.message} />
 
-      <div className="presupuesto-month-bar">
-        <button
-          type="button"
-          className="dashboard-cat-month-btn"
-          onClick={handlePrevMonth}
-        >
-          <ChevronLeft size={16} />
-        </button>
-        <span className="presupuesto-month-label">
-          {MESES_FULL[selectedMonth.getMonth()]} {selectedMonth.getFullYear()}
-        </span>
-        <button
-          type="button"
-          className="dashboard-cat-month-btn"
-          onClick={handleNextMonth}
-          disabled={addMonths(selectedMonth, 1) > startOfMonth(new Date())}
-        >
-          <ChevronRight size={16} />
-        </button>
-      </div>
+      <MonthNavigator value={selectedMonth} onChange={setSelectedMonth} />
 
       <div className="stats-grid" style={{ marginBottom: 20 }}>
         <div className="stat-card">
