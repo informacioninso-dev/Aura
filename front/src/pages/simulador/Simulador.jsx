@@ -20,7 +20,7 @@ const SIMULADOR_PAST_MONTHS = 6
 const PROJECTION_MODE_LABELS = {
   automatica: 'Automatica',
   simple: 'Simple',
-  personalizada: 'Personalizada',
+  conservadora: 'Conservadora',
 }
 const PAST_SIMULATION_DATE_MESSAGE = 'El simulador solo permite fechas desde hoy hacia adelante.'
 

@@ -30,9 +30,9 @@ const SERIES_FOCUS_OPTIONS = [
   { value: 'expense', label: 'Gastos' },
 ]
 const PROJECTION_MODE_OPTIONS = [
-  { value: 'automatica', label: 'Automatica' },
   { value: 'simple', label: 'Simple' },
-  { value: 'personalizada', label: 'Personalizada' },
+  { value: 'automatica', label: 'Inteligente' },
+  { value: 'conservadora', label: 'Conservadora' },
 ]
 const FUTURE_PROJECTION_OPTIONS = [
   { value: 12, label: '1 ano' },
@@ -54,9 +54,9 @@ function getProjectionAnalysisHelp(mode, analysisMonths, analysisCapMonths) {
         : `La proyeccion analiza hasta ${analysisCapMonths} meses de historial disponible.`)
     : 'Aun no hay historial suficiente para analizar ingresos y gastos puntuales.'
 
-  if (mode === 'simple') return `${historyText} Simple toma todos tus ingresos y gastos puntuales con una lectura directa.`
-  if (mode === 'personalizada') return `${historyText} Personalizada solo toma los ingresos y gastos puntuales que marques.`
-  return `${historyText} Automatica amortigua picos con esa historia.`
+  if (mode === 'simple') return `${historyText} Simple es aritmetica: suma tus fijos, variables y diferidos. No proyecta gastos puntuales al futuro.`
+  if (mode === 'conservadora') return `${historyText} Conservadora agrega un colchon: reparte tus gastos puntuales del ultimo ano entre los meses futuros, para prever imprevistos.`
+  return `${historyText} Inteligente proyecta tus fijos y variables sin sumar imprevistos.`
 }
 
 function getFrequencyLabel(frequency) {

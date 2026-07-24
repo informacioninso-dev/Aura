@@ -6,6 +6,7 @@ from .models import (
     PlanFeature,
     UserPlanAssignment,
     PROJECTION_MODE_AUTOMATICA,
+    PROJECTION_MODE_CONSERVADORA,
     PROJECTION_MODE_PERSONALIZADA,
     PROJECTION_MODE_SIMPLE,
 )
@@ -64,9 +65,9 @@ FEATURE_DEFAULTS = {
 }
 
 VALID_PROJECTION_MODES = {
-    PROJECTION_MODE_AUTOMATICA,
     PROJECTION_MODE_SIMPLE,
-    PROJECTION_MODE_PERSONALIZADA,
+    PROJECTION_MODE_AUTOMATICA,
+    PROJECTION_MODE_CONSERVADORA,
 }
 
 
@@ -174,6 +175,8 @@ def get_user_projection_mode(user):
         return PROJECTION_MODE_SIMPLE
 
     mode = getattr(user, 'projection_mode', PROJECTION_MODE_AUTOMATICA) or PROJECTION_MODE_AUTOMATICA
+    if mode == PROJECTION_MODE_PERSONALIZADA:
+        return PROJECTION_MODE_CONSERVADORA  # el modo viejo mapea al nuevo
     if mode not in VALID_PROJECTION_MODES:
         return PROJECTION_MODE_AUTOMATICA
     return mode
