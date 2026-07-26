@@ -99,7 +99,7 @@ export default function Home() {
           <div className="home-nav-actions">
             <Link to={accountTarget} className="home-btn-quiet">{accountLabel}</Link>
             <Link to={primaryTarget} className="home-btn-nav">
-              {isLoggedIn ? 'Abrir Aura' : 'Probar gratis'}
+              {isLoggedIn ? 'Abrir Aura' : 'Crear cuenta'}
             </Link>
           </div>
         </div>

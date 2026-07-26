@@ -133,19 +133,21 @@
 }
 
 .home-btn-nav {
-  min-height: 40px;
-  padding: 0 15px;
-  border: 1px solid rgba(24, 200, 146, 0.44);
-  border-radius: 9px;
-  background: rgba(24, 200, 146, 0.09);
-  color: var(--home-green-soft);
-  font-size: 13px;
-  transition: background 160ms ease, color 160ms ease;
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid var(--home-green);
+  border-radius: 10px;
+  background: var(--home-green);
+  color: #FFFFFF;
+  font-size: 12px;
+  box-shadow: 0 6px 16px rgba(16,185,129,0.18);
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 
 .home-btn-nav:hover {
-  background: var(--home-green);
-  color: #071a15;
+  background: #0EA574;
+  border-color: #0EA574;
+  color: #FFFFFF;
 }
 
 .home-hero-wrap {
