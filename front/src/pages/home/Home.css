@@ -1042,9 +1042,12 @@
 }
 
 @media (min-width: 520px) {
-  .home-brand-copy small,
-  .home-btn-quiet {
+  .home-brand-copy small {
     display: block;
+  }
+
+  .home-btn-quiet {
+    display: inline-flex;
   }
 
   .home-hero-actions {
