@@ -332,6 +332,9 @@ export default function Simulador() {
   const projectionModeLabel = PROJECTION_MODE_LABELS[mode] || 'Simple'
   const selectedBank = bancos.find((item) => item.id === Number(form.banco))
   const paymentLabel = form.tipo === 'contado' ? 'Impacto unico' : form.tipo === 'recurrente' ? 'Aumento mensual' : 'Cuota mensual'
+  const financedAmount = resultado
+    ? Math.max(0, Number(resultado.total_a_pagar) - Number(resultado.total_intereses))
+    : 0
   const amountLabel = form.tipo === 'recurrente' ? 'Monto mensual' : 'Monto de la decision'
   const durationLabel = form.tipo === 'recurrente' ? 'Durante cuantos meses?' : 'Plazo (meses)'
   const startDateLabel = parseLocalDate(form.fecha_inicio)?.toLocaleDateString('es-EC', {
@@ -602,12 +605,29 @@ export default function Simulador() {
                       <summary>Ver detalle del calculo</summary>
                       <div className="simulator-detail-list">
                         <div><span>Proyeccion utilizada</span><strong>{projectionModeLabel}</strong></div>
-                        <div><span>Saldo minimo sin la decision</span><strong>{fmt(resultado.saldo_minimo_base)}</strong></div>
-                        <div><span>Saldo que quieres conservar</span><strong>{fmt(resultado.colchon_minimo)}</strong></div>
-                        <div><span>Impacto total analizado</span><strong>{fmt(resultado.total_a_pagar)}</strong></div>
-                        {form.tipo === 'cuotas' && (
-                          <div><span>Intereses estimados</span><strong>{fmt(resultado.total_intereses)}</strong></div>
+                        <div><span>La decision empieza</span><strong>{startDateLabel}</strong></div>
+                        {resultado.tipo === 'cuotas' && (
+                          <>
+                            <div><span>Monto financiado, sin intereses</span><strong>{fmt(financedAmount)}</strong></div>
+                            <div><span>Numero de cuotas</span><strong>{resultado.meses_con_impacto}</strong></div>
+                            <div><span>Valor de cada cuota</span><strong>{fmt(resultado.cuota_mensual)}</strong></div>
+                            <div><span>Intereses totales del credito</span><strong>{fmt(resultado.total_intereses)}</strong></div>
+                            <div><span>Total final a pagar</span><strong>{fmt(resultado.total_a_pagar)}</strong></div>
+                          </>
                         )}
+                        {resultado.tipo === 'contado' && (
+                          <div><span>Pago unico</span><strong>{fmt(resultado.total_a_pagar)}</strong></div>
+                        )}
+                        {resultado.tipo === 'recurrente' && (
+                          <>
+                            <div><span>Gasto mensual</span><strong>{fmt(resultado.cuota_mensual)}</strong></div>
+                            <div><span>Meses incluidos</span><strong>{resultado.meses_con_impacto}</strong></div>
+                            <div><span>Total durante el periodo</span><strong>{fmt(resultado.total_a_pagar)}</strong></div>
+                          </>
+                        )}
+                        <div><span>Saldo minimo sin la decision</span><strong>{fmt(resultado.saldo_minimo_base)}</strong></div>
+                        <div><span>Saldo minimo incluyendo el gasto</span><strong>{fmt(resultado.saldo_minimo_escenario)}</strong></div>
+                        <div><span>Saldo que quieres conservar</span><strong>{fmt(resultado.colchon_minimo)}</strong></div>
                         <div><span>Horizonte evaluado</span><strong>{resultado.horizon_months} meses</strong></div>
                       </div>
                     </details>
