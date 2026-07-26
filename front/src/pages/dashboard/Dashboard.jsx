@@ -773,22 +773,22 @@ export default function Dashboard() {
     const gastoDisplay = point.is_real ? point.gasto_real : point.gasto_proj
 
     return (
-      <div style={{ background: 'rgba(26,37,64,0.97)', border: '1px solid rgba(196,135,246,0.2)', borderRadius: 12, padding: '10px 12px' }}>
-        <div style={{ color: '#FFFFFF', marginBottom: 6, fontWeight: 700 }}>
+      <div style={{ background: 'var(--app-popover)', border: '1px solid rgba(196,135,246,0.2)', borderRadius: 12, padding: '10px 12px' }}>
+        <div style={{ color: 'var(--app-text)', marginBottom: 6, fontWeight: 700 }}>
           {`${label} - ${point.is_real ? 'Real' : 'Proyectado'}`}
         </div>
         {advancedProjectionEnabled && point.gapAcumulado != null && (
-          <div style={{ color: '#C487F6', fontWeight: 700, marginBottom: 4 }}>
+          <div style={{ color: 'var(--app-lila)', fontWeight: 700, marginBottom: 4 }}>
             {`Saldo disponible: ${fmt(point.gapAcumulado)}`}
           </div>
         )}
-        <div style={{ color: '#10B981' }}>{`Total disponible este mes: ${fmt(ingDisponible)}`}</div>
+        <div style={{ color: 'var(--app-green)' }}>{`Total disponible este mes: ${fmt(ingDisponible)}`}</div>
         {advancedProjectionEnabled && point.opening != null && (
-          <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, marginBottom: 4 }}>
+          <div style={{ color: 'rgba(var(--app-ink-rgb),0.45)', fontSize: 11, marginBottom: 4 }}>
             {`Saldo anterior: ${fmt(point.opening)} + ingresos: ${fmt(point.ingMes)}`}
           </div>
         )}
-        <div style={{ color: '#F87171' }}>{`Gastos del mes: ${fmt(gastoDisplay)}`}</div>
+        <div style={{ color: 'var(--app-danger)' }}>{`Gastos del mes: ${fmt(gastoDisplay)}`}</div>
       </div>
     )
   }
@@ -803,38 +803,38 @@ export default function Dashboard() {
         <AreaChart data={visibleProjectionSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="gIngReal" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
-              <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+              <stop offset="5%" stopColor="var(--app-green)" stopOpacity={0.25} />
+              <stop offset="95%" stopColor="var(--app-green)" stopOpacity={0} />
             </linearGradient>
             <linearGradient id="gIngProj" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#10B981" stopOpacity={0.10} />
-              <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+              <stop offset="5%" stopColor="var(--app-green)" stopOpacity={0.10} />
+              <stop offset="95%" stopColor="var(--app-green)" stopOpacity={0} />
             </linearGradient>
             <linearGradient id="gGastoReal" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#F87171" stopOpacity={0.25} />
-              <stop offset="95%" stopColor="#F87171" stopOpacity={0} />
+              <stop offset="5%" stopColor="var(--app-danger)" stopOpacity={0.25} />
+              <stop offset="95%" stopColor="var(--app-danger)" stopOpacity={0} />
             </linearGradient>
             <linearGradient id="gGastoProj" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#F87171" stopOpacity={0.10} />
-              <stop offset="95%" stopColor="#F87171" stopOpacity={0} />
+              <stop offset="5%" stopColor="var(--app-danger)" stopOpacity={0.10} />
+              <stop offset="95%" stopColor="var(--app-danger)" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-          <XAxis dataKey="label" tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 11 }} />
-          <YAxis tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 11 }} tickFormatter={fmtAxis} width={82} />
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(var(--app-ink-rgb),0.06)" />
+          <XAxis dataKey="label" tick={{ fill: 'rgba(var(--app-ink-rgb),0.35)', fontSize: 11 }} />
+          <YAxis tick={{ fill: 'rgba(var(--app-ink-rgb),0.35)', fontSize: 11 }} tickFormatter={fmtAxis} width={82} />
           {visibleCurrentMonthLabel && (
             <ReferenceLine
               x={visibleCurrentMonthLabel}
-              stroke="rgba(255,255,255,0.25)"
+              stroke="rgba(var(--app-ink-rgb),0.25)"
               strokeDasharray="4 4"
-              label={{ value: 'Hoy', position: 'insideTopRight', fill: 'rgba(255,255,255,0.40)', fontSize: 11 }}
+              label={{ value: 'Hoy', position: 'insideTopRight', fill: 'rgba(var(--app-ink-rgb),0.40)', fontSize: 11 }}
             />
           )}
           <ReferenceLine y={0} stroke="rgba(248,113,113,0.35)" strokeDasharray="4 3" />
           <Tooltip
             content={renderProjectionTooltip}
-            contentStyle={{ background: 'rgba(26,37,64,0.97)', border: '1px solid rgba(196,135,246,0.2)', borderRadius: 12 }}
-            labelStyle={{ color: '#FFFFFF', marginBottom: 6, fontWeight: 700 }}
+            contentStyle={{ background: 'var(--app-popover)', border: '1px solid rgba(196,135,246,0.2)', borderRadius: 12 }}
+            labelStyle={{ color: 'var(--app-text)', marginBottom: 6, fontWeight: 700 }}
             itemSorter={(item) => ({
               ing_real: 0,
               ing_proj: 1,
@@ -859,14 +859,14 @@ export default function Dashboard() {
           {!isCompactProjectionChart && <Legend content={renderProjectionLegend} />}
           {shouldShowSeries('income') && (
             <>
-              <Area connectNulls={false} type="monotone" dataKey="ing_real" stroke="#10B981" strokeWidth={2.5} fill="url(#gIngReal)" dot={false} />
-              <Area connectNulls={false} type="monotone" dataKey="ing_proj" stroke="#10B981" strokeWidth={2} fill="url(#gIngProj)" strokeDasharray="5 4" dot={false} />
+              <Area connectNulls={false} type="monotone" dataKey="ing_real" stroke="var(--app-green)" strokeWidth={2.5} fill="url(#gIngReal)" dot={false} />
+              <Area connectNulls={false} type="monotone" dataKey="ing_proj" stroke="var(--app-green)" strokeWidth={2} fill="url(#gIngProj)" strokeDasharray="5 4" dot={false} />
             </>
           )}
           {shouldShowSeries('expense') && (
             <>
-              <Area connectNulls={false} type="monotone" dataKey="gasto_real" stroke="#F87171" strokeWidth={2.5} fill="url(#gGastoReal)" dot={false} />
-              <Area connectNulls={false} type="monotone" dataKey="gasto_proj" stroke="#F87171" strokeWidth={2} fill="url(#gGastoProj)" strokeDasharray="5 4" dot={false} />
+              <Area connectNulls={false} type="monotone" dataKey="gasto_real" stroke="var(--app-danger)" strokeWidth={2.5} fill="url(#gGastoReal)" dot={false} />
+              <Area connectNulls={false} type="monotone" dataKey="gasto_proj" stroke="var(--app-danger)" strokeWidth={2} fill="url(#gGastoProj)" strokeDasharray="5 4" dot={false} />
             </>
           )}
         </AreaChart>
@@ -916,50 +916,50 @@ export default function Dashboard() {
         <AreaChart data={chartSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="gIngRealF" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
-              <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+              <stop offset="5%" stopColor="var(--app-green)" stopOpacity={0.25} />
+              <stop offset="95%" stopColor="var(--app-green)" stopOpacity={0} />
             </linearGradient>
             <linearGradient id="gIngProjF" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#10B981" stopOpacity={0.10} />
-              <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+              <stop offset="5%" stopColor="var(--app-green)" stopOpacity={0.10} />
+              <stop offset="95%" stopColor="var(--app-green)" stopOpacity={0} />
             </linearGradient>
             <linearGradient id="gGastoRealF" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#F87171" stopOpacity={0.25} />
-              <stop offset="95%" stopColor="#F87171" stopOpacity={0} />
+              <stop offset="5%" stopColor="var(--app-danger)" stopOpacity={0.25} />
+              <stop offset="95%" stopColor="var(--app-danger)" stopOpacity={0} />
             </linearGradient>
             <linearGradient id="gGastoProjF" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#F87171" stopOpacity={0.10} />
-              <stop offset="95%" stopColor="#F87171" stopOpacity={0} />
+              <stop offset="5%" stopColor="var(--app-danger)" stopOpacity={0.10} />
+              <stop offset="95%" stopColor="var(--app-danger)" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-          <XAxis dataKey="label" tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 10 }} interval="preserveStartEnd" />
-          <YAxis tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 11 }} tickFormatter={fmtAxis} width={82} />
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(var(--app-ink-rgb),0.06)" />
+          <XAxis dataKey="label" tick={{ fill: 'rgba(var(--app-ink-rgb),0.35)', fontSize: 10 }} interval="preserveStartEnd" />
+          <YAxis tick={{ fill: 'rgba(var(--app-ink-rgb),0.35)', fontSize: 11 }} tickFormatter={fmtAxis} width={82} />
           {currentMonthKey && (
             <ReferenceLine
               x={chartSeries.find(p => p.month === currentMonthKey)?.label}
-              stroke="rgba(255,255,255,0.25)"
+              stroke="rgba(var(--app-ink-rgb),0.25)"
               strokeDasharray="4 4"
-              label={{ value: 'Hoy', position: 'insideTopRight', fill: 'rgba(255,255,255,0.40)', fontSize: 11 }}
+              label={{ value: 'Hoy', position: 'insideTopRight', fill: 'rgba(var(--app-ink-rgb),0.40)', fontSize: 11 }}
             />
           )}
           <ReferenceLine y={0} stroke="rgba(248,113,113,0.35)" strokeDasharray="4 3" />
           <Tooltip
             content={renderProjectionTooltip}
-            contentStyle={{ background: 'rgba(26,37,64,0.97)', border: '1px solid rgba(196,135,246,0.2)', borderRadius: 12 }}
-            labelStyle={{ color: '#FFFFFF', marginBottom: 6, fontWeight: 700 }}
+            contentStyle={{ background: 'var(--app-popover)', border: '1px solid rgba(196,135,246,0.2)', borderRadius: 12 }}
+            labelStyle={{ color: 'var(--app-text)', marginBottom: 6, fontWeight: 700 }}
           />
           <Legend content={renderProjectionLegend} />
           {shouldShowSeries('income') && (
             <>
-              <Area connectNulls={false} type="monotone" dataKey="ing_real" stroke="#10B981" strokeWidth={2} fill="url(#gIngRealF)" dot={false} />
-              <Area connectNulls={false} type="monotone" dataKey="ing_proj" stroke="#10B981" strokeWidth={1.5} fill="url(#gIngProjF)" strokeDasharray="5 4" dot={false} />
+              <Area connectNulls={false} type="monotone" dataKey="ing_real" stroke="var(--app-green)" strokeWidth={2} fill="url(#gIngRealF)" dot={false} />
+              <Area connectNulls={false} type="monotone" dataKey="ing_proj" stroke="var(--app-green)" strokeWidth={1.5} fill="url(#gIngProjF)" strokeDasharray="5 4" dot={false} />
             </>
           )}
           {shouldShowSeries('expense') && (
             <>
-              <Area connectNulls={false} type="monotone" dataKey="gasto_real" stroke="#F87171" strokeWidth={2} fill="url(#gGastoRealF)" dot={false} />
-              <Area connectNulls={false} type="monotone" dataKey="gasto_proj" stroke="#F87171" strokeWidth={1.5} fill="url(#gGastoProjF)" strokeDasharray="5 4" dot={false} />
+              <Area connectNulls={false} type="monotone" dataKey="gasto_real" stroke="var(--app-danger)" strokeWidth={2} fill="url(#gGastoRealF)" dot={false} />
+              <Area connectNulls={false} type="monotone" dataKey="gasto_proj" stroke="var(--app-danger)" strokeWidth={1.5} fill="url(#gGastoProjF)" strokeDasharray="5 4" dot={false} />
             </>
           )}
         </AreaChart>
@@ -1003,8 +1003,8 @@ export default function Dashboard() {
 
 
   const gastoPct = totalIng > 0 ? Math.min(100, Math.round((totalGastos / totalIng) * 100)) : 0
-  const barColor = gastoPct >= 90 ? '#F87171' : gastoPct >= 75 ? '#FB923C' : gastoPct >= 50 ? '#FBBF24' : '#10B981'
-  const tasaColor = tasaAhorro >= 20 ? '#10B981' : tasaAhorro >= 0 ? '#FBBF24' : '#F87171'
+  const barColor = gastoPct >= 90 ? 'var(--app-danger)' : gastoPct >= 75 ? '#FB923C' : gastoPct >= 50 ? '#FBBF24' : 'var(--app-green)'
+  const tasaColor = tasaAhorro >= 20 ? 'var(--app-green)' : tasaAhorro >= 0 ? '#FBBF24' : 'var(--app-danger)'
 
   return (
     <div className="dashboard-shell">
@@ -1078,7 +1078,7 @@ export default function Dashboard() {
         >
           <div className="stat-card-header">
             <span className="stat-label">Ingresos</span>
-            <TrendingUp size={16} style={{ color: '#10B981' }} />
+            <TrendingUp size={16} style={{ color: 'var(--app-green)' }} />
           </div>
           <div className="stat-value green">{fmt(totalIng)}</div>
           <div className="stat-sub">Fijos + puntuales en {monthReferenceText}</div>
@@ -1096,7 +1096,7 @@ export default function Dashboard() {
         >
           <div className="stat-card-header">
             <span className="stat-label">Gastos</span>
-            <TrendingDown size={16} style={{ color: '#F87171' }} />
+            <TrendingDown size={16} style={{ color: 'var(--app-danger)' }} />
           </div>
           <div className="stat-value red">{fmt(totalGastos)}</div>
           <div className="stat-sub">Fijos + puntuales + cuotas en {monthReferenceText}</div>
@@ -1109,7 +1109,7 @@ export default function Dashboard() {
         <div className="stat-card">
           <div className="stat-card-header">
             <span className="stat-label">Balance</span>
-            <Wallet size={16} style={{ color: balance >= 0 ? '#10B981' : '#F87171' }} />
+            <Wallet size={16} style={{ color: balance >= 0 ? 'var(--app-green)' : 'var(--app-danger)' }} />
           </div>
           <div className={`stat-value ${balance >= 0 ? 'green' : 'red'}`}>{fmt(balance)}</div>
           <div className="stat-sub">{balance >= 0 ? 'Flujo positivo' : 'Flujo apretado'}</div>
@@ -1349,7 +1349,7 @@ export default function Dashboard() {
               <div className="dashboard-premium-meta">
                 <div className="dashboard-premium-stat">
                   <span className="dashboard-premium-stat-label">Si sigues asi, terminarias con</span>
-                  <strong className="dashboard-premium-stat-value" style={{ color: projectedGap >= 0 ? '#C487F6' : '#F87171' }}>
+                  <strong className="dashboard-premium-stat-value" style={{ color: projectedGap >= 0 ? 'var(--app-lila)' : 'var(--app-danger)' }}>
                     {fmt(projectedGap)}
                   </strong>
                   <span className="dashboard-chart-note">Saldo estimado al cierre de {projectedGapLabel}</span>
@@ -1381,7 +1381,7 @@ export default function Dashboard() {
                 </div>
                 <div className="dashboard-premium-stat">
                   <span className="dashboard-premium-stat-label">Reserva por puntuales</span>
-                  <strong className="dashboard-premium-stat-value" style={{ color: isConservativeMode ? '#F87171' : undefined }}>
+                  <strong className="dashboard-premium-stat-value" style={{ color: isConservativeMode ? 'var(--app-danger)' : undefined }}>
                     {isConservativeMode ? fmt(punctualReserve) : 'No incluida'}
                   </strong>
                   <span className="dashboard-chart-note">

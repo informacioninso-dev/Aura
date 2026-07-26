@@ -442,7 +442,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
             <h2 className="finance-panel-kicker">{copy.titulo}</h2>
             <p className="finance-panel-kpi">
               {esVariable ? 'Estimado al mes:' : 'Total al mes:'}&nbsp;
-              <span style={{ color: '#F87171', fontWeight: 700 }}>
+              <span style={{ color: 'var(--app-danger)', fontWeight: 700 }}>
                 ${formatAmount(total)}
               </span>
             </p>
@@ -455,7 +455,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
             <h1 className="page-title">{copy.titulo}</h1>
             <p className="page-subtitle">
               {esVariable ? 'Estimado al mes:' : 'Total al mes:'}&nbsp;
-              <span style={{ color: '#F87171', fontWeight: 700 }}>
+              <span style={{ color: 'var(--app-danger)', fontWeight: 700 }}>
                 ${formatAmount(total)}
               </span>
             </p>
@@ -517,7 +517,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
                 <thead>
                   <tr>
                     <th style={{ width: 36, paddingRight: 0 }}>
-                      <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAll} style={{ cursor: 'pointer', accentColor: '#C487F6' }} />
+                      <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAll} style={{ cursor: 'pointer', accentColor: 'var(--app-lila)' }} />
                     </th>
                     {['Nombre', 'Categoria', esVariable ? 'Estimado' : 'Monto', 'Frecuencia', 'Desde', 'Hasta', 'Estado', ''].map((h) => <th key={h}>{h}</th>)}
                   </tr>
@@ -526,7 +526,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
                   {paginatedItems.map((item) => (
                     <tr key={item.id}>
                       <td style={{ width: 36, paddingRight: 0 }}>
-                        <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} style={{ cursor: 'pointer', accentColor: '#C487F6' }} />
+                        <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} style={{ cursor: 'pointer', accentColor: 'var(--app-lila)' }} />
                       </td>
                       <td style={{ fontWeight: 600 }}>{item.descripcion}</td>
                       <td><span className="badge badge-gray" style={{ textTransform: 'capitalize' }}>{item.categoria}</span></td>
@@ -558,7 +558,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
       <Modal open={modal} onClose={() => setModal(false)} title={editId ? 'Editar gasto' : '+ Nuevo gasto'}>
         <form onSubmit={handleSubmit}>
           {!editId && (
-            <p style={{ marginTop: -8, marginBottom: 14, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
+            <p style={{ marginTop: -8, marginBottom: 14, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
               Carga rapida: nombre, categoria y monto.
             </p>
           )}
@@ -578,7 +578,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
                   </button>
                 ))}
               </div>
-              <p style={{ marginTop: 6, fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
+              <p style={{ marginTop: 6, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.4)' }}>
                 Elige uno o escribe el tuyo abajo.
               </p>
             </div>
@@ -602,7 +602,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
               <label className="form-modal-label">{copy.labelMonto}</label>
               <input className="form-modal-input" type="number" required min="0" step="0.01" placeholder="0" value={form.monto} onChange={(e) => setForm({ ...form, monto: e.target.value })} />
               {copy.ayudaMonto && (
-                <p style={{ marginTop: 6, fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45 }}>
+                <p style={{ marginTop: 6, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)', lineHeight: 1.45 }}>
                   {copy.ayudaMonto}
                 </p>
               )}
@@ -610,12 +610,12 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
           </div>
 
           <div className="form-modal-group">
-            <label className="form-modal-label">Desde <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>— afecta el historico y la proyeccion</span></label>
+            <label className="form-modal-label">Desde <span style={{ color: 'rgba(var(--app-ink-rgb),0.45)', fontSize: 11 }}>— afecta el historico y la proyeccion</span></label>
             <div className="date-input-wrap">
               <input className="form-modal-input" type="date" required min={DATE_INPUT_MIN} max={maxExpenseDate} value={form.fecha_inicio} onChange={(e) => setStartDate(e.target.value)} />
             </div>
             <DateQuickActions value={form.fecha_inicio} onChange={setStartDate} disabled={loading} />
-            <p style={{ marginTop: 8, fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45 }}>
+            <p style={{ marginTop: 8, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)', lineHeight: 1.45 }}>
               Si este gasto empieza mas adelante, no lo cargues aqui. Simulalo en el simulador usando tasa 0%.
             </p>
           </div>
@@ -694,12 +694,12 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
       <Modal open={versioningItem !== null} onClose={() => setVersioningItem(null)} title="Nueva version">
         {versioningItem && (
           <form onSubmit={handleVersion}>
-            <p style={{ marginTop: -8, marginBottom: 16, fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+            <p style={{ marginTop: -8, marginBottom: 16, fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.5)', lineHeight: 1.5 }}>
               Cerramos el registro actual un dia antes de la nueva fecha. El historial queda guardado.
             </p>
 
-            <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
-              <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>Actual: </span>
+            <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(var(--app-ink-rgb),0.04)', borderRadius: 10, fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
+              <span style={{ fontWeight: 600, color: 'rgba(var(--app-ink-rgb),0.7)' }}>Actual: </span>
               {versioningItem.descripcion} — ${formatAmount(parseFloat(versioningItem.monto))} {versioningItem.frecuencia}
             </div>
 
@@ -736,7 +736,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
                   <input className="form-modal-input" type="date" required min={DATE_INPUT_MIN} max={maxExpenseDate} value={versionForm.nuevaFecha} onChange={(e) => setVersionStartDate(e.target.value)} />
                 </div>
                 <DateQuickActions value={versionForm.nuevaFecha} onChange={setVersionStartDate} disabled={versionLoading} />
-                <p style={{ marginTop: 8, fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45 }}>
+                <p style={{ marginTop: 8, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)', lineHeight: 1.45 }}>
                   Si el nuevo gasto arranca en el futuro, llevalo al simulador con tasa 0% en vez de versionarlo aqui.
                 </p>
               </div>
@@ -756,7 +756,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
       <Modal open={realItem !== null} onClose={() => setRealItem(null)} title="Cuanto pagaste?">
         {realItem && (
           <form onSubmit={handleSubmitReal}>
-            <p style={{ marginTop: -8, marginBottom: 16, fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+            <p style={{ marginTop: -8, marginBottom: 16, fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.5)', lineHeight: 1.5 }}>
               Registra lo que realmente pagaste de <strong>{realItem.descripcion}</strong>. Con esto tu proyeccion
               deja de usar el estimado de ${formatAmount(parseFloat(realItem.monto))}.
             </p>
@@ -781,8 +781,8 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
             </div>
 
             {realHistory.length > 0 && (
-              <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
-                <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>Ya registrado: </span>
+              <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(var(--app-ink-rgb),0.04)', borderRadius: 10, fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
+                <span style={{ fontWeight: 600, color: 'rgba(var(--app-ink-rgb),0.7)' }}>Ya registrado: </span>
                 {realHistory.slice(0, 4).map((e) => `${e.mes}/${e.anio}: $${formatAmount(parseFloat(e.monto_real))}`).join(' · ')}
               </div>
             )}

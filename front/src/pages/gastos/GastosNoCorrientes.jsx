@@ -360,7 +360,7 @@ export default function GastosNoCorrientes({ embedded = false }) {
             <h2 className="finance-panel-kicker">Gastos puntuales</h2>
             <p className="finance-panel-kpi">
               Total cargado:&nbsp;
-              <span style={{ color: '#F87171', fontWeight: 700 }}>
+              <span style={{ color: 'var(--app-danger)', fontWeight: 700 }}>
                 ${formatAmount(total)}
               </span>
             </p>
@@ -373,7 +373,7 @@ export default function GastosNoCorrientes({ embedded = false }) {
             <h1 className="page-title">Gastos puntuales</h1>
             <p className="page-subtitle">
               Total cargado:&nbsp;
-              <span style={{ color: '#F87171', fontWeight: 700 }}>
+              <span style={{ color: 'var(--app-danger)', fontWeight: 700 }}>
                 ${formatAmount(total)}
               </span>
             </p>
@@ -440,7 +440,7 @@ export default function GastosNoCorrientes({ embedded = false }) {
                 <thead>
                   <tr>
                     <th style={{ width: 36, paddingRight: 0 }}>
-                      <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAll} style={{ cursor: 'pointer', accentColor: '#C487F6' }} />
+                      <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAll} style={{ cursor: 'pointer', accentColor: 'var(--app-lila)' }} />
                     </th>
                     {['Nombre', 'Categoria', 'Monto', 'Fecha', 'Notas', ''].map((h) => <th key={h}>{h}</th>)}
                   </tr>
@@ -449,7 +449,7 @@ export default function GastosNoCorrientes({ embedded = false }) {
                   {paginatedItems.map((item) => (
                     <tr key={item.id}>
                       <td style={{ width: 36, paddingRight: 0 }}>
-                        <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} style={{ cursor: 'pointer', accentColor: '#C487F6' }} />
+                        <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} style={{ cursor: 'pointer', accentColor: 'var(--app-lila)' }} />
                       </td>
                       <td>
                         <div className="table-title-stack">
@@ -469,7 +469,7 @@ export default function GastosNoCorrientes({ embedded = false }) {
                       <td><span className="badge badge-gray" style={{ textTransform: 'capitalize' }}>{item.categoria}</span></td>
                       <td className="table-amount negative">${formatAmount(parseFloat(item.monto))}</td>
                       <td>{item.fecha}</td>
-                      <td style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>{item.notas || '-'}</td>
+                      <td style={{ color: 'rgba(var(--app-ink-rgb),0.35)', fontSize: 13 }}>{item.notas || '-'}</td>
                       <td className="table-actions-cell">
                         <div className="table-actions-row">
                           <button className="btn-icon edit" onClick={() => openEdit(item)}><Pencil size={15} /></button>
@@ -488,7 +488,7 @@ export default function GastosNoCorrientes({ embedded = false }) {
       <Modal open={modal} onClose={() => setModal(false)} title={editId ? 'Editar gasto' : '+ Nuevo gasto puntual'}>
         <form onSubmit={handleSubmit}>
           {!editId && (
-            <p style={{ marginTop: -8, marginBottom: 14, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
+            <p style={{ marginTop: -8, marginBottom: 14, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
               Carga rapida: nombre, categoria y monto. Lo demas es opcional.
             </p>
           )}
@@ -546,7 +546,7 @@ export default function GastosNoCorrientes({ embedded = false }) {
           )}
 
           {!editId && !showAdvanced && canCustomizeProjection && (
-            <p style={{ marginTop: -4, marginBottom: 14, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
+            <p style={{ marginTop: -4, marginBottom: 14, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
               Aqui tambien puedes decidir si este gasto puntual entra o no en tu proyeccion conservadora.
             </p>
           )}
@@ -559,7 +559,7 @@ export default function GastosNoCorrientes({ embedded = false }) {
                   <input className="form-modal-input" type="date" required min={DATE_INPUT_MIN} max={maxExpenseDate} value={form.fecha} onChange={(e) => setForm({ ...form, fecha: clampExpenseDate(e.target.value) })} />
                 </div>
                 <DateQuickActions value={form.fecha} onChange={(value) => setForm({ ...form, fecha: clampExpenseDate(value) })} disabled={loading} />
-                <p style={{ marginTop: 8, fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45 }}>
+                <p style={{ marginTop: 8, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)', lineHeight: 1.45 }}>
                   Si este gasto todavia no pasa, simulalo en el simulador con tasa 0% en lugar de dejarlo futuro aqui.
                 </p>
               </div>
@@ -574,11 +574,11 @@ export default function GastosNoCorrientes({ embedded = false }) {
                       type="checkbox"
                       checked={form.incluir_en_proyeccion}
                       onChange={(e) => setForm({ ...form, incluir_en_proyeccion: e.target.checked })}
-                      style={{ marginTop: 3, accentColor: '#C487F6' }}
+                      style={{ marginTop: 3, accentColor: 'var(--app-lila)' }}
                     />
                     <div>
                       <div className="form-modal-label" style={{ marginBottom: 4 }}>Usar en mi proyeccion conservadora</div>
-                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.45 }}>
+                      <div style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.5)', lineHeight: 1.45 }}>
                         Solo aplica en modo Personalizada. Dejalo activo si este gasto puntual podria repetirse; apagalo para viajes u otros casos especiales.
                       </div>
                     </div>
@@ -589,7 +589,7 @@ export default function GastosNoCorrientes({ embedded = false }) {
           )}
 
           {!editId && !showAdvanced && (
-            <p style={{ marginTop: -4, marginBottom: 18, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
+            <p style={{ marginTop: -4, marginBottom: 18, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
               Si no cambias nada, queda con fecha de hoy. Si es para mas adelante, simulalo en el simulador con tasa 0%.
             </p>
           )}

@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { Plus, Pencil, Trash2, Check, X } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 
 import api from '../../api/client'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
@@ -44,6 +45,11 @@ function sortCategoriasPorUso(items, gastos) {
 }
 
 export default function Presupuesto() {
+  const [searchParams] = useSearchParams()
+  const notificationYear = Number(searchParams.get('anio'))
+  const notificationMonth = Number(searchParams.get('mes'))
+  const notificationCategory = searchParams.get('categoria') || ''
+
   const [categorias, setCategorias] = useState([])
   const [gastos, setGastos] = useState({})
   const [modal, setModal] = useState(false)
@@ -55,12 +61,38 @@ export default function Presupuesto() {
   const [editPresup, setEditPresup] = useState(null)
   const [savingBudgetId, setSavingBudgetId] = useState(null)
   const [valorPresup, setValorPresup] = useState('')
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(notificationCategory)
   const [showAllSummary, setShowAllSummary] = useState(false)
   const [showAllIcons, setShowAllIcons] = useState(false)
   const [feedback, setFeedback] = useState({ type: '', message: '' })
-  const [selectedMonth, setSelectedMonth] = useState(() => startOfMonth(new Date()))
+  const [selectedMonth, setSelectedMonth] = useState(() => (
+    notificationYear >= 2000 && notificationYear <= 2100 && notificationMonth >= 1 && notificationMonth <= 12
+      ? new Date(notificationYear, notificationMonth - 1, 1)
+      : startOfMonth(new Date())
+  ))
 
+  useEffect(() => {
+    if (notificationYear < 2000 || notificationYear > 2100 || notificationMonth < 1 || notificationMonth > 12) return
+    setSelectedMonth((current) => (
+      current.getFullYear() === notificationYear && current.getMonth() === notificationMonth - 1
+        ? current
+        : new Date(notificationYear, notificationMonth - 1, 1)
+    ))
+  }, [notificationYear, notificationMonth])
+
+  useEffect(() => {
+    if (notificationCategory) setQuery(notificationCategory)
+  }, [notificationCategory])
+
+  useEffect(() => {
+    if (!notificationCategory || categorias.length === 0) return undefined
+    const frameId = window.requestAnimationFrame(() => {
+      const target = Array.from(document.querySelectorAll('[data-budget-category]'))
+        .find((element) => element.dataset.budgetCategory === notificationCategory)
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+    return () => window.cancelAnimationFrame(frameId)
+  }, [notificationCategory, categorias])
   useEffect(() => {
     cargarTodo(selectedMonth)
   }, [selectedMonth])
@@ -327,7 +359,7 @@ export default function Presupuesto() {
             ))}
           </div>
         ) : (
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginTop: 16, textAlign: 'center' }}>
+          <p style={{ fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.35)', marginTop: 16, textAlign: 'center' }}>
             Sin gastos registrados en {MESES_FULL[selectedMonth.getMonth()]} {selectedMonth.getFullYear()}.
           </p>
         )}
@@ -501,12 +533,12 @@ const ResumenCategoriaRow = memo(function ResumenCategoriaRow({ cat, totalGastad
   const usoLimite = limite ? Math.round((cat.gasto / limite) * 100) : null
   const porcentajeMes = percentOf(cat.gasto, totalGastadoMes)
   const barColor = usoLimite == null
-    ? '#C487F6'
+    ? 'var(--app-lila)'
     : usoLimite >= 100
-      ? '#F87171'
+      ? 'var(--app-danger)'
       : usoLimite >= 75
         ? '#FBBF24'
-        : '#10B981'
+        : 'var(--app-green)'
   const barWidth = usoLimite == null ? Math.max(8, porcentajeMes) : Math.min(100, usoLimite)
 
   return (
@@ -554,17 +586,17 @@ const TarjetaCategoria = memo(function TarjetaCategoria({
   const pct = limite ? Math.min(100, Math.round((gasto / limite) * 100)) : null
   const over = pct !== null && pct >= 100
   const warn = pct !== null && pct >= 75 && pct < 100
-  const barColor = over ? '#F87171' : warn ? '#FBBF24' : '#10B981'
+  const barColor = over ? 'var(--app-danger)' : warn ? '#FBBF24' : 'var(--app-green)'
   const isSavingBudget = savingBudgetId === cat.id
 
   return (
-    <div className="card" style={{ padding: 16 }}>
+    <div className="card" data-budget-category={cat.nombre} style={{ padding: 16 }}>
       <div className="budget-card-head">
         <div className="budget-card-meta">
           <span style={{ fontSize: 24 }}>{cat.icono}</span>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 15, textTransform: 'capitalize' }}>{cat.nombre}</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.38)', marginTop: 2 }}>
               {gasto > 0 ? `Este mes: $${formatAmount(gasto)}` : 'Sin gasto este mes'}
             </div>
           </div>
@@ -579,16 +611,16 @@ const TarjetaCategoria = memo(function TarjetaCategoria({
       {limite !== null && (
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 5 }}>
-            <span style={{ color: over ? '#F87171' : warn ? '#FBBF24' : 'rgba(255,255,255,0.60)' }}>
+            <span style={{ color: over ? 'var(--app-danger)' : warn ? '#FBBF24' : 'rgba(var(--app-ink-rgb),0.60)' }}>
               ${formatAmount(gasto)}
               {over ? '  · limite superado' : ''}
             </span>
-            <span style={{ color: 'rgba(255,255,255,0.30)' }}>${formatAmount(limite)}</span>
+            <span style={{ color: 'rgba(var(--app-ink-rgb),0.30)' }}>${formatAmount(limite)}</span>
           </div>
-          <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 99, height: 6, marginBottom: 4 }}>
+          <div style={{ background: 'rgba(var(--app-ink-rgb),0.08)', borderRadius: 99, height: 6, marginBottom: 4 }}>
             <div style={{ width: `${pct}%`, height: 6, borderRadius: 99, background: barColor, transition: 'width 0.4s' }} />
           </div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', textAlign: 'right', marginBottom: 10 }}>{pct}% usado</div>
+          <div style={{ fontSize: 11, color: 'rgba(var(--app-ink-rgb),0.28)', textAlign: 'right', marginBottom: 10 }}>{pct}% usado</div>
         </>
       )}
 
@@ -656,9 +688,9 @@ const TarjetaCategoria = memo(function TarjetaCategoria({
             padding: '8px 0',
             fontSize: 12,
             fontWeight: 600,
-            color: limite ? 'rgba(255,255,255,0.38)' : '#C487F6',
-            background: limite ? 'rgba(255,255,255,0.04)' : 'rgba(196,135,246,0.08)',
-            border: limite ? '1px solid rgba(255,255,255,0.07)' : '1px dashed rgba(196,135,246,0.35)',
+            color: limite ? 'rgba(var(--app-ink-rgb),0.38)' : 'var(--app-lila)',
+            background: limite ? 'rgba(var(--app-ink-rgb),0.04)' : 'rgba(196,135,246,0.08)',
+            border: limite ? '1px solid rgba(var(--app-ink-rgb),0.07)' : '1px dashed rgba(196,135,246,0.35)',
             borderRadius: 10,
             cursor: 'pointer',
             transition: 'all 0.15s',
@@ -688,7 +720,7 @@ const FilaCategoria = memo(function FilaCategoria({
   const isEditing = editPresup === cat.id
 
   return (
-    <div className="presupuesto-fila">
+    <div className="presupuesto-fila" data-budget-category={cat.nombre}>
       <div className="presupuesto-fila-meta">
         <span style={{ fontSize: 20, lineHeight: 1 }}>{cat.icono}</span>
         <span className="presupuesto-fila-nombre">{cat.nombre}</span>

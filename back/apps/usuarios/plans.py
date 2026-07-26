@@ -197,6 +197,7 @@ def assign_plan_to_user(*, user, plan, assigned_by=None, notes='', ends_at=None,
         current.starts_at = now
         current.ends_at = ends_at
         current.is_active = True
+        current.cancel_at_period_end = False
         current.save()
         return current
 

@@ -299,7 +299,7 @@ export default function Ingresos({ embedded = false }) {
             <h2 className="finance-panel-kicker">Ingresos fijos</h2>
             <p className="finance-panel-kpi">
               Total al mes:&nbsp;
-              <span style={{ color: '#10B981', fontWeight: 700 }}>
+              <span style={{ color: 'var(--app-green)', fontWeight: 700 }}>
                 ${formatAmount(total)}
               </span>
             </p>
@@ -314,7 +314,7 @@ export default function Ingresos({ embedded = false }) {
             <h1 className="page-title">Ingresos</h1>
             <p className="page-subtitle">
               Total al mes:&nbsp;
-              <span style={{ color: '#10B981', fontWeight: 700 }}>
+              <span style={{ color: 'var(--app-green)', fontWeight: 700 }}>
                 ${formatAmount(total)}
               </span>
             </p>
@@ -377,7 +377,7 @@ export default function Ingresos({ embedded = false }) {
                 <thead>
                   <tr>
                     <th style={{ width: 36, paddingRight: 0 }}>
-                      <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAll} style={{ cursor: 'pointer', accentColor: '#C487F6' }} />
+                      <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAll} style={{ cursor: 'pointer', accentColor: 'var(--app-lila)' }} />
                     </th>
                     {['Nombre', 'Monto', 'Frecuencia', 'Desde', 'Hasta', 'Estado', ''].map((h) => (
                       <th key={h}>{h}</th>
@@ -388,7 +388,7 @@ export default function Ingresos({ embedded = false }) {
                   {paginatedItems.map((item) => (
                     <tr key={item.id}>
                       <td style={{ width: 36, paddingRight: 0 }}>
-                        <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} style={{ cursor: 'pointer', accentColor: '#C487F6' }} />
+                        <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} style={{ cursor: 'pointer', accentColor: 'var(--app-lila)' }} />
                       </td>
                       <td style={{ fontWeight: 600 }}>{item.descripcion}</td>
                       <td className="table-amount positive">${formatAmount(parseFloat(item.monto))}</td>
@@ -420,7 +420,7 @@ export default function Ingresos({ embedded = false }) {
       <Modal open={modal} onClose={() => setModal(false)} title={editId ? 'Editar ingreso' : '+ Nuevo ingreso'}>
         <form onSubmit={handleSubmit}>
           {!editId && (
-            <p style={{ marginTop: -8, marginBottom: 14, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
+            <p style={{ marginTop: -8, marginBottom: 14, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
               Carga rapida: nombre y monto. Lo demas es opcional.
             </p>
           )}
@@ -450,7 +450,7 @@ export default function Ingresos({ embedded = false }) {
           </div>
 
           <div className="form-modal-group">
-            <label className="form-modal-label">Desde <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>— afecta el historico y la proyeccion</span></label>
+            <label className="form-modal-label">Desde <span style={{ color: 'rgba(var(--app-ink-rgb),0.45)', fontSize: 11 }}>— afecta el historico y la proyeccion</span></label>
             <div className="date-input-wrap">
               <input className="form-modal-input" type="date" required min={DATE_INPUT_MIN} max={DATE_INPUT_MAX} value={form.fecha_inicio} onChange={(e) => setForm((prev) => ({ ...prev, fecha_inicio: e.target.value, fecha_fin: prev.fecha_fin && prev.fecha_fin < e.target.value ? '' : prev.fecha_fin }))} />
             </div>
@@ -519,12 +519,12 @@ export default function Ingresos({ embedded = false }) {
       <Modal open={versioningItem !== null} onClose={() => setVersioningItem(null)} title="Nueva version">
         {versioningItem && (
           <form onSubmit={handleVersion}>
-            <p style={{ marginTop: -8, marginBottom: 16, fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+            <p style={{ marginTop: -8, marginBottom: 16, fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.5)', lineHeight: 1.5 }}>
               Cerramos el registro actual un dia antes de la nueva fecha. El historial queda guardado.
             </p>
 
-            <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
-              <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>Actual: </span>
+            <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(var(--app-ink-rgb),0.04)', borderRadius: 10, fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
+              <span style={{ fontWeight: 600, color: 'rgba(var(--app-ink-rgb),0.7)' }}>Actual: </span>
               {versioningItem.descripcion} — ${formatAmount(parseFloat(versioningItem.monto))} {versioningItem.frecuencia}
             </div>
 

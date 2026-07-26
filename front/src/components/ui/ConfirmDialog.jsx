@@ -15,8 +15,8 @@ export default function ConfirmDialog({
   return (
     <Modal open={open} onClose={loading ? undefined : onClose} title={title}>
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: -8, marginBottom: 20 }}>
-        <AlertTriangle size={18} style={{ color: '#F87171', flexShrink: 0, marginTop: 1 }} />
-        <p style={{ color: 'rgba(255,255,255,0.68)', fontSize: 14, lineHeight: 1.45 }}>
+        <AlertTriangle size={18} style={{ color: 'var(--app-danger)', flexShrink: 0, marginTop: 1 }} />
+        <p style={{ color: 'rgba(var(--app-ink-rgb),0.68)', fontSize: 14, lineHeight: 1.45 }}>
           {message}
         </p>
       </div>

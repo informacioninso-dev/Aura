@@ -380,7 +380,7 @@ export default function Diferidos() {
                       <tr key={item.id}>
                         <td>
                           <div style={{ fontWeight: 700 }}>{item.descripcion}</div>
-                          <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>
+                          <div style={{ color: 'rgba(var(--app-ink-rgb),0.45)', fontSize: 12 }}>
                             {item.num_cuotas} cuotas
                           </div>
                         </td>
@@ -391,13 +391,13 @@ export default function Diferidos() {
                         </td>
                         <td>
                           <div>{item.fecha_inicio}</div>
-                          <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>
+                          <div style={{ color: 'rgba(var(--app-ink-rgb),0.45)', fontSize: 12 }}>
                             {item.status.key === 'upcoming' ? 'Aun no empieza' : 'Ya cuenta en tu historial'}
                           </div>
                         </td>
                         <td>
                           <div>{item.fecha_fin}</div>
-                          <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>
+                          <div style={{ color: 'rgba(var(--app-ink-rgb),0.45)', fontSize: 12 }}>
                             {item.status.key === 'current' && `${item.remainingInstallments} cuotas aprox. restantes`}
                             {item.status.key === 'upcoming' && 'Pendiente de iniciar'}
                             {item.status.key === 'finished' && 'Ya finalizo'}
@@ -405,22 +405,22 @@ export default function Diferidos() {
                           </div>
                         </td>
                         <td className="table-amount">${formatAmount(item.totalValue)}</td>
-                        <td className="table-amount" style={{ color: '#C487F6' }}>${formatAmount(item.monthlyValue)}</td>
+                        <td className="table-amount" style={{ color: 'var(--app-lila)' }}>${formatAmount(item.monthlyValue)}</td>
                         <td style={{ minWidth: 180 }}>
                           <div style={{ display: 'grid', gap: 8 }}>
                             <span className={item.status.badgeClass}>{item.status.label}</span>
                             <div style={{ display: 'grid', gap: 4 }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'rgba(255,255,255,0.40)' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'rgba(var(--app-ink-rgb),0.40)' }}>
                                 <span>Progreso</span>
                                 <span>{item.progress}%</span>
                               </div>
-                              <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 99, height: 6 }}>
+                              <div style={{ background: 'rgba(var(--app-ink-rgb),0.08)', borderRadius: 99, height: 6 }}>
                                 <div
                                   style={{
                                     width: `${item.progress}%`,
                                     height: 6,
                                     borderRadius: 99,
-                                    background: 'linear-gradient(90deg, #C487F6, #10B981)',
+                                    background: 'linear-gradient(90deg, var(--app-lila), var(--app-green))',
                                     transition: 'width 0.4s',
                                   }}
                                 />
@@ -561,7 +561,7 @@ export default function Diferidos() {
                 border: '1px solid rgba(196,135,246,0.18)',
                 background: 'rgba(196,135,246,0.06)',
                 fontSize: 13,
-                color: 'rgba(255,255,255,0.72)',
+                color: 'rgba(var(--app-ink-rgb),0.72)',
               }}
             >
               Esta cuota se sumara automaticamente a tu flujo mensual.

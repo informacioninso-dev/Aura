@@ -4,7 +4,9 @@ import {
   Calculator,
   CreditCard,
   LogOut,
+  Moon,
   Rat,
+  Sun,
   Tags,
   Upload,
   UserRound,
@@ -41,7 +43,7 @@ function NavItem({ to, icon, label, onClick }) {
   )
 }
 
-export default function Sidebar({ isOpen, onClose }) {
+export default function Sidebar({ isOpen, onClose, theme, onThemeToggle }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
 
@@ -89,6 +91,25 @@ export default function Sidebar({ isOpen, onClose }) {
       </nav>
 
       <div className="sidebar-footer">
+        <button
+          type="button"
+          className="theme-toggle"
+          onClick={onThemeToggle}
+          aria-label={`Activar modo ${theme === 'dark' ? 'claro' : 'oscuro'}`}
+          aria-pressed={theme === 'light'}
+        >
+          <span className="nav-item-icon" aria-hidden="true">
+            {theme === 'light'
+              ? <Sun size={17} strokeWidth={2.1} />
+              : <Moon size={17} strokeWidth={2.1} />}
+          </span>
+          <span className="theme-toggle-label">
+            {theme === 'light' ? 'Modo claro' : 'Modo oscuro'}
+          </span>
+          <span className="theme-toggle-switch" aria-hidden="true">
+            <span />
+          </span>
+        </button>
         <NavItem to="/perfil" icon={UserRound} label={user?.username || 'Mi perfil'} onClick={handleNavClick} />
         <button
           onClick={handleLogout}

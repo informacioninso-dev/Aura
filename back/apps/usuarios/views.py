@@ -1097,6 +1097,45 @@ class CancelarSuscripcionView(APIView):
         })
 
 
+class ReactivarSuscripcionView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request):
+        assignment = get_active_plan_assignment(request.user)
+        if not assignment or assignment.plan.is_default:
+            return Response(
+                {'detail': 'No tienes una cancelacion activa para deshacer.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if assignment.tipo != UserPlanAssignment.TIPO_PAGO:
+            return Response(
+                {'detail': 'Este plan fue asignado manualmente y no requiere reactivacion.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not assignment.cancel_at_period_end:
+            return Response({
+                'detail': 'Tu suscripcion ya estaba activa.',
+                'ends_at': assignment.ends_at,
+            })
+
+        assignment.cancel_at_period_end = False
+        assignment.save(update_fields=['cancel_at_period_end', 'updated_at'])
+
+        _admin_log(
+            actor=request.user,
+            action='suscripcion_reactivada',
+            request=request,
+            target_user=request.user,
+            details={'plan': assignment.plan.name, 'ends_at': str(assignment.ends_at)},
+        )
+
+        return Response({
+            'detail': 'Cancelacion deshecha. Tu plan Pro vuelve a estar activo.',
+            'ends_at': assignment.ends_at,
+        })
+
 class NegocioMetricasView(APIView):
     permission_classes = (permissions.IsAuthenticated, IsSuperAdmin)
     throttle_classes = (throttling.ScopedRateThrottle,)

@@ -17,8 +17,46 @@
   --glass-bg-2: rgba(255,255,255,0.08);
   --grad:       linear-gradient(135deg, #C487F6 0%, #10B981 100%);
   --grad-r:     linear-gradient(135deg, #10B981 0%, #C487F6 100%);
+
+  /* Internal app theme tokens. Public and admin surfaces keep the dark defaults. */
+  --app-bg: #0F172A;
+  --app-surface-solid: #1A2540;
+  --app-surface-rgb: 26,37,64;
+  --app-text: #FFFFFF;
+  --app-ink-rgb: 255,255,255;
+  --app-popover: rgba(15,23,42,0.97);
+  --app-shadow: rgba(0,0,0,0.50);
+  --app-lila: #C487F6;
+  --app-green: #10B981;
+  --app-danger: #F87171;
+  --app-on-accent: #FFFFFF;
 }
 
+.app-theme-root {
+  color-scheme: dark;
+}
+
+.app-theme-root[data-theme='light'] {
+  color-scheme: light;
+  --app-bg: #F4F1EA;
+  --app-surface-solid: #FFFFFF;
+  --app-surface-rgb: 255,255,255;
+  --app-text: #172033;
+  --app-ink-rgb: 23,32,51;
+  --app-popover: rgba(255,255,255,0.98);
+  --app-shadow: rgba(35,45,63,0.18);
+  --app-lila: #7B4FA5;
+  --app-green: #087A5B;
+  --app-danger: #C2414F;
+}
+
+html[data-app-theme='dark'] body {
+  background: #0F172A;
+}
+
+html[data-app-theme='light'] body {
+  background: #F4F1EA;
+}
 * {
   box-sizing: border-box;
   margin: 0;

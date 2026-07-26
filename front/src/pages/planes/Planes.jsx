@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { CheckCircle2, Zap } from 'lucide-react'
 import api from '../../api/client'
 import { useAuth } from '../../context/useAuth'
 import { getApiErrorMessage } from '../../api/errors'
 
 export default function Planes() {
-  const { user, fetchPerfil } = useAuth()
-  const navigate = useNavigate()
+  const { user } = useAuth()
   const [planes, setPlanes] = useState([])
   const [loading, setLoading] = useState(true)
   const [pagando, setPagando] = useState(null)
@@ -23,7 +21,7 @@ export default function Planes() {
     setError('')
     try {
       const { data } = await api.post('/usuarios/pago/iniciar/', { plan_id: plan.id })
-      window.location.href = data.pay_url
+      window.location.assign(data.pay_url)
     } catch (err) {
       setError(getApiErrorMessage(err, 'No se pudo iniciar el pago.'))
       setPagando(null)
@@ -44,7 +42,7 @@ export default function Planes() {
     <div className="page-container">
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
         <h1 className="page-title">Planes</h1>
-        <p style={{ color: 'rgba(255,255,255,0.55)', marginBottom: 32, fontSize: 15 }}>
+        <p style={{ color: 'rgba(var(--app-ink-rgb),0.55)', marginBottom: 32, fontSize: 15 }}>
           Elige el plan que mejor se adapte a tus necesidades.
         </p>
 
@@ -62,9 +60,9 @@ export default function Planes() {
                 key={plan.id}
                 style={{
                   background: esActual
-                    ? 'linear-gradient(135deg, rgba(196,135,246,0.15), rgba(15,22,41,0.95))'
-                    : 'rgba(255,255,255,0.04)',
-                  border: esActual ? '1.5px solid rgba(196,135,246,0.5)' : '1.5px solid rgba(255,255,255,0.08)',
+                    ? 'linear-gradient(135deg, rgba(196,135,246,0.15), rgba(var(--app-surface-rgb),0.95))'
+                    : 'rgba(var(--app-ink-rgb),0.04)',
+                  border: esActual ? '1.5px solid rgba(196,135,246,0.5)' : '1.5px solid rgba(var(--app-ink-rgb),0.08)',
                   borderRadius: 18,
                   padding: '28px 24px',
                   display: 'flex',
@@ -76,7 +74,7 @@ export default function Planes() {
                 {esActual && (
                   <div style={{
                     position: 'absolute', top: 14, right: 14,
-                    background: 'rgba(196,135,246,0.2)', color: '#C487F6',
+                    background: 'rgba(196,135,246,0.2)', color: 'var(--app-lila)',
                     fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
                     letterSpacing: '0.5px',
                   }}>
@@ -86,24 +84,24 @@ export default function Planes() {
 
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                    {!esGratis && <Zap size={16} color="#C487F6" />}
-                    <span style={{ fontSize: 18, fontWeight: 700, color: '#fff' }}>{plan.name}</span>
+                    {!esGratis && <Zap size={16} color="var(--app-lila)" />}
+                    <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--app-text)' }}>{plan.name}</span>
                   </div>
                   {plan.description && (
-                    <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', margin: 0 }}>{plan.description}</p>
+                    <p style={{ fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.50)', margin: 0 }}>{plan.description}</p>
                   )}
                 </div>
 
                 <div>
                   {esGratis ? (
-                    <span style={{ fontSize: 28, fontWeight: 800, color: '#fff' }}>Gratis</span>
+                    <span style={{ fontSize: 28, fontWeight: 800, color: 'var(--app-text)' }}>Gratis</span>
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                      <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)' }}>$</span>
-                      <span style={{ fontSize: 28, fontWeight: 800, color: '#fff' }}>
+                      <span style={{ fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.55)' }}>$</span>
+                      <span style={{ fontSize: 28, fontWeight: 800, color: 'var(--app-text)' }}>
                         {Number(plan.precio_mensual).toFixed(2)}
                       </span>
-                      <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)' }}>
+                      <span style={{ fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.55)' }}>
                         / {plan.duracion_meses === 1 ? 'mes' : `${plan.duracion_meses} meses`}
                       </span>
                     </div>
@@ -121,8 +119,8 @@ export default function Planes() {
                     if (feature.value_type === 'bool' && !feature.value_bool) return null
 
                     return (
-                      <li key={feature.code} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'rgba(255,255,255,0.75)' }}>
-                        <CheckCircle2 size={14} color="#C487F6" style={{ flexShrink: 0 }} />
+                      <li key={feature.code} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.75)' }}>
+                        <CheckCircle2 size={14} color="var(--app-lila)" style={{ flexShrink: 0 }} />
                         {valor}
                       </li>
                     )
@@ -140,7 +138,7 @@ export default function Planes() {
                     </button>
                   ) : (
                     <button
-                      className="btn-primary"
+                      className="btn-modal-save"
                       style={{ width: '100%' }}
                       onClick={() => handleContratar(plan)}
                       disabled={pagando === plan.id}

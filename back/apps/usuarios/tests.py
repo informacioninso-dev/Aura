@@ -1,9 +1,11 @@
+from datetime import timedelta
 from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.conf import settings
 from django.test import override_settings
+from django.utils import timezone
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from rest_framework import status
@@ -341,6 +343,84 @@ class TestUsuarioAPI(APITestCase):
         self.assertEqual(refresh_response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
+
+    def test_perfil_expone_estado_de_suscripcion_pagada(self):
+        user = User.objects.create_user(
+            email='subscriptionprofile@example.com',
+            username='subscriptionprofile',
+            password='clave12345',
+        )
+        plan = Plan.objects.get(slug='pro')
+        ends_at = timezone.now() + timedelta(days=30)
+        assignment = assign_plan_to_user(user=user, plan=plan, ends_at=ends_at)
+        assignment.cancel_at_period_end = True
+        assignment.save(update_fields=['cancel_at_period_end', 'updated_at'])
+        self.client.force_authenticate(user=user)
+
+        response = self.client.get('/api/usuarios/perfil/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['plan']['assignment_id'], assignment.id)
+        self.assertEqual(response.data['plan']['assignment_tipo'], UserPlanAssignment.TIPO_PAGO)
+        self.assertEqual(response.data['plan']['assignment_ends_at'], ends_at.isoformat())
+        self.assertTrue(response.data['plan']['cancel_at_period_end'])
+
+    def test_usuario_puede_cancelar_y_deshacer_cancelacion(self):
+        user = User.objects.create_user(
+            email='subscriptiontoggle@example.com',
+            username='subscriptiontoggle',
+            password='clave12345',
+        )
+        plan = Plan.objects.get(slug='pro')
+        assignment = assign_plan_to_user(
+            user=user,
+            plan=plan,
+            ends_at=timezone.now() + timedelta(days=30),
+        )
+        self.client.force_authenticate(user=user)
+
+        cancel_response = self.client.post('/api/usuarios/suscripcion/cancelar/', {}, format='json')
+        assignment.refresh_from_db()
+
+        self.assertEqual(cancel_response.status_code, status.HTTP_200_OK)
+        self.assertTrue(assignment.cancel_at_period_end)
+
+        reactivate_response = self.client.post('/api/usuarios/suscripcion/reactivar/', {}, format='json')
+        assignment.refresh_from_db()
+
+        self.assertEqual(reactivate_response.status_code, status.HTTP_200_OK)
+        self.assertFalse(assignment.cancel_at_period_end)
+        self.assertTrue(
+            AdminActionLog.objects.filter(
+                actor=user,
+                target_user=user,
+                action='suscripcion_reactivada',
+            ).exists()
+        )
+
+    def test_nueva_compra_limpia_cancelacion_anterior(self):
+        user = User.objects.create_user(
+            email='subscriptionreturn@example.com',
+            username='subscriptionreturn',
+            password='clave12345',
+        )
+        plan = Plan.objects.get(slug='pro')
+        assignment = assign_plan_to_user(
+            user=user,
+            plan=plan,
+            ends_at=timezone.now() + timedelta(days=1),
+        )
+        assignment.cancel_at_period_end = True
+        assignment.save(update_fields=['cancel_at_period_end', 'updated_at'])
+
+        renewed = assign_plan_to_user(
+            user=user,
+            plan=plan,
+            ends_at=timezone.now() + timedelta(days=30),
+        )
+
+        renewed.refresh_from_db()
+        self.assertFalse(renewed.cancel_at_period_end)
 
     @patch('apps.usuarios.views.payphone_service.confirmar_cobro', return_value={'statusCode': 3})
     def test_confirmar_pago_aprobado_activa_plan_y_marca_pago_aprobado(self, mock_confirmar):

@@ -18,7 +18,7 @@ const DIRECTION_CONFIG = {
     headerTitle: 'Lo que me deben',
     headerSubtitle: 'Prestamos, vueltas y pendientes que otras personas tienen contigo.',
     panelKpiLabel: 'Pendiente por cobrar',
-    panelAccent: '#C487F6',
+    panelAccent: 'var(--app-lila)',
     fetchError: 'No pudimos cargar lo que te deben.',
     pendingLabel: 'Te deben hoy',
     pendingValueClass: 'lila',
@@ -46,7 +46,7 @@ const DIRECTION_CONFIG = {
     headerTitle: 'Lo que debo',
     headerSubtitle: 'Vueltas, prestamos y pendientes que tienes con personas conocidas.',
     panelKpiLabel: 'Pendiente por pagar',
-    panelAccent: '#F87171',
+    panelAccent: 'var(--app-danger)',
     fetchError: 'No pudimos cargar lo que debes.',
     pendingLabel: 'Debo hoy',
     pendingValueClass: 'red',
@@ -346,11 +346,11 @@ export default function CuentasPersonasPanel({ embedded = false, direction = 'me
                       <td style={{ fontWeight: 700 }}>{item.persona}</td>
                       <td>
                         <div style={{ fontWeight: 600 }}>{item.concepto}</div>
-                        <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>{item.notas || 'Sin notas'}</div>
+                        <div style={{ color: 'rgba(var(--app-ink-rgb),0.45)', fontSize: 12 }}>{item.notas || 'Sin notas'}</div>
                       </td>
                       <td>
                         <div>{item.fecha_prestamo}</div>
-                        <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>
+                        <div style={{ color: 'rgba(var(--app-ink-rgb),0.45)', fontSize: 12 }}>
                           {item.fecha_recordatorio ? `Recordar: ${item.fecha_recordatorio}` : 'Sin recordatorio'}
                         </div>
                       </td>
@@ -376,7 +376,7 @@ export default function CuentasPersonasPanel({ embedded = false, direction = 'me
       <Modal open={modal} onClose={() => setModal(false)} title={editId ? config.editTitle : config.createTitle}>
         <form onSubmit={handleSubmit}>
           {!editId && (
-            <p style={{ marginTop: -8, marginBottom: 14, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
+            <p style={{ marginTop: -8, marginBottom: 14, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
               {config.quickHint}
             </p>
           )}
@@ -508,7 +508,7 @@ export default function CuentasPersonasPanel({ embedded = false, direction = 'me
           )}
 
           {!editId && !showAdvanced && (
-            <p style={{ marginTop: -4, marginBottom: 18, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
+            <p style={{ marginTop: -4, marginBottom: 18, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
               {config.idleHint}
             </p>
           )}

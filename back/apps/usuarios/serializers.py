@@ -53,7 +53,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
     projection_mode = serializers.ChoiceField(choices=PROJECTION_MODE_CHOICES, required=False)
 
     def get_plan(self, obj):
-        plan, _ = get_current_plan(obj)
+        plan, assignment = get_current_plan(obj)
         if not plan:
             return None
         return {
@@ -61,6 +61,10 @@ class UsuarioSerializer(serializers.ModelSerializer):
             'slug': plan.slug,
             'name': plan.name,
             'is_default': plan.is_default,
+            'assignment_id': assignment.id if assignment else None,
+            'assignment_tipo': assignment.tipo if assignment else None,
+            'assignment_ends_at': assignment.ends_at.isoformat() if assignment and assignment.ends_at else None,
+            'cancel_at_period_end': assignment.cancel_at_period_end if assignment else False,
         }
 
     def get_feature_access(self, obj):

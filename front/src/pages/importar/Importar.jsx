@@ -158,21 +158,21 @@ export default function Importar() {
         </div>
 
         <div className="card" style={{ maxWidth: 520, textAlign: 'center', padding: 40 }}>
-          <CheckCircle size={56} style={{ color: '#10B981', marginBottom: 16 }} />
+          <CheckCircle size={56} style={{ color: 'var(--app-green)', marginBottom: 16 }} />
           <p style={{ fontWeight: 800, fontSize: 20, marginBottom: 8 }}>Todo importado</p>
 
           <div className="import-result-stats">
             <div>
-              <p style={{ fontWeight: 700, fontSize: 28, color: '#10B981' }}>{resultado.ingresos_creados}</p>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>ingresos puntuales</p>
+              <p style={{ fontWeight: 700, fontSize: 28, color: 'var(--app-green)' }}>{resultado.ingresos_creados}</p>
+              <p style={{ fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.45)' }}>ingresos puntuales</p>
             </div>
             <div>
-              <p style={{ fontWeight: 700, fontSize: 28, color: '#F87171' }}>{resultado.gastos_creados}</p>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>gastos puntuales</p>
+              <p style={{ fontWeight: 700, fontSize: 28, color: 'var(--app-danger)' }}>{resultado.gastos_creados}</p>
+              <p style={{ fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.45)' }}>gastos puntuales</p>
             </div>
           </div>
 
-          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 24 }}>
+          <p style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.35)', marginBottom: 24 }}>
             Los movimientos del archivo se guardan como puntuales en su fecha original.
             Asi no se vuelven recurrentes ni alteran tus meses futuros.
           </p>
@@ -217,7 +217,7 @@ export default function Importar() {
             style={{
               fontSize: 12,
               fontWeight: 700,
-              color: 'rgba(255,255,255,0.35)',
+              color: 'rgba(var(--app-ink-rgb),0.35)',
               textTransform: 'uppercase',
               letterSpacing: '0.08em',
               marginBottom: 8,
@@ -228,7 +228,7 @@ export default function Importar() {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {Object.entries(preview.mapa_columnas || {}).map(([campo, columna]) => (
               <span key={campo} className="badge badge-gray">
-                <span style={{ color: '#C487F6' }}>{campo}</span> {'<-'} {columna}
+                <span style={{ color: 'var(--app-lila)' }}>{campo}</span> {'<-'} {columna}
               </span>
             ))}
           </div>
@@ -237,9 +237,9 @@ export default function Importar() {
         {preview.filas_ok.length > 0 && (
           <div className="card" style={{ padding: 0, marginBottom: 16 }}>
             <div className="import-preview-toolbar">
-              <CheckCircle size={16} style={{ color: '#10B981' }} />
+              <CheckCircle size={16} style={{ color: 'var(--app-green)' }} />
               <span style={{ fontWeight: 700, fontSize: 14 }}>Filas validas ({preview.filas_ok.length})</span>
-              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.40)' }}>
+              <span style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.40)' }}>
                 Mostrando {previewSliceStart + 1}-{Math.min(previewSliceEnd, preview.filas_ok.length)} de {preview.filas_ok.length}
               </span>
 
@@ -247,14 +247,14 @@ export default function Importar() {
                 <button
                   type="button"
                   onClick={togglePaginaActual}
-                  style={{ fontSize: 12, color: '#C487F6', background: 'none', border: 'none', cursor: 'pointer' }}
+                  style={{ fontSize: 12, color: 'var(--app-lila)', background: 'none', border: 'none', cursor: 'pointer' }}
                 >
                   {visibleSelectedCount === visibleIndexes.length ? 'Deseleccionar pagina' : 'Seleccionar pagina'}
                 </button>
                 <button
                   type="button"
                   onClick={toggleTodo}
-                  style={{ fontSize: 12, color: '#C487F6', background: 'none', border: 'none', cursor: 'pointer' }}
+                  style={{ fontSize: 12, color: 'var(--app-lila)', background: 'none', border: 'none', cursor: 'pointer' }}
                 >
                   {seleccion.length === preview.filas_ok.length ? 'Deseleccionar todo' : 'Seleccionar todo'}
                 </button>
@@ -271,7 +271,7 @@ export default function Importar() {
               >
                 Anterior
               </button>
-              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', minWidth: 70, textAlign: 'center' }}>
+              <span style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)', minWidth: 70, textAlign: 'center' }}>
                 {safePreviewPage}/{previewPageCount}
               </span>
               <button
@@ -283,7 +283,7 @@ export default function Importar() {
               >
                 Siguiente
               </button>
-              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
+              <span style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.35)' }}>
                 La tabla se pagina para mantener la carga rapida aun con archivos grandes.
               </span>
             </div>
@@ -309,7 +309,7 @@ export default function Importar() {
                             type="checkbox"
                             checked={selected}
                             onChange={() => toggleFila(absoluteIndex)}
-                            style={{ accentColor: '#C487F6', cursor: 'pointer' }}
+                            style={{ accentColor: 'var(--app-lila)', cursor: 'pointer' }}
                           />
                         </td>
                         <td style={{ fontSize: 13 }}>{fila.fecha}</td>
@@ -325,13 +325,13 @@ export default function Importar() {
                             {fila.tipo}
                           </span>
                         </td>
-                        <td style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', textTransform: 'capitalize' }}>
+                        <td style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)', textTransform: 'capitalize' }}>
                           {fila.categoria}
                         </td>
                         <td style={{ fontSize: 12 }}>
                           {fila.frecuencia
                             ? `${fila.tipo === 'gasto' && fila.tipo_monto === 'variable' ? 'Variable' : 'Fijo'} · ${fila.frecuencia}`
-                            : <span style={{ color: 'rgba(255,255,255,0.4)' }}>Puntual</span>}
+                            : <span style={{ color: 'rgba(var(--app-ink-rgb),0.4)' }}>Puntual</span>}
                         </td>
                       </tr>
                     )
@@ -352,27 +352,27 @@ export default function Importar() {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <XCircle size={16} style={{ color: '#F87171' }} />
-              <span style={{ fontWeight: 700, fontSize: 14, color: '#F87171' }}>
+              <XCircle size={16} style={{ color: 'var(--app-danger)' }} />
+              <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--app-danger)' }}>
                 Filas con error ({preview.filas_error.length}) - no se importaran
               </span>
             </div>
 
             {preview.filas_error.slice(0, 5).map((filaError, index) => (
-              <div key={`${filaError.fila}-${index}`} style={{ fontSize: 12, color: 'rgba(255,255,255,0.50)', marginBottom: 4 }}>
+              <div key={`${filaError.fila}-${index}`} style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.50)', marginBottom: 4 }}>
                 Fila {filaError.fila}: {filaError.error}
               </div>
             ))}
 
             {preview.filas_error.length > 5 && (
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.30)' }}>
+              <div style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.30)' }}>
                 ...y {preview.filas_error.length - 5} mas
               </div>
             )}
           </div>
         )}
 
-        {error && <div style={{ marginTop: 12, color: '#F87171', fontSize: 13 }}>{error}</div>}
+        {error && <div style={{ marginTop: 12, color: 'var(--app-danger)', fontSize: 13 }}>{error}</div>}
       </div>
     )
   }
@@ -394,8 +394,8 @@ export default function Importar() {
         onDrop={onDrop}
         onClick={() => inputRef.current?.click()}
         style={{
-          border: `2px dashed ${drag ? '#C487F6' : 'rgba(255,255,255,0.12)'}`,
-          background: drag ? 'rgba(196,135,246,0.06)' : 'rgba(255,255,255,0.02)',
+          border: `2px dashed ${drag ? 'var(--app-lila)' : 'rgba(var(--app-ink-rgb),0.12)'}`,
+          background: drag ? 'rgba(196,135,246,0.06)' : 'rgba(var(--app-ink-rgb),0.02)',
         }}
       >
         <input
@@ -409,16 +409,16 @@ export default function Importar() {
         {cargando ? (
           <>
             <div className="spinner" style={{ margin: '0 auto 16px' }} />
-            <p style={{ color: 'rgba(255,255,255,0.55)' }}>Procesando archivo...</p>
+            <p style={{ color: 'rgba(var(--app-ink-rgb),0.55)' }}>Procesando archivo...</p>
           </>
         ) : (
           <>
-            <Upload size={44} style={{ color: drag ? '#C487F6' : 'rgba(255,255,255,0.25)', marginBottom: 16 }} />
+            <Upload size={44} style={{ color: drag ? 'var(--app-lila)' : 'rgba(var(--app-ink-rgb),0.25)', marginBottom: 16 }} />
             <p style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>
               {drag ? 'Suelta aqui el archivo' : 'Arrastra tu archivo aqui'}
             </p>
-            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.40)' }}>o haz clic para seleccionarlo</p>
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', marginTop: 10 }}>.csv · .xlsx · max. 5 MB</p>
+            <p style={{ fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.40)' }}>o haz clic para seleccionarlo</p>
+            <p style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.25)', marginTop: 10 }}>.csv · .xlsx · max. 5 MB</p>
           </>
         )}
       </div>
@@ -430,7 +430,7 @@ export default function Importar() {
             border: '1px solid rgba(248,113,113,0.25)',
             borderRadius: 12,
             padding: '12px 16px',
-            color: '#F87171',
+            color: 'var(--app-danger)',
             fontSize: 13,
             marginBottom: 20,
           }}
@@ -442,11 +442,11 @@ export default function Importar() {
       <div className="responsive-grid-2">
         <div className="card" style={{ padding: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-            <FileSpreadsheet size={18} style={{ color: '#C487F6' }} />
+            <FileSpreadsheet size={18} style={{ color: 'var(--app-lila)' }} />
             <span style={{ fontWeight: 700, fontSize: 14 }}>Formato esperado</span>
           </div>
 
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 10 }}>
+          <p style={{ fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.55)', marginBottom: 10 }}>
             El archivo debe tener al menos estas columnas. Los nombres pueden variar y el sistema intenta detectarlos.
           </p>
 
@@ -460,14 +460,14 @@ export default function Importar() {
             { col: 'tipo_monto', desc: 'Para gastos que se repiten: "fijo" (mismo monto) o "variable" (cambia). Opcional.' },
           ].map((item) => (
             <div key={item.col} style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-              <span style={{ fontWeight: 700, color: '#C487F6', minWidth: 90, fontSize: 12 }}>{item.col}</span>
-              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.40)' }}>{item.desc}</span>
+              <span style={{ fontWeight: 700, color: 'var(--app-lila)', minWidth: 90, fontSize: 12 }}>{item.col}</span>
+              <span style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.40)' }}>{item.desc}</span>
             </div>
           ))}
 
-          <div style={{ marginTop: 14, padding: '10px 14px', background: 'rgba(255,255,255,0.04)', borderRadius: 10 }}>
-            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.30)', marginBottom: 2 }}>Tambien detecta alias comunes:</p>
-            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>
+          <div style={{ marginTop: 14, padding: '10px 14px', background: 'rgba(var(--app-ink-rgb),0.04)', borderRadius: 10 }}>
+            <p style={{ fontSize: 11, color: 'rgba(var(--app-ink-rgb),0.30)', marginBottom: 2 }}>Tambien detecta alias comunes:</p>
+            <p style={{ fontSize: 11, color: 'rgba(var(--app-ink-rgb),0.25)' }}>
               concepto, detalle, glosa, importe, valor, amount, abono, cargo, movement.
             </p>
           </div>
@@ -487,8 +487,8 @@ export default function Importar() {
               `Tu plan permite hasta ${formatNumber(maxFilasPlan)} filas por importacion.`,
             ].map((text, index) => (
               <div key={`${index}-${text}`} style={{ display: 'flex', gap: 8, marginBottom: 7, alignItems: 'flex-start' }}>
-                <span style={{ color: '#C487F6', marginTop: 1 }}>·</span>
-                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>{text}</span>
+                <span style={{ color: 'var(--app-lila)', marginTop: 1 }}>·</span>
+                <span style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>{text}</span>
               </div>
             ))}
           </div>
@@ -501,7 +501,7 @@ export default function Importar() {
               background: 'rgba(196,135,246,0.08)',
               border: '1px solid rgba(196,135,246,0.20)',
               fontSize: 12,
-              color: 'rgba(255,255,255,0.55)',
+              color: 'rgba(var(--app-ink-rgb),0.55)',
             }}
           >
             Si necesitas una carga masiva con reglas especiales o mas volumen, ese flujo debe vivir en un plan superior y con un
@@ -520,7 +520,7 @@ export default function Importar() {
               border: '1.5px solid rgba(196,135,246,0.30)',
               borderRadius: 12,
               background: 'rgba(196,135,246,0.07)',
-              color: '#C487F6',
+              color: 'var(--app-lila)',
               fontSize: 13,
               fontWeight: 600,
               cursor: 'pointer',

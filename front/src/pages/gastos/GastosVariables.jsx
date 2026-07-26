@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Lightbulb, Plus, Pencil, Trash2 } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 
 import { getApiErrorMessage } from '../../api/errors'
 import api from '../../api/client'
@@ -17,7 +18,7 @@ import '../../components/ui/app.css'
 const SITUACION = {
   pendiente: { label: 'Pendiente', color: '#FBBF24' },
   en_estimado: { label: 'En el estimado', color: '#4ADE80' },
-  sobre: { label: 'Sobre el estimado', color: '#F87171' },
+  sobre: { label: 'Sobre el estimado', color: 'var(--app-danger)' },
   menos: { label: 'Menos de lo estimado', color: '#4ADE80' },
   sin_gasto: { label: 'Sin gasto este mes', color: '#60A5FA' },
 }
@@ -39,9 +40,16 @@ function getSituacionLabel(situacion) {
 }
 
 export default function GastosVariables() {
+  const [searchParams] = useSearchParams()
+  const notificationYear = Number(searchParams.get('anio'))
+  const notificationMonth = Number(searchParams.get('mes'))
   const { categorias } = useCategorias()
 
-  const [selectedMonth, setSelectedMonth] = useState(() => startOfMonth(new Date()))
+  const [selectedMonth, setSelectedMonth] = useState(() => (
+    notificationYear >= 2000 && notificationYear <= 2100 && notificationMonth >= 1 && notificationMonth <= 12
+      ? new Date(notificationYear, notificationMonth - 1, 1)
+      : startOfMonth(new Date())
+  ))
   const [filas, setFilas] = useState([])
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
@@ -71,6 +79,16 @@ export default function GastosVariables() {
   const now = new Date()
   const esMesActual = anio === now.getFullYear() && mes === now.getMonth() + 1
   const pendientes = filas.filter((fila) => fila.situacion === 'pendiente').length
+
+  useEffect(() => {
+    if (notificationYear < 2000 || notificationYear > 2100 || notificationMonth < 1 || notificationMonth > 12) return
+    setSelectedMonth((current) => (
+      current.getFullYear() === notificationYear && current.getMonth() === notificationMonth - 1
+        ? current
+        : new Date(notificationYear, notificationMonth - 1, 1)
+    ))
+    setPage(1)
+  }, [notificationYear, notificationMonth])
 
   const fetchResumen = useCallback(async () => {
     setLoading(true)
@@ -272,7 +290,7 @@ export default function GastosVariables() {
           {situacion.label}
         </span>
         {fila.situacion !== 'pendiente' && fila.situacion !== 'sin_gasto' && fila.delta_abs != null && (
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
+          <div style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
             {parseFloat(fila.delta_abs) >= 0 ? '+' : ''}${formatAmount(Math.abs(parseFloat(fila.delta_abs)))}
             {pct != null ? ` (${pct >= 0 ? '+' : ''}${pct}%)` : ''}
           </div>
@@ -288,7 +306,7 @@ export default function GastosVariables() {
           <h2 className="finance-panel-kicker">Gastos variables</h2>
           <p className="finance-panel-kpi">
             Estimado al mes:&nbsp;
-            <span style={{ color: '#F87171', fontWeight: 700 }}>${formatAmount(totalEstimado)}</span>
+            <span style={{ color: 'var(--app-danger)', fontWeight: 700 }}>${formatAmount(totalEstimado)}</span>
           </p>
         </div>
         <button className="btn-add page-primary-action" onClick={openNew}><Plus size={16} /> Agregar</button>
@@ -372,8 +390,8 @@ export default function GastosVariables() {
                             <span className="table-amount negative">${formatAmount(parseFloat(fila.real))}</span>
                           ) : (
                             <div>
-                              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>~${formatAmount(parseFloat(fila.sugerido))}</span>
-                              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>estimado</div>
+                              <span style={{ color: 'rgba(var(--app-ink-rgb),0.5)', fontSize: 13 }}>~${formatAmount(parseFloat(fila.sugerido))}</span>
+                              <div style={{ fontSize: 11, color: 'rgba(var(--app-ink-rgb),0.3)' }}>estimado</div>
                             </div>
                           )}
                         </td>
@@ -419,7 +437,7 @@ export default function GastosVariables() {
                   </button>
                 ))}
               </div>
-              <p style={{ marginTop: 6, fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
+              <p style={{ marginTop: 6, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.4)' }}>
                 Elige uno o escribe el tuyo abajo.
               </p>
             </div>
@@ -442,7 +460,7 @@ export default function GastosVariables() {
             <div className="form-modal-group">
               <label className="form-modal-label">Monto estimado</label>
               <input className="form-modal-input" type="number" required min="0" step="0.01" placeholder="0" value={form.monto} onChange={(e) => setForm({ ...form, monto: e.target.value })} />
-              <p style={{ marginTop: 6, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
+              <p style={{ marginTop: 6, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
                 Lo iremos ajustando con lo que realmente pagues cada mes.
               </p>
             </div>
@@ -460,7 +478,7 @@ export default function GastosVariables() {
       <Modal open={realItem !== null} onClose={() => setRealItem(null)} title="Cuanto pagaste?">
         {realItem && (
           <form onSubmit={handleSubmitReal}>
-            <p style={{ marginTop: -8, marginBottom: 16, fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+            <p style={{ marginTop: -8, marginBottom: 16, fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.5)', lineHeight: 1.5 }}>
               Registra lo que pagaste de <strong>{realItem.descripcion}</strong> este mes.
               Si este mes no gastaste en esto, pon <strong>0</strong>.
             </p>

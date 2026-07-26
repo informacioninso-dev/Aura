@@ -147,7 +147,7 @@ export default function Reporte() {
   }
 
   const balanceColor = data
-    ? (data.resumen.balance >= 0 ? '#10B981' : '#F87171')
+    ? (data.resumen.balance >= 0 ? 'var(--app-green)' : 'var(--app-danger)')
     : '#FFFFFF'
 
   const anios = []
@@ -210,7 +210,7 @@ export default function Reporte() {
       <FeedbackAlert type={feedback.type || 'error'} message={feedback.message} />
 
       {loading && (
-        <div style={{ textAlign: 'center', padding: 60, color: 'rgba(255,255,255,0.35)', fontSize: 14 }}>
+        <div style={{ textAlign: 'center', padding: 60, color: 'rgba(var(--app-ink-rgb),0.35)', fontSize: 14 }}>
           Cargando reporte...
         </div>
       )}
@@ -218,10 +218,10 @@ export default function Reporte() {
       {!loading && data && (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}>
-            <SummaryCard label="Ingresos" value={data.resumen.total_ingresos} color="#10B981" prefix="$" />
-            <SummaryCard label="Gastos" value={data.resumen.total_gastos} color="#F87171" prefix="$" />
+            <SummaryCard label="Ingresos" value={data.resumen.total_ingresos} color="var(--app-green)" prefix="$" />
+            <SummaryCard label="Gastos" value={data.resumen.total_gastos} color="var(--app-danger)" prefix="$" />
             <SummaryCard label="Balance" value={data.resumen.balance} color={balanceColor} prefix="$" signed />
-            <SummaryCard label="Tasa de ahorro" value={data.resumen.tasa_ahorro} color="#C487F6" suffix="%" />
+            <SummaryCard label="Tasa de ahorro" value={data.resumen.tasa_ahorro} color="var(--app-lila)" suffix="%" />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 28 }}>
@@ -239,12 +239,12 @@ export default function Reporte() {
                 {data.categorias.map((categoria) => {
                   const pct = categoria.pct_limite
                   const barColor = pct == null
-                    ? '#C487F6'
+                    ? 'var(--app-lila)'
                     : pct >= 100
-                      ? '#F87171'
+                      ? 'var(--app-danger)'
                       : pct >= 75
                         ? '#FBBF24'
-                        : '#10B981'
+                        : 'var(--app-green)'
 
                   return (
                     <div key={categoria.categoria}>
@@ -252,10 +252,10 @@ export default function Reporte() {
                         <span style={{ fontSize: 13, fontWeight: 600 }}>
                           {categoria.icono} {categoria.categoria}
                         </span>
-                        <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.60)' }}>
+                        <span style={{ fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.60)' }}>
                           ${formatAmount(Number(categoria.total))}
                           {categoria.limite != null && (
-                            <span style={{ fontSize: 11, marginLeft: 6, color: 'rgba(255,255,255,0.35)' }}>
+                            <span style={{ fontSize: 11, marginLeft: 6, color: 'rgba(var(--app-ink-rgb),0.35)' }}>
                               / ${formatAmount(Number(categoria.limite))}
                             </span>
                           )}
@@ -263,7 +263,7 @@ export default function Reporte() {
                       </div>
 
                       {categoria.limite != null && (
-                        <div style={{ height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.08)' }}>
+                        <div style={{ height: 5, borderRadius: 99, background: 'rgba(var(--app-ink-rgb),0.08)' }}>
                           <div
                             style={{
                               height: '100%',
@@ -299,9 +299,9 @@ export default function Reporte() {
                     {data.top_gastos.map((gasto, index) => (
                       <tr key={index}>
                         <td>{gasto.descripcion}</td>
-                        <td style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>{gasto.categoria}</td>
-                        <td style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>{gasto.fecha}</td>
-                        <td style={{ textAlign: 'right', fontWeight: 600, color: '#F87171' }}>
+                        <td style={{ color: 'rgba(var(--app-ink-rgb),0.55)', fontSize: 12 }}>{gasto.categoria}</td>
+                        <td style={{ color: 'rgba(var(--app-ink-rgb),0.55)', fontSize: 12 }}>{gasto.fecha}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--app-danger)' }}>
                           ${formatAmount(Number(gasto.monto))}
                         </td>
                       </tr>
@@ -313,7 +313,7 @@ export default function Reporte() {
           )}
 
           {data.categorias.length === 0 && data.top_gastos.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '48px 0', color: 'rgba(255,255,255,0.30)', fontSize: 14 }}>
+            <div style={{ textAlign: 'center', padding: '48px 0', color: 'rgba(var(--app-ink-rgb),0.30)', fontSize: 14 }}>
               No hubo movimientos en {MESES[mes - 1]} {anio}.
             </div>
           )}
@@ -331,7 +331,7 @@ function SummaryCard({ label, value, color, prefix = '', suffix = '', signed = f
 
   return (
     <div className="card" style={{ textAlign: 'center' }}>
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+      <div style={{ fontSize: 11, color: 'rgba(var(--app-ink-rgb),0.45)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
         {label}
       </div>
       <div style={{ fontSize: 26, fontWeight: 800, color }}>
@@ -345,17 +345,17 @@ function MiniCard({ label, value }) {
   return (
     <div
       style={{
-        background: 'rgba(255,255,255,0.04)',
-        border: '1px solid rgba(255,255,255,0.08)',
+        background: 'rgba(var(--app-ink-rgb),0.04)',
+        border: '1px solid rgba(var(--app-ink-rgb),0.08)',
         borderRadius: 12,
         padding: '12px 16px',
         textAlign: 'center',
       }}
     >
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.40)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+      <div style={{ fontSize: 11, color: 'rgba(var(--app-ink-rgb),0.40)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
         {label}
       </div>
-      <div style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,0.80)' }}>
+      <div style={{ fontSize: 18, fontWeight: 700, color: 'rgba(var(--app-ink-rgb),0.80)' }}>
         ${formatNumber(Number(value))}
       </div>
     </div>

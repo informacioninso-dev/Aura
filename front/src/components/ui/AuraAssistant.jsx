@@ -164,10 +164,10 @@ export default function AuraAssistant() {
 
   const inputStyle = {
     width: '100%', boxSizing: 'border-box',
-    background: 'rgba(255,255,255,0.06)',
-    border: '1px solid rgba(255,255,255,0.12)',
+    background: 'rgba(var(--app-ink-rgb),0.06)',
+    border: '1px solid rgba(var(--app-ink-rgb),0.12)',
     borderRadius: 8, padding: '8px 12px',
-    color: '#fff', fontSize: 14, fontFamily: 'inherit',
+    color: 'var(--app-text)', fontSize: 14, fontFamily: 'inherit',
     outline: 'none',
   }
 
@@ -187,8 +187,8 @@ export default function AuraAssistant() {
           padding: '11px 18px',
           borderRadius: 999,
           border: 'none',
-          background: 'linear-gradient(135deg, #C487F6 0%, #8B5CF6 100%)',
-          color: '#fff',
+          background: 'linear-gradient(135deg, var(--app-lila) 0%, #8B5CF6 100%)',
+          color: 'var(--app-on-accent)',
           fontWeight: 700,
           fontSize: 14,
           cursor: 'pointer',
@@ -213,7 +213,7 @@ export default function AuraAssistant() {
         >
           <div style={{
             width: '100%', maxWidth: 480,
-            background: 'rgba(18,26,50,0.98)',
+            background: 'var(--app-popover)',
             border: '1px solid rgba(196,135,246,0.25)',
             borderRadius: 20,
             padding: '24px 20px 20px',
@@ -222,32 +222,32 @@ export default function AuraAssistant() {
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Sparkles size={18} color="#C487F6" />
-                <span style={{ color: '#fff', fontWeight: 700, fontSize: 16 }}>Aura AI</span>
+                <Sparkles size={18} color="var(--app-lila)" />
+                <span style={{ color: 'var(--app-text)', fontWeight: 700, fontSize: 16 }}>Aura AI</span>
               </div>
-              <button onClick={cerrar} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.5)', padding: 4 }}>
+              <button onClick={cerrar} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(var(--app-ink-rgb),0.5)', padding: 4 }}>
                 <X size={20} />
               </button>
             </div>
 
             {exito ? (
               <div style={{ textAlign: 'center', padding: '24px 0' }}>
-                <Check size={40} color="#10B981" style={{ margin: '0 auto 10px' }} />
-                <p style={{ color: '#10B981', fontWeight: 700, fontSize: 16 }}>¡Registrado!</p>
+                <Check size={40} color="var(--app-green)" style={{ margin: '0 auto 10px' }} />
+                <p style={{ color: 'var(--app-green)', fontWeight: 700, fontSize: 16 }}>¡Registrado!</p>
               </div>
             ) : parsed ? (
               /* Pantalla de confirmación editable */
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, margin: 0 }}>Revisá y editá si hace falta:</p>
-                  <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: esGasto ? '#F87171' : '#10B981' }}>
+                  <p style={{ color: 'rgba(var(--app-ink-rgb),0.5)', fontSize: 13, margin: 0 }}>Revisá y editá si hace falta:</p>
+                  <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: esGasto ? 'var(--app-danger)' : 'var(--app-green)' }}>
                     {TIPO_LABELS[parsed.tipo]}
                   </span>
                 </div>
 
                 {/* Descripción */}
                 <div style={{ marginBottom: 10 }}>
-                  <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 4 }}>Descripción</label>
+                  <label style={{ fontSize: 11, color: 'rgba(var(--app-ink-rgb),0.35)', display: 'block', marginBottom: 4 }}>Descripción</label>
                   <input
                     value={campo('descripcion') || ''}
                     onChange={(e) => setEditar('descripcion', e.target.value)}
@@ -257,7 +257,7 @@ export default function AuraAssistant() {
 
                 {/* Monto */}
                 <div style={{ marginBottom: 10 }}>
-                  <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 4 }}>Monto</label>
+                  <label style={{ fontSize: 11, color: 'rgba(var(--app-ink-rgb),0.35)', display: 'block', marginBottom: 4 }}>Monto</label>
                   <input
                     type="number"
                     min="0"
@@ -271,7 +271,7 @@ export default function AuraAssistant() {
                 {/* Categoría (solo gastos) */}
                 {esGasto && (
                   <div style={{ marginBottom: 10 }}>
-                    <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 4 }}>Categoría</label>
+                    <label style={{ fontSize: 11, color: 'rgba(var(--app-ink-rgb),0.35)', display: 'block', marginBottom: 4 }}>Categoría</label>
                     <select value={campo('categoria') || 'otro'} onChange={(e) => setEditar('categoria', e.target.value)} style={inputStyle}>
                       {['vivienda','alimentacion','transporte','salud','educacion','entretenimiento','ropa','servicios','tecnologia','deudas','ahorro','otro'].map((c) => (
                         <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
@@ -283,7 +283,7 @@ export default function AuraAssistant() {
                 {/* Frecuencia (solo fijos) */}
                 {esFijo && (
                   <div style={{ marginBottom: 10 }}>
-                    <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 4 }}>Frecuencia</label>
+                    <label style={{ fontSize: 11, color: 'rgba(var(--app-ink-rgb),0.35)', display: 'block', marginBottom: 4 }}>Frecuencia</label>
                     <select value={campo('frecuencia') || 'mensual'} onChange={(e) => setEditar('frecuencia', e.target.value)} style={inputStyle}>
                       {Object.entries(FREQ_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                     </select>
@@ -293,7 +293,7 @@ export default function AuraAssistant() {
                 {/* Fecha (solo puntuales) */}
                 {!esFijo && (
                   <div style={{ marginBottom: 10 }}>
-                    <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 4 }}>Fecha</label>
+                    <label style={{ fontSize: 11, color: 'rgba(var(--app-ink-rgb),0.35)', display: 'block', marginBottom: 4 }}>Fecha</label>
                     <input
                       type="date"
                       value={campo('fecha') || ''}
@@ -303,12 +303,12 @@ export default function AuraAssistant() {
                   </div>
                 )}
 
-                {error && <p style={{ color: '#F87171', fontSize: 13, marginBottom: 10 }}>{error}</p>}
+                {error && <p style={{ color: 'var(--app-danger)', fontSize: 13, marginBottom: 10 }}>{error}</p>}
                 <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-                  <button onClick={resetear} style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
+                  <button onClick={resetear} style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid rgba(var(--app-ink-rgb),0.15)', background: 'transparent', color: 'rgba(var(--app-ink-rgb),0.6)', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
                     Volver
                   </button>
-                  <button onClick={confirmar} disabled={guardando} style={{ flex: 2, padding: '10px 0', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #C487F6, #8B5CF6)', color: '#fff', fontWeight: 700, cursor: guardando ? 'not-allowed' : 'pointer', fontSize: 14, opacity: guardando ? 0.7 : 1 }}>
+                  <button onClick={confirmar} disabled={guardando} style={{ flex: 2, padding: '10px 0', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, var(--app-lila), #8B5CF6)', color: 'var(--app-on-accent)', fontWeight: 700, cursor: guardando ? 'not-allowed' : 'pointer', fontSize: 14, opacity: guardando ? 0.7 : 1 }}>
                     {guardando ? 'Guardando...' : 'Confirmar'}
                   </button>
                 </div>
@@ -316,9 +316,9 @@ export default function AuraAssistant() {
             ) : (
               /* Pantalla de entrada */
               <div>
-                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 12 }}>
+                <p style={{ color: 'rgba(var(--app-ink-rgb),0.5)', fontSize: 13, marginBottom: 12 }}>
                   Decí o escribí lo que pasó, por ejemplo:<br />
-                  <span style={{ color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>"gasté $50 en almuerzo hoy"</span>
+                  <span style={{ color: 'rgba(var(--app-ink-rgb),0.35)', fontStyle: 'italic' }}>"gasté $50 en almuerzo hoy"</span>
                 </p>
                 <div style={{ position: 'relative', marginBottom: 12 }}>
                   <textarea
@@ -329,10 +329,10 @@ export default function AuraAssistant() {
                     rows={3}
                     style={{
                       width: '100%', boxSizing: 'border-box',
-                      background: 'rgba(255,255,255,0.06)',
-                      border: '1px solid rgba(255,255,255,0.12)',
+                      background: 'rgba(var(--app-ink-rgb),0.06)',
+                      border: '1px solid rgba(var(--app-ink-rgb),0.12)',
                       borderRadius: 12, padding: '12px 48px 12px 14px',
-                      color: '#fff', fontSize: 15, resize: 'none',
+                      color: 'var(--app-text)', fontSize: 15, resize: 'none',
                       outline: 'none', fontFamily: 'inherit',
                     }}
                   />
@@ -343,7 +343,7 @@ export default function AuraAssistant() {
                       background: escuchando ? 'rgba(248,113,113,0.2)' : 'rgba(196,135,246,0.15)',
                       border: `1px solid ${escuchando ? 'rgba(248,113,113,0.4)' : 'rgba(196,135,246,0.3)'}`,
                       borderRadius: 8, padding: 6, cursor: 'pointer',
-                      color: escuchando ? '#F87171' : '#C487F6',
+                      color: escuchando ? 'var(--app-danger)' : 'var(--app-lila)',
                     }}
                     title={escuchando ? 'Detener' : 'Hablar'}
                   >
@@ -351,16 +351,16 @@ export default function AuraAssistant() {
                   </button>
                 </div>
                 {escuchando && (
-                  <p style={{ color: '#C487F6', fontSize: 13, marginBottom: 10, textAlign: 'center' }}>Escuchando...</p>
+                  <p style={{ color: 'var(--app-lila)', fontSize: 13, marginBottom: 10, textAlign: 'center' }}>Escuchando...</p>
                 )}
-                {error && <p style={{ color: '#F87171', fontSize: 13, marginBottom: 10 }}>{error}</p>}
+                {error && <p style={{ color: 'var(--app-danger)', fontSize: 13, marginBottom: 10 }}>{error}</p>}
                 <button
                   onClick={parsear}
                   disabled={!texto.trim() || cargando}
                   style={{
                     width: '100%', padding: '12px 0', borderRadius: 12, border: 'none',
-                    background: texto.trim() ? 'linear-gradient(135deg, #C487F6, #8B5CF6)' : 'rgba(255,255,255,0.08)',
-                    color: texto.trim() ? '#fff' : 'rgba(255,255,255,0.3)',
+                    background: texto.trim() ? 'linear-gradient(135deg, var(--app-lila), #8B5CF6)' : 'rgba(var(--app-ink-rgb),0.08)',
+                    color: texto.trim() ? '#fff' : 'rgba(var(--app-ink-rgb),0.3)',
                     fontWeight: 700, fontSize: 15, cursor: texto.trim() && !cargando ? 'pointer' : 'not-allowed',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   }}

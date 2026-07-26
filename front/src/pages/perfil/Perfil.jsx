@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CheckCircle, User } from 'lucide-react'
+import { CheckCircle, Crown, RotateCcw, User } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import { getApiErrorMessage } from '../../api/errors'
@@ -9,6 +9,11 @@ import api from '../../api/client'
 import '../../components/ui/app.css'
 
 const MONEDAS = ['USD', 'CLP', 'EUR', 'ARS', 'COP', 'MXN', 'PEN']
+
+function formatPlanDate(value) {
+  if (!value) return ''
+  return new Date(value).toLocaleDateString('es', { day: '2-digit', month: 'long', year: 'numeric' })
+}
 
 export default function Perfil() {
   const { user, fetchPerfil, changePassword, logout } = useAuth()
@@ -30,6 +35,7 @@ export default function Perfil() {
   const [passError, setPassError] = useState('')
 
   const [cancelLoading, setCancelLoading] = useState(false)
+  const [reactivateLoading, setReactivateLoading] = useState(false)
   const [cancelOk, setCancelOk] = useState('')
   const [cancelError, setCancelError] = useState('')
   const [confirmCancel, setConfirmCancel] = useState(false)
@@ -52,6 +58,21 @@ export default function Perfil() {
       setCancelError(getApiErrorMessage(err, 'No se pudo cancelar la suscripcion.'))
     } finally {
       setCancelLoading(false)
+    }
+  }
+
+  async function handleReactivarSuscripcion() {
+    setReactivateLoading(true)
+    setCancelError('')
+    setCancelOk('')
+    try {
+      const { data } = await api.post('/usuarios/suscripcion/reactivar/')
+      await fetchPerfil()
+      setCancelOk(data.detail || 'Cancelacion deshecha. Tu plan Pro vuelve a estar activo.')
+    } catch (err) {
+      setCancelError(getApiErrorMessage(err, 'No se pudo deshacer la cancelacion.'))
+    } finally {
+      setReactivateLoading(false)
     }
   }
 
@@ -122,20 +143,20 @@ export default function Perfil() {
       <div className="card" style={{ marginBottom: 18 }}>
         <div className="perfil-summary">
           <div className="perfil-avatar-shell">
-            <User size={24} style={{ color: '#C487F6' }} />
+            <User size={24} style={{ color: 'var(--app-lila)' }} />
           </div>
           <div className="perfil-summary-copy">
             <div className="perfil-summary-row">
-              <p style={{ fontWeight: 700, color: '#fff', fontSize: 16 }}>{user?.username}</p>
+              <p style={{ fontWeight: 700, color: 'var(--app-text)', fontSize: 16 }}>{user?.username}</p>
               <span className={`subtle-plan-badge ${currentPlanBadgeClass}`}>{currentPlanLabel}</span>
             </div>
-            <p style={{ color: 'rgba(255,255,255,0.40)', fontSize: 13 }}>{user?.email}</p>
+            <p style={{ color: 'rgba(var(--app-ink-rgb),0.40)', fontSize: 13 }}>{user?.email}</p>
           </div>
         </div>
 
         <FeedbackAlert type="error" message={error} />
         {ok && (
-          <div style={{ background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.25)', color: '#10B981', borderRadius: 12, padding: '12px 16px', fontSize: 13, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.25)', color: 'var(--app-green)', borderRadius: 12, padding: '12px 16px', fontSize: 13, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
             <CheckCircle size={15} /> {ok}
           </div>
         )}
@@ -159,6 +180,88 @@ export default function Perfil() {
             {loading ? 'Guardando...' : 'Guardar cambios'}
           </button>
         </form>
+      </div>
+
+      <div className="card perfil-plan-card">
+        <div className="perfil-plan-header">
+          <div className="perfil-plan-icon" aria-hidden="true">
+            <Crown size={20} />
+          </div>
+          <div className="perfil-plan-heading">
+            <span>Plan y suscripcion</span>
+            <h3>Plan {currentPlanLabel}</h3>
+          </div>
+          <span className={`subtle-plan-badge ${currentPlanBadgeClass}`}>{currentPlanLabel}</span>
+        </div>
+
+        <p className="perfil-plan-copy">
+          {!isPro && 'Estas en el plan Free. Puedes pasar a Pro cuando quieras para desbloquear todas las herramientas.'}
+          {isPro && !esPago && 'Tu plan Pro fue asignado a tu cuenta y no tiene cobro administrado desde Aura.'}
+          {isPro && esPago && cancelAtPeriodEnd && (
+            <>La cancelacion esta programada. Conservas Pro hasta el <strong>{formatPlanDate(endsAt)}</strong> y puedes deshacerla mientras el periodo siga activo.</>
+          )}
+          {isPro && esPago && !cancelAtPeriodEnd && (
+            <>Tu periodo Pro esta activo{endsAt ? <> hasta el <strong>{formatPlanDate(endsAt)}</strong></> : ''}.</>
+          )}
+        </p>
+
+        <FeedbackAlert type="success" message={cancelOk} />
+        <FeedbackAlert type="error" message={cancelError} />
+
+        {!isPro && (
+          <button type="button" className="btn-modal-save perfil-plan-primary" onClick={() => navigate('/planes')}>
+            <Crown size={16} /> Pasar a Pro
+          </button>
+        )}
+
+        {isPro && esPago && cancelAtPeriodEnd && (
+          <button
+            type="button"
+            className="btn-modal-save perfil-plan-primary"
+            disabled={reactivateLoading}
+            onClick={handleReactivarSuscripcion}
+          >
+            <RotateCcw size={16} /> {reactivateLoading ? 'Reactivando...' : 'Deshacer cancelacion'}
+          </button>
+        )}
+
+        {isPro && esPago && !cancelAtPeriodEnd && (
+          <>
+            {!confirmCancel ? (
+              <button
+                type="button"
+                className="btn-modal-cancel perfil-plan-danger"
+                onClick={() => setConfirmCancel(true)}
+              >
+                Cancelar al final del periodo
+              </button>
+            ) : (
+              <div className="perfil-cancel-box">
+                <p>
+                  No perderas Pro hoy. Lo conservaras hasta terminar el periodo actual y despues volveras a Free.
+                </p>
+                <div className="perfil-plan-actions">
+                  <button
+                    type="button"
+                    className="btn-modal-cancel perfil-plan-danger"
+                    disabled={cancelLoading}
+                    onClick={handleCancelarSuscripcion}
+                  >
+                    {cancelLoading ? 'Cancelando...' : 'Confirmar cancelacion'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-modal-cancel"
+                    disabled={cancelLoading}
+                    onClick={() => setConfirmCancel(false)}
+                  >
+                    Conservar Pro
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       <div className="card">
@@ -209,73 +312,6 @@ export default function Perfil() {
         </form>
       </div>
 
-      {isPro && esPago && (
-        <div className="card" style={{ marginTop: 18 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Suscripcion</h3>
-
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', marginBottom: 16 }}>
-            {cancelAtPeriodEnd ? (
-              <>
-                Tu suscripcion esta <span style={{ color: '#FBBF24', fontWeight: 600 }}>cancelada</span>.
-                {endsAt && (
-                  <> Tu plan Pro se mantiene hasta el <strong style={{ color: '#fff' }}>{new Date(endsAt).toLocaleDateString('es', { day: '2-digit', month: 'long', year: 'numeric' })}</strong>, luego vuelve a Free.</>
-                )}
-              </>
-            ) : (
-              <>
-                Plan <strong style={{ color: '#C487F6' }}>Pro</strong> activo.
-                {endsAt && (
-                  <> Proximo cobro: <strong style={{ color: '#fff' }}>{new Date(endsAt).toLocaleDateString('es', { day: '2-digit', month: 'long', year: 'numeric' })}</strong>.</>
-                )}
-              </>
-            )}
-          </div>
-
-          <FeedbackAlert type="success" message={cancelOk} />
-          <FeedbackAlert type="error" message={cancelError} />
-
-          {!cancelAtPeriodEnd && (
-            <>
-              {!confirmCancel ? (
-                <button
-                  type="button"
-                  className="btn-modal-cancel"
-                  style={{ width: '100%', padding: '12px 0', color: '#F87171', borderColor: 'rgba(248,113,113,0.30)' }}
-                  onClick={() => setConfirmCancel(true)}
-                >
-                  Cancelar suscripcion
-                </button>
-              ) : (
-                <div style={{ background: 'rgba(248,113,113,0.07)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 12, padding: '14px 16px' }}>
-                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', marginBottom: 14 }}>
-                    Vas a cancelar tu suscripcion Pro. Seguiras teniendo acceso hasta el fin del periodo actual y luego pasas a Free automaticamente.
-                  </p>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <button
-                      type="button"
-                      className="btn-modal-cancel"
-                      style={{ flex: 1, color: '#F87171', borderColor: 'rgba(248,113,113,0.35)' }}
-                      disabled={cancelLoading}
-                      onClick={handleCancelarSuscripcion}
-                    >
-                      {cancelLoading ? 'Cancelando...' : 'Si, cancelar'}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-modal-cancel"
-                      style={{ flex: 1 }}
-                      disabled={cancelLoading}
-                      onClick={() => setConfirmCancel(false)}
-                    >
-                      Volver
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
     </div>
   )
 }

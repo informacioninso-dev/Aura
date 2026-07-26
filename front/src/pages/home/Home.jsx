@@ -1,383 +1,325 @@
-import { ArrowRight, BarChart3, Calculator, Check, CheckCircle2, Wallet, Zap } from 'lucide-react'
+import {
+  ArrowRight,
+  BarChart3,
+  Calculator,
+  CalendarRange,
+  Check,
+  CheckCircle2,
+  Wallet,
+  Zap,
+} from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import BrandMark from '../../components/brand/BrandMark'
 import { useAuth } from '../../context/useAuth'
 import './Home.css'
 
-const features = [
-  {
-    icon: BarChart3,
-    title: 'Ves a donde va tu plata',
-    desc: 'Sin Excel, sin hojas de calculo, sin adivinar. El mes se arma solo en segundos.',
-  },
+const valueRows = [
   {
     icon: Wallet,
-    title: 'Sin sorpresas a fin de mes',
-    desc: 'Cuotas, suscripciones y gastos fijos en un solo lugar. Sin abrir el banco a las 11pm a ver si alcanza.',
+    step: '01 / AHORA',
+    title: 'Cuanto me queda de verdad?',
+    desc: 'Aura descuenta fijos, variables, cuotas y compromisos para mostrar el dinero realmente disponible.',
+    tone: 'green',
+  },
+  {
+    icon: BarChart3,
+    step: '02 / DESPUES',
+    title: 'Como vienen mis proximos meses?',
+    desc: 'La proyeccion convierte tu historial en una ruta clara, no en otra lista de movimientos pasados.',
+    tone: 'lila',
   },
   {
     icon: Calculator,
-    title: 'Simula antes de endeudarte',
-    desc: 'Prueba montos, plazos y tasas. Si el mes no aguanta la cuota, Aura te lo dice antes.',
+    step: '03 / ANTES DE DECIDIR',
+    title: 'Que pasa si hago este gasto?',
+    desc: 'Simula una compra, un prestamo o un gasto de vida y compara tu saldo futuro antes de comprometerte.',
+    tone: 'coral',
   },
-]
-
-const heroProofs = [
-  'Sin tarjeta de credito',
-  'Listo en 2 minutos',
-  'Funciona en celular',
-]
-
-const heroStats = [
-  { label: 'Hoy te quedan', value: '$380.000', tone: 'positive' },
-  { label: 'Cuotas activas', value: '$95.000', tone: 'accent' },
-  { label: 'Proximo corte', value: '8 dias', tone: 'neutral' },
-]
-
-const heroBreakdown = [
-  { label: 'Ingresos del mes', value: '$850.000', tone: 'positive' },
-  { label: 'Gastos fijos', value: '$310.000', tone: 'negative' },
-  { label: 'Cuotas y creditos', value: '$160.000', tone: 'neutral' },
-]
-
-const heroProjectionRows = [
-  { month: 'May', value: '$420.000', trend: 'up' },
-  { month: 'Jun', value: '$310.000', trend: 'down' },
-  { month: 'Jul', value: '$490.000', trend: 'up' },
 ]
 
 const pricingPlans = [
   {
     name: 'Gratis',
-    desc: 'Para empezar a ordenar tus finanzas hoy.',
-    price: null,
+    number: '01',
+    desc: 'Para ordenar el mes y probar decisiones sin pagar.',
+    price: 'Gratis',
+    period: '',
     featured: false,
-    badge: null,
     features: [
       'Dashboard de ingresos y gastos',
-      'Gastos a cuotas',
-      'Simulador de creditos',
+      'Gastos a cuotas y simulador',
       'Proyeccion de 6 meses',
-      'Hasta 2.000 filas por importacion',
     ],
     cta: 'Crear cuenta gratis',
-    ctaStyle: 'secondary',
   },
   {
     name: 'Pro',
-    desc: 'Para quien quiere ver mas lejos y decidir mejor.',
-    price: '2.99',
+    number: '02',
+    desc: 'Para ver mas lejos y proyectar con mas contexto.',
+    price: '$2.99',
+    period: '/ mes',
     featured: true,
-    badge: 'Mas popular',
     features: [
-      'Todo lo del plan Gratis',
       'Proyeccion acumulada hasta 10 anos',
-      'Modos de proyeccion avanzados',
-      'Historial ampliado hasta 24 meses',
-      'Cuentas con personas',
+      'Modos inteligente y conservador',
+      'Historial ampliado y cuentas con personas',
     ],
-    cta: 'Comenzar con Pro',
-    ctaStyle: 'primary',
+    cta: 'Elegir Pro',
   },
-]
-
-const simRows = [
-  { label: 'Quiero', value: 'Auto 2024' },
-  { label: 'Monto', value: '$15.000.000' },
-  { label: 'Banco', value: 'BCI - 8.5% anual' },
-  { label: 'Cuota', value: '$681.000' },
-  { label: 'Plazo', value: '24 meses' },
 ]
 
 export default function Home() {
   const { user } = useAuth()
   const isLoggedIn = Boolean(user)
-  const topPrimaryTarget = isLoggedIn ? '/dashboard' : '/login'
-  const topPrimaryLabel = isLoggedIn ? 'Mi dinero' : 'Ingresar'
-  const topSecondaryTarget = isLoggedIn ? '/perfil' : '/registro'
-  const topSecondaryLabel = isLoggedIn ? 'Mi perfil' : 'Crear cuenta'
-  const heroPrimaryTarget = isLoggedIn ? '/dashboard' : '/registro'
-  const heroPrimaryLabel = isLoggedIn ? 'Ir a mi dashboard' : 'Crear cuenta'
-  const heroSecondaryTarget = isLoggedIn ? '/simulador' : '/login'
-  const heroSecondaryLabel = isLoggedIn ? 'Abrir simulador' : 'Ya tengo cuenta'
-  const simulatorCtaTarget = isLoggedIn ? '/simulador' : '/registro'
-  const simulatorCtaLabel = isLoggedIn ? 'Abrir simulador' : 'Simular gratis'
-  const footerPrimaryTarget = isLoggedIn ? '/dashboard' : '/registro'
-  const footerPrimaryLabel = isLoggedIn ? 'Volver a mi dashboard' : 'Crear cuenta'
-  const footerSecondaryTarget = isLoggedIn ? '/perfil' : '/login'
-  const footerSecondaryLabel = isLoggedIn ? 'Ir a mi perfil' : 'Inicia sesion'
+  const primaryTarget = isLoggedIn ? '/dashboard' : '/registro'
+  const primaryLabel = isLoggedIn ? 'Ir a mi dinero' : 'Crear cuenta gratis'
+  const accountTarget = isLoggedIn ? '/perfil' : '/login'
+  const accountLabel = isLoggedIn ? 'Mi perfil' : 'Ingresar'
+  const simulatorTarget = isLoggedIn ? '/simulador' : '/registro'
   const logoTarget = isLoggedIn ? '/dashboard' : '/'
 
   return (
     <div className="home">
-      <nav className="nav" aria-label="Principal">
-        <div className="nav-inner">
-          <Link to={logoTarget} className="nav-logo">
-            <BrandMark className="nav-logo-icon" />
-            <div className="nav-logo-text">
-              <div className="nav-logo-name">AURA</div>
-              <div className="nav-logo-tag">Tu plata mas clara.</div>
-            </div>
+      <nav className="home-nav" aria-label="Principal">
+        <div className="home-nav-inner">
+          <Link to={logoTarget} className="home-brand">
+            <BrandMark className="home-brand-mark" />
+            <span className="home-brand-copy">
+              <strong>AURA</strong>
+              <small>Tu plata mas clara</small>
+            </span>
           </Link>
-          <div className="nav-links">
-            <Link to={topPrimaryTarget} className="btn-ghost">{topPrimaryLabel}</Link>
-            <Link to={topSecondaryTarget} className="btn-dark">{topSecondaryLabel}</Link>
+
+          <div className="home-nav-jumps" aria-label="Contenido de la pagina">
+            <a href="#como-funciona">Como funciona</a>
+            <a href="#planes">Planes</a>
+          </div>
+
+          <div className="home-nav-actions">
+            <Link to={accountTarget} className="home-btn-quiet">{accountLabel}</Link>
+            <Link to={primaryTarget} className="home-btn-nav">
+              {isLoggedIn ? 'Abrir Aura' : 'Probar gratis'}
+            </Link>
           </div>
         </div>
       </nav>
 
-      <main className="home-main">
-        <div className="hero-wrap">
-          <div className="hero">
-            <div className="hero-copy">
-              <div className="hero-badge">
-                <span className="hero-badge-dot" />
-                Gratis y sin tarjeta
+      <main>
+        <section className="home-hero-wrap">
+          <div className="home-hero">
+            <div className="home-hero-copy">
+              <div className="home-eyebrow">
+                <span />
+                Control financiero personal
               </div>
               <h1>
-                Ganaste bien este mes.
-                <br />
-                <span className="gradient">Por que no te queda nada?</span>
+                Mira hasta donde llega tu plata.
+                <em> Antes de gastarla.</em>
               </h1>
-              <p className="hero-desc">
-                Aura te muestra en segundos a donde se fue tu plata, que viene el mes que entra y si puedes tomar esa cuota sin quedar ajustado.
+              <p className="home-hero-desc">
+                Aura une lo que ganas, lo que debes y lo que planeas para decirte si una decision cabe en tus finanzas, hoy y en los meses que vienen.
               </p>
-              <div className="hero-actions">
-                <Link to={heroPrimaryTarget} className="btn-primary">
-                  {heroPrimaryLabel} <ArrowRight size={16} />
+
+              <div className="home-hero-actions">
+                <Link to={primaryTarget} className="home-btn-primary">
+                  {primaryLabel} <ArrowRight size={17} />
                 </Link>
-                <Link to={heroSecondaryTarget} className="btn-secondary-link">
-                  {heroSecondaryLabel}
-                </Link>
+                <a href="#como-funciona" className="home-btn-text">
+                  Ver como funciona
+                </a>
               </div>
-              <p className="hero-note">
-                Sin planillas. Sin sumar a mano. Sin abrir el banco a medianoche.
-              </p>
-              <div className="hero-proof-list">
-                {heroProofs.map((item) => (
-                  <span key={item} className="hero-proof-chip">{item}</span>
-                ))}
+
+              <div className="home-proof-line" aria-label="Beneficios de registro">
+                <span><Check size={14} /> Sin tarjeta</span>
+                <span><Check size={14} /> Listo en 2 minutos</span>
+                <span><Check size={14} /> Hecho para celular</span>
               </div>
             </div>
 
-            <div className="mockup">
-              <div className="mockup-bar">
-                <div className="dot dot-r" />
-                <div className="dot dot-y" />
-                <div className="dot dot-g" />
-                <div className="mockup-url">
-                  <span>app.aura.cl/dashboard</span>
+            <div className="home-money-window" aria-label="Ejemplo del panorama financiero en Aura">
+              <div className="home-money-head">
+                <div>
+                  <span className="home-money-kicker">RADAR DE TU DINERO</span>
+                  <strong>Julio 2026</strong>
                 </div>
+                <span className="home-live"><i /> Actualizado</span>
               </div>
-              <div className="mockup-body">
-                <div className="mockup-highlight">
-                  <div>
-                    <div className="mockup-highlight-label">Hoy te quedan</div>
-                    <div className="mockup-highlight-value">$1.400.000</div>
-                    <div className="mockup-highlight-sub">Despues de fijos, cuotas y extras del mes</div>
-                  </div>
-                  <span className="mockup-highlight-badge">Saldo sano</span>
+
+              <div className="home-balance">
+                <div>
+                  <span>Saldo disponible proyectado</span>
+                  <strong>$1.400.000</strong>
+                  <small>Despues de cubrir todo el mes</small>
                 </div>
-                <div className="mockup-stat-grid">
-                  {heroStats.map((stat) => (
-                    <div key={stat.label} className={`mockup-stat-card is-${stat.tone}`}>
-                      <div className="mockup-stat-label">{stat.label}</div>
-                      <div className="mockup-stat-value">{stat.value}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="mockup-panel-grid">
-                  <div className="mockup-panel">
-                    <div className="mockup-panel-title">Asi se arma tu mes</div>
-                    <div className="mockup-breakdown">
-                      {heroBreakdown.map((item) => (
-                        <div key={item.label} className="mockup-flow-row">
-                          <span>{item.label}</span>
-                          <strong className={`mockup-flow-value is-${item.tone}`}>{item.value}</strong>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="mockup-panel">
-                    <div className="mockup-panel-title">Proximo trimestre</div>
-                    <div className="mockup-projection-list">
-                      {heroProjectionRows.map((row) => (
-                        <div key={row.month} className="mockup-projection-row">
-                          <span className="mockup-projection-month">{row.month}</span>
-                          <strong className={`mockup-projection-value is-${row.trend}`}>{row.value}</strong>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div className="mockup-insight">
-                  <div className="mockup-insight-title">Antes de tomar una cuota nueva</div>
-                  <p className="mockup-insight-copy">
-                    Simula el impacto y mira si tu flujo sigue sano sin dejarte corto al cierre del mes.
-                  </p>
-                  <div className="mockup-insight-chip-row">
-                    <span className="mockup-insight-chip">Proyeccion</span>
-                    <span className="mockup-insight-chip">Simulador</span>
-                    <span className="mockup-insight-chip">Presupuesto</span>
-                  </div>
-                </div>
-                <div className="mockup-footer-note">
-                  Hecho para revisar rapido desde celular, tablet o laptop.
-                </div>
+                <span className="home-health">Saludable</span>
               </div>
-            </div>
-          </div>
-        </div>
 
-        <section>
-          <div className="section">
-            <div className="section-head">
-              <div className="section-label">Lo resuelve rapido</div>
-              <h2 className="section-title">Menos vueltas. Mas claridad.</h2>
-              <p className="section-desc">
-                Lo importante aparece primero para que decidas rapido.
-              </p>
-            </div>
-            <div className="features-grid">
-              {features.map((feature) => (
-                <div key={feature.title} className="feature-card">
-                  <div className="feature-icon">
-                    <feature.icon size={22} strokeWidth={2.2} />
-                  </div>
-                  <h3 className="feature-title">{feature.title}</h3>
-                  <p className="feature-desc">{feature.desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <div className="sim-strip">
-          <div className="sim-inner">
-            <div>
-              <div className="sim-badge">Prestamos</div>
-              <h2 className="sim-title">Si un pago a cuotas te ahoga, lo ves antes.</h2>
-              <p className="sim-desc">
-                Prueba montos, tasas y plazos antes de comprometerte.
-              </p>
-              <Link to={simulatorCtaTarget} className="btn-lila">
-                {simulatorCtaLabel} <ArrowRight size={16} />
-              </Link>
-            </div>
-
-            <div className="sim-card">
-              {simRows.map(({ label, value }) => (
-                <div key={label} className="sim-row">
-                  <span className="sim-row-label">{label}</span>
-                  <span className="sim-row-value">{value}</span>
-                </div>
-              ))}
-              <div className="sim-result">
-                <div className="sim-result-icon">
-                  <Check size={16} strokeWidth={3} />
+              <div className="home-chart-head">
+                <div>
+                  <span className="home-chart-dot is-green" />
+                  Sin hacer la compra
                 </div>
                 <div>
-                  <div className="sim-result-text">Si te da</div>
-                  <div className="sim-result-sub">
-                    Tu flujo sigue positivo cada mes.
-                  </div>
+                  <span className="home-chart-dot is-lila" />
+                  Incluyendo la compra
+                </div>
+              </div>
+
+              <div className="home-chart" aria-hidden="true">
+                <svg viewBox="0 0 520 150" preserveAspectRatio="none">
+                  <path className="home-chart-grid" d="M0 25H520M0 75H520M0 125H520M104 0V150M208 0V150M312 0V150M416 0V150" />
+                  <path className="home-chart-area" d="M0 121 C75 109 118 88 175 77 S290 58 350 38 S450 22 520 8 V150 H0 Z" />
+                  <path className="home-chart-line is-base" d="M0 121 C75 109 118 88 175 77 S290 58 350 38 S450 22 520 8" />
+                  <path className="home-chart-line is-decision" d="M0 121 C75 115 118 108 175 105 S290 95 350 86 S450 81 520 70" />
+                  <circle className="home-chart-point" cx="175" cy="105" r="4" />
+                </svg>
+                <span className="home-chart-label is-first">HOY</span>
+                <span className="home-chart-label is-last">12 MESES</span>
+              </div>
+
+              <div className="home-decision">
+                <div className="home-decision-icon"><CalendarRange size={18} /></div>
+                <div>
+                  <span>Si haces una compra de $1.200.000</span>
+                  <strong>Tu saldo sigue positivo, pero octubre queda ajustado.</strong>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <section className="pricing-section">
-          <div className="pricing-inner">
-            <div className="section-head">
-              <div className="section-label">Planes</div>
-              <h2 className="section-title">Simple y sin sorpresas.</h2>
-              <p className="section-desc">Empieza gratis y sube cuando necesites ver mas lejos.</p>
-            </div>
-            <div className="pricing-grid">
-              {pricingPlans.map((plan) => (
-                <div key={plan.name} className={`pricing-card${plan.featured ? ' is-featured' : ''}`}>
-                  {plan.badge && <div className="pricing-card-badge">{plan.badge}</div>}
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                      {plan.featured && <Zap size={16} color="#C487F6" />}
-                      <div className="pricing-card-name">{plan.name}</div>
-                    </div>
-                    <div className="pricing-card-desc">{plan.desc}</div>
-                  </div>
-                  <div className="pricing-card-price">
-                    {plan.price ? (
-                      <>
-                        <span className="pricing-price-currency">$</span>
-                        <span className="pricing-price-amount">{plan.price}</span>
-                        <span className="pricing-price-period">/ mes</span>
-                      </>
-                    ) : (
-                      <span className="pricing-price-amount">Gratis</span>
-                    )}
-                  </div>
-                  <ul className="pricing-features">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="pricing-feature">
-                        <CheckCircle2 size={14} className="pricing-feature-icon" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="pricing-cta">
-                    <Link
-                      to={isLoggedIn ? '/planes' : '/registro'}
-                      className={plan.ctaStyle === 'primary' ? 'btn-primary' : 'btn-dark'}
-                      style={{ width: '100%', justifyContent: 'center', display: 'flex' }}
-                    >
-                      {plan.cta}
-                    </Link>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="home-story-rail" aria-label="Lo que Aura muestra">
+            <div><span>01</span><strong>Lo que tienes hoy</strong></div>
+            <div><span>02</span><strong>Lo que viene despues</strong></div>
+            <div><span>03</span><strong>El costo real de decidir</strong></div>
           </div>
         </section>
 
-        <div className="cta-section">
-          <div className="cta-box">
-            <BrandMark className="cta-logo" />
-            <h2 className="cta-title">Empieza en minutos.</h2>
-            <p className="cta-desc">
-              Crea tu cuenta y entiende tu panorama sin enredarte.
-            </p>
-            <Link
-              to={footerPrimaryTarget}
-              className="btn-primary"
-              style={{ fontSize: 16, padding: '15px 32px' }}
-            >
-              {footerPrimaryLabel} <ArrowRight size={16} />
-            </Link>
-            <p className="cta-sub">
-              {isLoggedIn ? 'Acceso rapido:' : 'Ya tienes cuenta?'}{' '}
-              <Link
-                to={footerSecondaryTarget}
-                style={{ color: '#E9D5FF', textDecoration: 'none', fontWeight: 700 }}
-              >
-                {footerSecondaryLabel}
-              </Link>
+        <section id="como-funciona" className="home-value-section">
+          <div className="home-section-heading">
+            <div>
+              <span className="home-section-label">NO ES OTRO REGISTRO DE GASTOS</span>
+              <h2>Las tres preguntas que si cambian una decision.</h2>
+            </div>
+            <p>
+              Lo importante no es llenar cuadros. Es entender rapido que puedes hacer con tu dinero.
             </p>
           </div>
-        </div>
+
+          <div className="home-value-layout">
+            <div className="home-value-list">
+              {valueRows.map((item) => (
+                <article key={item.title} className={`home-value-row is-${item.tone}`}>
+                  <div className="home-value-icon"><item.icon size={21} /></div>
+                  <div>
+                    <span>{item.step}</span>
+                    <h3>{item.title}</h3>
+                    <p>{item.desc}</p>
+                  </div>
+                  <ArrowRight className="home-value-arrow" size={18} />
+                </article>
+              ))}
+            </div>
+
+            <aside className="home-simulator-sheet">
+              <div className="home-sheet-head">
+                <span>SIMULACION / COMPRA GRANDE</span>
+                <strong>Puede mi plata con esto?</strong>
+              </div>
+              <div className="home-sheet-choice">
+                <span>Decision</span>
+                <strong>Moto nueva</strong>
+                <small>$4.800.000 a 18 meses</small>
+              </div>
+              <dl className="home-sheet-numbers">
+                <div>
+                  <dt>Sin la compra</dt>
+                  <dd>$820.000</dd>
+                </div>
+                <div>
+                  <dt>Con la compra</dt>
+                  <dd>$340.000</dd>
+                </div>
+                <div>
+                  <dt>Cuota estimada</dt>
+                  <dd>-$310.000</dd>
+                </div>
+              </dl>
+              <div className="home-sheet-verdict">
+                <Check size={16} />
+                <div>
+                  <strong>La compra cabe</strong>
+                  <span>Mantienes saldo positivo durante los 18 meses.</span>
+                </div>
+              </div>
+              <Link to={simulatorTarget} className="home-sheet-link">
+                Probar una decision <ArrowRight size={16} />
+              </Link>
+            </aside>
+          </div>
+        </section>
+
+        <section id="planes" className="home-pricing-section">
+          <div className="home-pricing-inner">
+            <div className="home-section-heading is-pricing">
+              <div>
+                <span className="home-section-label">EMPIEZA SIN COMPROMETERTE</span>
+                <h2>Primero entiende tu mes. Luego decide si necesitas mas.</h2>
+              </div>
+              <p>El plan gratis ya te deja ordenar, proyectar y simular. Pro abre una mirada mas larga.</p>
+            </div>
+
+            <div className="home-plan-list">
+              {pricingPlans.map((plan) => (
+                <article key={plan.name} className={`home-plan-row${plan.featured ? ' is-featured' : ''}`}>
+                  <span className="home-plan-number">{plan.number}</span>
+                  <div className="home-plan-name">
+                    <div>
+                      {plan.featured && <Zap size={15} />}
+                      <h3>{plan.name}</h3>
+                    </div>
+                    <p>{plan.desc}</p>
+                  </div>
+                  <div className="home-plan-price">
+                    <strong>{plan.price}</strong>
+                    {plan.period && <span>{plan.period}</span>}
+                  </div>
+                  <ul>
+                    {plan.features.map((feature) => (
+                      <li key={feature}><CheckCircle2 size={14} /> {feature}</li>
+                    ))}
+                  </ul>
+                  <Link to={isLoggedIn ? '/planes' : '/registro'} className={plan.featured ? 'home-plan-cta is-featured' : 'home-plan-cta'}>
+                    {plan.cta} <ArrowRight size={15} />
+                  </Link>
+                </article>
+              ))}
+            </div>
+
+            <div className="home-closing">
+              <div>
+                <BrandMark className="home-closing-mark" />
+                <div>
+                  <span>Tu plata mas clara, desde hoy.</span>
+                  <strong>Abre Aura y arma tu primer mes en minutos.</strong>
+                </div>
+              </div>
+              <Link to={primaryTarget} className="home-btn-primary">
+                {primaryLabel} <ArrowRight size={17} />
+              </Link>
+            </div>
+          </div>
+        </section>
       </main>
 
-      <footer className="footer">
-        <div className="footer-inner">
-          <Link to={logoTarget} className="footer-logo">
-            <BrandMark className="footer-logo-icon" />
-            <span className="footer-brand">AURA - Tu plata mas clara.</span>
+      <footer className="home-footer">
+        <div className="home-footer-inner">
+          <Link to={logoTarget} className="home-brand is-footer">
+            <BrandMark className="home-brand-mark" />
+            <span className="home-brand-copy"><strong>AURA</strong></span>
           </Link>
-          <div className="footer-links">
-            <Link to={topPrimaryTarget} className="footer-link">{topPrimaryLabel}</Link>
-            <Link to={topSecondaryTarget} className="footer-link">{topSecondaryLabel}</Link>
-          </div>
-          <span className="footer-copy">(c) {new Date().getFullYear()} Aura</span>
+          <span>Aura no reemplaza asesoria financiera profesional.</span>
+          <span>(c) {new Date().getFullYear()} Aura</span>
         </div>
       </footer>
     </div>

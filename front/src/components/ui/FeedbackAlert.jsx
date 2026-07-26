@@ -5,7 +5,7 @@ export default function FeedbackAlert({ type = 'error', message }) {
     ? {
         bg: 'rgba(16,185,129,0.10)',
         border: '1px solid rgba(16,185,129,0.25)',
-        color: '#10B981',
+        color: 'var(--app-green)',
       }
     : {
         bg: 'rgba(248,113,113,0.10)',
