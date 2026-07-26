@@ -3,6 +3,8 @@ import {
   Calculator,
   CalendarClock,
   CheckCircle,
+  ChevronLeft,
+  ChevronRight,
   CreditCard,
   Repeat2,
   Save,
@@ -34,6 +36,9 @@ import '../../components/ui/app.css'
 
 const COLCHON_STORAGE_KEY = 'simulador_colchon_minimo'
 const PAST_SIMULATION_DATE_MESSAGE = 'El simulador solo permite fechas desde hoy hacia adelante.'
+const SIMULATOR_CHART_BREAKPOINT = 768
+const MOBILE_SIMULATION_WINDOW_MONTHS = 6
+const DESKTOP_SIMULATION_WINDOW_MONTHS = 12
 const PROJECTION_MODE_LABELS = {
   automatica: 'Inteligente',
   simple: 'Simple',
@@ -111,6 +116,19 @@ function normalizeDetectedDuplicates(items) {
   }))
 }
 
+function clampSimulationWindow(startIndex, totalPoints, windowSize) {
+  if (totalPoints <= 0) return { startIndex: 0, endIndex: 0 }
+
+  const safeWindowSize = Math.max(1, Math.min(windowSize, totalPoints))
+  const maxStartIndex = Math.max(0, totalPoints - safeWindowSize)
+  const safeStartIndex = Math.min(Math.max(0, startIndex), maxStartIndex)
+
+  return {
+    startIndex: safeStartIndex,
+    endIndex: Math.min(totalPoints - 1, safeStartIndex + safeWindowSize - 1),
+  }
+}
+
 function getInitialColchonMinimo() {
   if (typeof window === 'undefined') return ''
   const savedValue = window.localStorage.getItem(COLCHON_STORAGE_KEY)
@@ -145,6 +163,11 @@ export default function Simulador() {
   const [simulaciones, setSimulaciones] = useState([])
   const [form, setForm] = useState(createInitialForm)
   const [resultado, setResultado] = useState(null)
+  const [isCompactChart, setIsCompactChart] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < SIMULATOR_CHART_BREAKPOINT,
+  )
+  const [chartStartIndex, setChartStartIndex] = useState(0)
+  const [showFullChart, setShowFullChart] = useState(false)
   const [loadingData, setLoadingData] = useState(true)
   const [simulating, setSimulating] = useState(false)
   const [guardando, setGuardando] = useState(false)
@@ -158,6 +181,18 @@ export default function Simulador() {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    function handleResize() {
+      setIsCompactChart(window.innerWidth < SIMULATOR_CHART_BREAKPOINT)
+    }
+
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   useEffect(() => {
     async function loadInitialData() {
@@ -244,6 +279,8 @@ export default function Simulador() {
 
     try {
       const { data } = await api.post('/simulador/evaluar/', buildPayload())
+      setChartStartIndex(0)
+      setShowFullChart(false)
       setResultado(data)
       if (typeof window !== 'undefined') {
         window.localStorage.setItem(COLCHON_STORAGE_KEY, String(form.colchon_minimo))
@@ -342,6 +379,38 @@ export default function Simulador() {
     month: 'short',
     year: 'numeric',
   }) || form.fecha_inicio
+  const simulationFlow = resultado?.flow || []
+  const simulationWindowSize = isCompactChart
+    ? MOBILE_SIMULATION_WINDOW_MONTHS
+    : DESKTOP_SIMULATION_WINDOW_MONTHS
+  const simulationWindow = clampSimulationWindow(
+    chartStartIndex,
+    simulationFlow.length,
+    simulationWindowSize,
+  )
+  const visibleSimulationFlow = showFullChart
+    ? simulationFlow
+    : simulationFlow.slice(simulationWindow.startIndex, simulationWindow.endIndex + 1)
+  const simulationRangeLabel = visibleSimulationFlow.length
+    ? `${visibleSimulationFlow[0].label} - ${visibleSimulationFlow.at(-1).label}`
+    : ''
+  const decisionStartPoint = visibleSimulationFlow.find(
+    (point) => point.month === resultado?.fecha_inicio?.slice(0, 7),
+  )
+  const showSimulationNavigator = simulationFlow.length > simulationWindowSize
+  const canGoPreviousPeriod = simulationWindow.startIndex > 0
+  const canGoNextPeriod = simulationWindow.endIndex < simulationFlow.length - 1
+
+  function slideSimulationChart(direction) {
+    setChartStartIndex((current) => {
+      const safeCurrent = clampSimulationWindow(current, simulationFlow.length, simulationWindowSize)
+      return clampSimulationWindow(
+        safeCurrent.startIndex + direction * simulationWindowSize,
+        simulationFlow.length,
+        simulationWindowSize,
+      ).startIndex
+    })
+  }
 
   const filteredSimulaciones = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
@@ -680,8 +749,16 @@ export default function Simulador() {
                       aria-label={`Dinero que te quedaría con y sin este gasto durante ${resultado.horizon_months} meses`}
                     >
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={resultado.flow} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                        <LineChart data={visibleSimulationFlow} margin={{ top: 18, right: 8, left: 0, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                          {decisionStartPoint && (
+                            <ReferenceLine
+                              x={decisionStartPoint.label}
+                              stroke="#F87171"
+                              strokeDasharray="4 4"
+                              label={{ value: 'Empieza el gasto', position: 'insideTopRight', fill: '#FCA5A5', fontSize: 10 }}
+                            />
+                          )}
                           <XAxis dataKey="label" minTickGap={34} tick={{ fill: 'rgba(255,255,255,0.40)', fontSize: 10 }} />
                           <YAxis
                             width={66}
@@ -705,6 +782,37 @@ export default function Simulador() {
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
+                    {showSimulationNavigator && (
+                      <div className="simulator-chart-navigator">
+                        <button
+                          type="button"
+                          onClick={() => slideSimulationChart(-1)}
+                          disabled={showFullChart || !canGoPreviousPeriod}
+                          aria-label="Ver periodo anterior"
+                        >
+                          <ChevronLeft size={18} />
+                        </button>
+                        <div className="simulator-chart-range" aria-live="polite">
+                          <strong>{simulationRangeLabel}</strong>
+                          <span>{showFullChart ? `${simulationFlow.length} meses` : `${visibleSimulationFlow.length} de ${simulationFlow.length} meses`}</span>
+                          <button
+                            type="button"
+                            className="simulator-chart-view-toggle"
+                            onClick={() => setShowFullChart((current) => !current)}
+                          >
+                            {showFullChart ? 'Ver por periodos' : 'Ver todo'}
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => slideSimulationChart(1)}
+                          disabled={showFullChart || !canGoNextPeriod}
+                          aria-label="Ver periodo siguiente"
+                        >
+                          <ChevronRight size={18} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </>
               ) : (
