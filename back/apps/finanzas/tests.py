@@ -25,6 +25,7 @@ from .models import (
 )
 from .utils import (
     _monto_base_gasto_mes,
+    _monto_variable_proyectado_inteligente,
     parece_gasto_variable,
     calcular_balance_mes,
     calcular_proyeccion_acumulada,
@@ -1106,7 +1107,7 @@ class TestFinanzasAPI(APITestCase):
         self.assertEqual(response.data['analysis_history_cap_months'], 18)
         self.assertEqual(response.data['history_months_used'], 12)
         self.assertTrue(response.data['variable_projection_applied'])
-        self.assertEqual(response.data['min_variable_history_months'], 3)
+        self.assertEqual(response.data['min_variable_history_months'], 0)
         self.assertEqual(
             Decimal(str(response.data['starting_balance'])),
             Decimal(str(response.data['series'][5]['closing_balance'])),
@@ -1303,12 +1304,13 @@ class TestFinanzasAPI(APITestCase):
         )
 
         self.assertEqual(data['history_months_used'], 2)
-        self.assertFalse(data['variable_projection_applied'])
+        self.assertTrue(data['variable_projection_applied'])
+        self.assertEqual(data['min_variable_history_months'], 0)
         self.assertEqual(Decimal(str(data['smoothed_variable_ingresos'])), Decimal('0.0'))
         self.assertEqual(Decimal(str(data['smoothed_variable_gastos'])), Decimal('0.0'))
         self.assertEqual(Decimal(str(data['series'][1]['projected_gap'])), Decimal('600.0'))
 
-    def test_proyeccion_acumulada_plan_pro_exige_tres_meses_elegibles(self):
+    def test_proyeccion_conservadora_respeta_un_unico_puntual_elegible(self):
         current_month = first_day_of_month(datetime.date.today())
         previous_month = add_months(current_month, -1)
         self.user_a.date_joined = aware_midnight(add_months(current_month, -12))
@@ -1316,7 +1318,7 @@ class TestFinanzasAPI(APITestCase):
 
         plan_pro = Plan.objects.get(slug='pro')
         assign_plan_to_user(user=self.user_a, plan=plan_pro, assigned_by=None, notes='Projection eligibility threshold')
-        self.user_a.projection_mode = 'personalizada'
+        self.user_a.projection_mode = 'conservadora'
         self.user_a.save(update_fields=['projection_mode'])
 
         Ingreso.objects.create(
@@ -1365,13 +1367,14 @@ class TestFinanzasAPI(APITestCase):
         response = self.client.get('/api/finanzas/proyeccion-acumulada/?months=1&past_months=6')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['history_months_used'], 1)
-        self.assertFalse(response.data['variable_projection_applied'])
+        self.assertEqual(response.data['history_months_used'], 2)
+        self.assertTrue(response.data['variable_projection_applied'])
+        self.assertEqual(response.data['conservative_punctual_months_used'], 1)
         self.assertEqual(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('0.0'))
-        self.assertEqual(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('0.0'))
-        self.assertEqual(Decimal(str(response.data['series'][-1]['projected_gap'])), Decimal('600.0'))
+        self.assertEqual(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('833.33'))
+        self.assertEqual(Decimal(str(response.data['series'][-1]['projected_gap'])), Decimal('-233.33'))
 
-    def test_proyeccion_acumulada_plan_pro_aplica_variable_con_tres_meses_elegibles(self):
+    def test_proyeccion_conservadora_prorratea_puntuales_del_ultimo_ano(self):
         current_month = first_day_of_month(datetime.date.today())
         previous_month = add_months(current_month, -1)
         self.user_a.date_joined = aware_midnight(add_months(current_month, -12))
@@ -1379,7 +1382,7 @@ class TestFinanzasAPI(APITestCase):
 
         plan_pro = Plan.objects.get(slug='pro')
         assign_plan_to_user(user=self.user_a, plan=plan_pro, assigned_by=None, notes='Projection eligibility applied')
-        self.user_a.projection_mode = 'personalizada'
+        self.user_a.projection_mode = 'conservadora'
         self.user_a.save(update_fields=['projection_mode'])
 
         Ingreso.objects.create(
@@ -1439,8 +1442,105 @@ class TestFinanzasAPI(APITestCase):
         self.assertTrue(response.data['variable_projection_applied'])
         # Los ingresos puntuales no se proyectan hacia adelante (solo cuentan en su mes real).
         self.assertEqual(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('0.0'))
-        self.assertGreater(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('0.0'))
-        self.assertEqual(Decimal(str(response.data['series'][-1]['projected_gap'])), Decimal('550.0'))
+        self.assertEqual(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('12.5'))
+        self.assertEqual(Decimal(str(response.data['series'][-1]['projected_gap'])), Decimal('587.5'))
+
+    def test_proyeccion_simple_usa_estimado_aunque_exista_un_real(self):
+        current_month = first_day_of_month(local_today())
+        assign_plan_to_user(
+            user=self.user_a,
+            plan=Plan.objects.get(slug='pro'),
+            assigned_by=None,
+            notes='Simple projection uses estimate',
+        )
+        self.user_a.projection_mode = 'simple'
+        self.user_a.save(update_fields=['projection_mode'])
+        gasto = GastoCorriente.objects.create(
+            usuario=self.user_a,
+            descripcion='Luz',
+            categoria='servicios',
+            monto=Decimal('50.00'),
+            tipo_monto='variable',
+            frecuencia='mensual',
+            fecha_inicio=add_months(current_month, -18),
+            activo=True,
+        )
+        previous_month = add_months(current_month, -1)
+        GastoCorrienteEjecucion.objects.create(
+            gasto=gasto,
+            anio=previous_month.year,
+            mes=previous_month.month,
+            monto_real=Decimal('200.00'),
+        )
+
+        data = calcular_proyeccion_acumulada(self.user_a, months=1, history_months=18)
+
+        self.assertEqual(data['projection_mode'], 'simple')
+        self.assertEqual(Decimal(str(data['series'][-1]['monthly_gastos'])), Decimal('50.0'))
+
+    def test_proyeccion_inteligente_pondera_18_meses_de_variables(self):
+        current_month = first_day_of_month(local_today())
+        assign_plan_to_user(
+            user=self.user_a,
+            plan=Plan.objects.get(slug='pro'),
+            assigned_by=None,
+            notes='Intelligent weighted projection',
+        )
+        self.user_a.projection_mode = 'automatica'
+        self.user_a.save(update_fields=['projection_mode'])
+        gasto = GastoCorriente.objects.create(
+            usuario=self.user_a,
+            descripcion='Supermercado',
+            categoria='alimentacion',
+            monto=Decimal('50.00'),
+            tipo_monto='variable',
+            frecuencia='mensual',
+            fecha_inicio=add_months(current_month, -24),
+            activo=True,
+        )
+        for offset in range(1, 19):
+            period = add_months(current_month, -offset)
+            amount = Decimal('200.00') if offset <= 12 else Decimal('100.00')
+            GastoCorrienteEjecucion.objects.create(
+                gasto=gasto, anio=period.year, mes=period.month, monto_real=amount,
+            )
+
+        data = calcular_proyeccion_acumulada(self.user_a, months=1, history_months=18)
+
+        self.assertEqual(data['projection_mode'], 'automatica')
+        self.assertEqual(data['variable_history_months_used'], 18)
+        self.assertEqual(data['variable_history_observations'], 18)
+        self.assertEqual(Decimal(str(data['series'][-1]['monthly_gastos'])), Decimal('180.0'))
+
+    def test_proyeccion_conservadora_incluye_un_puntual_sin_minimo(self):
+        current_month = first_day_of_month(local_today())
+        assign_plan_to_user(
+            user=self.user_a,
+            plan=Plan.objects.get(slug='pro'),
+            assigned_by=None,
+            notes='Conservative projection without minimum',
+        )
+        self.user_a.projection_mode = 'conservadora'
+        self.user_a.save(update_fields=['projection_mode'])
+        previous_month = add_months(current_month, -1)
+        GastoNoCorriente.objects.create(
+            usuario=self.user_a,
+            descripcion='Reparacion',
+            categoria='otro',
+            monto=Decimal('1200.00'),
+            fecha=previous_month + datetime.timedelta(days=5),
+            incluir_en_proyeccion=True,
+        )
+
+        data = calcular_proyeccion_acumulada(self.user_a, months=1, history_months=18)
+
+        self.assertEqual(data['projection_mode'], 'conservadora')
+        self.assertTrue(data['variable_projection_applied'])
+        self.assertEqual(data['min_variable_history_months'], 0)
+        self.assertEqual(data['conservative_punctual_months_used'], 1)
+        self.assertEqual(Decimal(str(data['conservative_punctual_total'])), Decimal('1200.0'))
+        self.assertEqual(Decimal(str(data['smoothed_variable_gastos'])), Decimal('100.0'))
+        self.assertEqual(Decimal(str(data['series'][-1]['monthly_gastos'])), Decimal('100.0'))
 
     def test_proyeccion_acumulada_modo_simple_no_proyecta_puntuales(self):
         current_month = first_day_of_month(datetime.date.today())
@@ -1565,7 +1665,7 @@ class TestFinanzasAPI(APITestCase):
             Decimal(str(response_simple.data['series'][-1]['projected_gap'])),
         )
 
-    def test_proyeccion_acumulada_plan_pro_estima_variable_segun_frecuencia_de_meses_activos(self):
+    def test_proyeccion_conservadora_distribuye_puntuales_entre_doce_meses(self):
         current_month = first_day_of_month(datetime.date.today())
         previous_month = add_months(current_month, -1)
         self.user_a.date_joined = aware_midnight(add_months(current_month, -12))
@@ -1625,8 +1725,8 @@ class TestFinanzasAPI(APITestCase):
         self.assertTrue(response.data['variable_projection_applied'])
         # Los ingresos puntuales no se proyectan hacia adelante (solo cuentan en su mes real).
         self.assertEqual(Decimal(str(response.data['smoothed_variable_ingresos'])), Decimal('0.0'))
-        self.assertEqual(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('60.0'))
-        self.assertEqual(Decimal(str(response.data['series'][-1]['projected_gap'])), Decimal('540.0'))
+        self.assertEqual(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('15.0'))
+        self.assertEqual(Decimal(str(response.data['series'][-1]['projected_gap'])), Decimal('585.0'))
 
     def test_proyeccion_acumulada_plan_pro_amortigua_outlier_con_iqr_y_ewma(self):
         current_month = first_day_of_month(datetime.date.today())
@@ -1691,7 +1791,7 @@ class TestFinanzasAPI(APITestCase):
 
         plan_pro = Plan.objects.get(slug='pro')
         assign_plan_to_user(user=self.user_a, plan=plan_pro, assigned_by=None, notes='Backfilled extras count')
-        self.user_a.projection_mode = 'personalizada'
+        self.user_a.projection_mode = 'conservadora'
         self.user_a.save(update_fields=['projection_mode'])
 
         Ingreso.objects.create(
@@ -1737,7 +1837,7 @@ class TestFinanzasAPI(APITestCase):
         self.assertEqual(response.data['history_months_used'], 3)
         self.assertTrue(response.data['variable_projection_applied'])
         self.assertEqual(response.data['analysis_history_months'], 3)
-        self.assertEqual(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('75.0'))
+        self.assertEqual(Decimal(str(response.data['smoothed_variable_gastos'])), Decimal('18.75'))
 
     def test_proyeccion_acumulada_deja_past_months_solo_para_la_vista(self):
         current_month = first_day_of_month(datetime.date.today())
@@ -1840,6 +1940,57 @@ class TestGastosVariables(APITestCase):
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['descripcion'], 'Luz')
 
+    # -- Proyeccion inteligente: 18 meses, ultimo ano con doble peso ----------
+
+    def test_inteligente_usa_un_solo_real_sin_exigir_minimo(self):
+        gasto = self._crear_variable(monto='50.00')
+        reference_month = first_day_of_month(local_today())
+        previous_month = add_months(reference_month, -1)
+        GastoCorrienteEjecucion.objects.create(
+            gasto=gasto,
+            anio=previous_month.year,
+            mes=previous_month.month,
+            monto_real=Decimal('72.00'),
+        )
+
+        self.assertEqual(
+            _monto_variable_proyectado_inteligente(
+                gasto.id, gasto.monto, reference_month, mapa_ejecuciones_variables(self.user),
+            ),
+            Decimal('72.00'),
+        )
+
+    def test_inteligente_pondera_todos_los_18_meses(self):
+        gasto = self._crear_variable(monto='50.00')
+        reference_month = first_day_of_month(local_today())
+        for offset in range(1, 19):
+            period = add_months(reference_month, -offset)
+            amount = Decimal('200.00') if offset <= 12 else Decimal('100.00')
+            GastoCorrienteEjecucion.objects.create(
+                gasto=gasto, anio=period.year, mes=period.month, monto_real=amount,
+            )
+
+        self.assertEqual(
+            _monto_variable_proyectado_inteligente(
+                gasto.id, gasto.monto, reference_month, mapa_ejecuciones_variables(self.user),
+            ),
+            Decimal('180.00'),
+        )
+
+    def test_inteligente_ignora_reales_anteriores_a_18_meses(self):
+        gasto = self._crear_variable(monto='50.00')
+        reference_month = first_day_of_month(local_today())
+        old_period = add_months(reference_month, -19)
+        GastoCorrienteEjecucion.objects.create(
+            gasto=gasto, anio=old_period.year, mes=old_period.month, monto_real=Decimal('999.00'),
+        )
+
+        self.assertEqual(
+            _monto_variable_proyectado_inteligente(
+                gasto.id, gasto.monto, reference_month, mapa_ejecuciones_variables(self.user),
+            ),
+            Decimal('50.00'),
+        )
     # -- Resolucion de monto: real -> promedio -> estimado --------------------
 
     def test_sin_historial_usa_el_monto_estimado(self):

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts'
-import { TrendingUp, TrendingDown, Wallet, PiggyBank, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, X, LayoutList, Tag } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, PiggyBank, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, Maximize2, X, LayoutList, Tag } from 'lucide-react'
 
 import api from '../../api/client'
 import { getApiErrorMessage } from '../../api/errors'
@@ -47,16 +47,19 @@ const DESKTOP_PROJECTION_WINDOW_MONTHS = 12
 const MOBILE_CHART_BREAKPOINT = 768
 
 
-function getProjectionAnalysisHelp(mode, analysisMonths, analysisCapMonths) {
-  const historyText = analysisMonths > 0
-    ? (analysisMonths < analysisCapMonths
-        ? `La proyeccion analiza ${analysisMonths} meses porque es la historia disponible.`
-        : `La proyeccion analiza hasta ${analysisCapMonths} meses de historial disponible.`)
-    : 'Aun no hay historial suficiente para analizar ingresos y gastos puntuales.'
+function getProjectionAnalysisHelp(mode, variableHistoryMonths, variableHistoryObservations) {
+  if (mode === 'simple') {
+    return 'Simple proyecta tus fijos, variables y diferidos con los montos estimados que registraste. No proyecta gastos puntuales al futuro.'
+  }
 
-  if (mode === 'simple') return `${historyText} Simple es aritmetica: suma tus fijos, variables y diferidos. No proyecta gastos puntuales al futuro.`
-  if (mode === 'conservadora') return `${historyText} Conservadora agrega un colchon: reparte tus gastos puntuales del ultimo ano entre los meses futuros, para prever imprevistos.`
-  return `${historyText} Inteligente proyecta tus fijos y variables sin sumar imprevistos.`
+  const variableHistoryText = variableHistoryObservations > 0
+    ? `Usa ${variableHistoryObservations} registros reales de variables en ${variableHistoryMonths} ${variableHistoryMonths === 1 ? 'mes' : 'meses'}, dentro de una ventana de hasta 18 meses. El ultimo ano tiene peso doble.`
+    : 'Aun no hay montos reales de variables; mientras los registras, usa tus estimados.'
+
+  if (mode === 'conservadora') {
+    return `${variableHistoryText} Conservadora tambien distribuye entre 12 meses los gastos puntuales que marcaste para incluir.`
+  }
+  return `${variableHistoryText} Inteligente no proyecta gastos puntuales historicos.`
 }
 
 function getFrequencyLabel(frequency) {
@@ -165,6 +168,7 @@ export default function Dashboard() {
   const [projectionModeSaving, setProjectionModeSaving] = useState(false)
   const [pastMonths, setPastMonths] = useState(6)
   const [futureMonths, setFutureMonths] = useState(12)
+  const [showProjectionPeriod, setShowProjectionPeriod] = useState(false)
   const [seriesFocus, setSeriesFocus] = useState('all')
   const [activeSummaryDetail, setActiveSummaryDetail] = useState(null)
   const [detailSort, setDetailSort] = useState('amount-desc')
@@ -1331,14 +1335,16 @@ export default function Dashboard() {
 
           {/* ── 1. Stats clave — se muestran con datos anteriores mientras recalcula ── */}
           {advancedProjection && !projectionError && !advancedChartEmpty && (() => {
-            const histMeses = advancedProjection?.history_months_used ?? 0
-            const svi = advancedProjection?.smoothed_variable_ingresos ?? 0
-            const svg = advancedProjection?.smoothed_variable_gastos ?? 0
             const projectedGap = latestProjectedPoint?.gapAcumulado ?? 0
             const projectedGapLabel = latestProjectedPoint?.label ?? 'fin del horizonte'
-            const variableProjectionApplied = advancedProjection?.variable_projection_applied ?? true
-            const minVariableHistoryMonths = advancedProjection?.min_variable_history_months ?? 3
-            const analysisHistoryMonths = advancedProjection?.analysis_history_months ?? 0
+            const variableHistoryMonths = advancedProjection?.variable_history_months_used ?? 0
+            const variableHistoryObservations = advancedProjection?.variable_history_observations ?? 0
+            const variableHistoryCap = advancedProjection?.variable_history_cap_months ?? 18
+            const punctualReserve = advancedProjection?.smoothed_variable_gastos ?? 0
+            const punctualTotal = advancedProjection?.conservative_punctual_total ?? 0
+            const punctualHistoryMonths = advancedProjection?.conservative_punctual_history_months ?? 12
+            const isSimpleMode = projectionMode === 'simple'
+            const isConservativeMode = projectionMode === 'conservadora'
             return (
               <div className="dashboard-premium-meta">
                 <div className="dashboard-premium-stat">
@@ -1354,32 +1360,42 @@ export default function Dashboard() {
                   <span className="dashboard-chart-note">Saldo con el que arranca esta proyeccion</span>
                 </div>
                 <div className="dashboard-premium-stat">
-                  <span className="dashboard-premium-stat-label">Promedio de ingresos puntuales</span>
-                  <strong className="dashboard-premium-stat-value" style={{ color: '#10B981' }}>{fmt(svi)}</strong>
+                  <span className="dashboard-premium-stat-label">Calculo de variables</span>
+                  <strong className="dashboard-premium-stat-value">{isSimpleMode ? 'Estimado' : 'Ponderado'}</strong>
+                  <span className="dashboard-chart-note">
+                    {isSimpleMode ? 'Usa los montos que registraste' : 'El ultimo ano tiene peso doble'}
+                  </span>
                 </div>
                 <div className="dashboard-premium-stat">
-                  <span className="dashboard-premium-stat-label">Promedio de gastos puntuales</span>
-                  <strong className="dashboard-premium-stat-value" style={{ color: '#F87171' }}>{fmt(svg)}</strong>
-                </div>
-                <div className="dashboard-premium-stat">
-                  <span className="dashboard-premium-stat-label">Calculado usando</span>
+                  <span className="dashboard-premium-stat-label">Historial variable</span>
                   <strong className="dashboard-premium-stat-value">
-                    {histMeses} {histMeses === 1 ? 'mes con puntuales' : 'meses con puntuales'}
+                    {isSimpleMode ? 'No aplica' : `${variableHistoryObservations} ${variableHistoryObservations === 1 ? 'registro' : 'registros'}`}
                   </strong>
                   <span className="dashboard-chart-note">
-                    {variableProjectionApplied
-                      ? `Proyeccion basada en ${analysisHistoryMonths} meses de historia`
-                      : `Necesitas al menos ${minVariableHistoryMonths} meses con puntuales`}
+                    {isSimpleMode
+                      ? 'Simple no ajusta montos con el historial'
+                      : variableHistoryObservations > 0
+                        ? `${variableHistoryMonths} ${variableHistoryMonths === 1 ? 'mes con datos' : 'meses con datos'} de hasta ${variableHistoryCap}`
+                        : 'Usa estimados hasta que registres valores reales'}
+                  </span>
+                </div>
+                <div className="dashboard-premium-stat">
+                  <span className="dashboard-premium-stat-label">Reserva por puntuales</span>
+                  <strong className="dashboard-premium-stat-value" style={{ color: isConservativeMode ? '#F87171' : undefined }}>
+                    {isConservativeMode ? fmt(punctualReserve) : 'No incluida'}
+                  </strong>
+                  <span className="dashboard-chart-note">
+                    {isConservativeMode
+                      ? `${fmt(punctualTotal)} seleccionados / ${punctualHistoryMonths} meses`
+                      : 'Disponible al usar el modo Conservadora'}
                   </span>
                 </div>
               </div>
             )
           })()}
-
           {/* ── 2. Controles ── */}
           <div className="dashboard-chart-toolbar">
-            {/* Fila 1: selectores */}
-            <div className="dashboard-chart-toolbar-row">
+            <div className="dashboard-chart-toolbar-primary">
               <label className="dashboard-chart-control">
                 <span>Modo</span>
                 <select
@@ -1393,48 +1409,90 @@ export default function Dashboard() {
                   ))}
                 </select>
               </label>
-              <label className="dashboard-chart-control">
-                <span>Historia</span>
-                <select
-                  className="dashboard-chart-select"
-                  value={pastMonths}
-                  onChange={(e) => {
-                    const val = Number(e.target.value)
-                    preserveScroll(() => setPastMonths(val))
-                    clearTimeout(projectionDebounceRef.current)
-                    projectionDebounceRef.current = setTimeout(() => loadProjectionChart(futureMonths, val), 300)
-                  }}
+
+              <div className="dashboard-chart-toolbar-actions">
+                <button
+                  type="button"
+                  className="dashboard-chart-icon-button"
+                  onClick={handleManualRefresh}
+                  disabled={loading || refreshing || projectionLoading}
+                  aria-label={projectionLoading ? 'Actualizando proyeccion' : 'Actualizar proyeccion'}
+                  title={projectionLoading ? 'Actualizando proyeccion' : 'Actualizar proyeccion'}
                 >
-                  <option value={3}>3 meses</option>
-                  <option value={6}>6 meses</option>
-                  <option value={12}>12 meses</option>
-                  <option value={24}>24 meses</option>
-                </select>
-              </label>
-              <label className="dashboard-chart-control">
-                <span>Horizonte</span>
-                <select
-                  className="dashboard-chart-select"
-                  value={futureMonths}
-                  onChange={(e) => {
-                    const val = Number(e.target.value)
-                    preserveScroll(() => setFutureMonths(val))
-                    clearTimeout(projectionDebounceRef.current)
-                    projectionDebounceRef.current = setTimeout(() => loadProjectionChart(val, pastMonths), 300)
-                  }}
+                  <RefreshCw size={17} className={projectionLoading ? 'is-spinning' : ''} />
+                </button>
+                <button
+                  type="button"
+                  className="dashboard-chart-icon-button dashboard-chart-view-all"
+                  onClick={() => setShowFullChart(true)}
+                  aria-label="Ampliar proyeccion"
+                  title="Ampliar proyeccion"
                 >
-                  <option value={12}>1 año</option>
-                  <option value={24}>2 años</option>
-                  <option value={60}>5 años</option>
-                  {availableFutureProjectionOptions.some((option) => option.value === 120) && (
-                    <option value={120}>10 años</option>
-                  )}
-                </select>
-              </label>
+                  <Maximize2 size={17} />
+                </button>
+              </div>
             </div>
-            {/* Fila 2: toggles + recalcular + ver todo (desktop) */}
-            <div className="dashboard-chart-toolbar-row">
-              <div className="dashboard-chart-toggle-group" role="tablist" aria-label="Curvas de la proyeccion">
+
+            <button
+              type="button"
+              className="dashboard-chart-period-trigger"
+              onClick={() => setShowProjectionPeriod((current) => !current)}
+              aria-expanded={showProjectionPeriod}
+              aria-controls="dashboard-projection-period"
+            >
+              <span>Ajustar periodo</span>
+              <span className="dashboard-chart-period-summary">
+                {pastMonths} meses / {futureMonths === 12 ? '1 año' : `${futureMonths / 12} años`}
+                <ChevronDown size={16} className={showProjectionPeriod ? 'is-open' : ''} />
+              </span>
+            </button>
+
+            <div className="dashboard-chart-options-row">
+              <div
+                id="dashboard-projection-period"
+                className={`dashboard-chart-period-controls ${showProjectionPeriod ? 'is-open' : ''}`}
+              >
+                <label className="dashboard-chart-control">
+                  <span>Historia</span>
+                  <select
+                    className="dashboard-chart-select"
+                    value={pastMonths}
+                    onChange={(e) => {
+                      const val = Number(e.target.value)
+                      preserveScroll(() => setPastMonths(val))
+                      clearTimeout(projectionDebounceRef.current)
+                      projectionDebounceRef.current = setTimeout(() => loadProjectionChart(futureMonths, val), 300)
+                    }}
+                  >
+                    <option value={3}>3 meses</option>
+                    <option value={6}>6 meses</option>
+                    <option value={12}>12 meses</option>
+                    <option value={24}>24 meses</option>
+                  </select>
+                </label>
+                <label className="dashboard-chart-control">
+                  <span>Horizonte</span>
+                  <select
+                    className="dashboard-chart-select"
+                    value={futureMonths}
+                    onChange={(e) => {
+                      const val = Number(e.target.value)
+                      preserveScroll(() => setFutureMonths(val))
+                      clearTimeout(projectionDebounceRef.current)
+                      projectionDebounceRef.current = setTimeout(() => loadProjectionChart(val, pastMonths), 300)
+                    }}
+                  >
+                    <option value={12}>1 año</option>
+                    <option value={24}>2 años</option>
+                    <option value={60}>5 años</option>
+                    {availableFutureProjectionOptions.some((option) => option.value === 120) && (
+                      <option value={120}>10 años</option>
+                    )}
+                  </select>
+                </label>
+              </div>
+
+              <div className="dashboard-chart-toggle-group dashboard-chart-series-control" role="tablist" aria-label="Curvas de la proyeccion">
                 {SERIES_FOCUS_OPTIONS.map((option) => (
                   <button
                     key={option.value}
@@ -1447,51 +1505,16 @@ export default function Dashboard() {
                   </button>
                 ))}
               </div>
-              <button
-                type="button"
-                className="btn-modal-cancel"
-                onClick={handleManualRefresh}
-                disabled={loading || refreshing || projectionLoading}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 13px', whiteSpace: 'nowrap', flexShrink: 0 }}
-              >
-                <RefreshCw size={14} style={{ opacity: refreshing || projectionLoading ? 0.7 : 1 }} />
-                {projectionLoading ? 'Recalculando...' : 'Recalcular'}
-              </button>
-              <button type="button" className="dashboard-chart-view-all" onClick={() => setShowFullChart(true)}>
-                Ver todo
-              </button>
             </div>
           </div>
-
           {/* ── 3. Nota de analisis ── */}
           <p className="dashboard-chart-note" style={{ marginTop: 10 }}>
             {getProjectionAnalysisHelp(
               projectionMode,
-              advancedProjection?.analysis_history_months ?? 0,
-              advancedProjection?.analysis_history_cap_months ?? 18,
+              advancedProjection?.variable_history_months_used ?? 0,
+              advancedProjection?.variable_history_observations ?? 0,
             )}
           </p>
-          {advancedProjection && !projectionError && !advancedChartEmpty && (() => {
-            const histMesesAviso = advancedProjection?.history_months_used ?? 0
-            const variableProjectionApplied = advancedProjection?.variable_projection_applied ?? true
-            const minVariableHistoryMonths = advancedProjection?.min_variable_history_months ?? 3
-            const analysisHistoryMonths = advancedProjection?.analysis_history_months ?? 0
-            if (!variableProjectionApplied) return (
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 12, padding: '10px 14px', marginTop: 8 }}>
-                <span style={{ fontSize: 16, lineHeight: 1 }}>!</span>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#FBBF24', marginBottom: 2 }}>La base fija ya esta proyectada</div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
-                    {histMesesAviso === 0
-                      ? `Tus ingresos, gastos fijos y cuotas ya estan incluidos. Los puntuales aun no entran porque necesitas ${minVariableHistoryMonths} meses con ingresos o gastos puntuales dentro de la historia analizada (${analysisHistoryMonths} meses disponibles hoy).`
-                      : `Tus ingresos, gastos fijos y cuotas ya estan incluidos. Los puntuales aun no entran porque solo hay ${histMesesAviso} ${histMesesAviso === 1 ? 'mes' : 'meses'} con ingresos o gastos puntuales dentro de la historia analizada (${analysisHistoryMonths} meses disponibles hoy); necesitas ${minVariableHistoryMonths}.`}
-                  </div>
-                </div>
-              </div>
-            )
-            return null
-          })()}
-
           {/* ── 4. Chart ── */}
           {projectionError ? (
             <div className="empty-state">

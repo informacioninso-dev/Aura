@@ -5,6 +5,16 @@ from django.db import models
 from django.conf import settings
 
 
+TIPO_ESCENARIO_CONTADO = 'contado'
+TIPO_ESCENARIO_CUOTAS = 'cuotas'
+TIPO_ESCENARIO_RECURRENTE = 'recurrente'
+TIPO_ESCENARIO_CHOICES = (
+    (TIPO_ESCENARIO_CONTADO, 'Pago unico'),
+    (TIPO_ESCENARIO_CUOTAS, 'A cuotas o prestamo'),
+    (TIPO_ESCENARIO_RECURRENTE, 'Nuevo gasto mensual'),
+)
+
+
 class Banco(models.Model):
     nombre = models.CharField(max_length=100)
     tasa_anual_minima = models.DecimalField(max_digits=5, decimal_places=2, help_text='Tasa anual mínima en %')
@@ -26,6 +36,7 @@ class Banco(models.Model):
 class Simulacion(models.Model):
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='simulaciones')
     nombre = models.CharField(max_length=200, help_text='Ej: Casa en Las Condes, iPhone 15 Pro')
+    tipo = models.CharField(max_length=20, choices=TIPO_ESCENARIO_CHOICES, default=TIPO_ESCENARIO_CUOTAS)
     monto = models.DecimalField(max_digits=14, decimal_places=2)
     banco = models.ForeignKey(Banco, on_delete=models.SET_NULL, null=True, blank=True)
     tasa_anual = models.DecimalField(max_digits=5, decimal_places=2, help_text='Tasa anual en %')

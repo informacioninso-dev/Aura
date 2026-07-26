@@ -6,6 +6,9 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from apps.usuarios.models import Plan
+from apps.usuarios.plans import assign_plan_to_user
+
 from .models import Banco, Simulacion
 
 
@@ -46,6 +49,109 @@ class TestSimuladorAPI(APITestCase):
             activo=False,
         )
 
+    def _future_month_date(self, day=15):
+        today = timezone.localdate()
+        next_month = (today.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
+        return next_month.replace(day=day).isoformat()
+
+    def _evaluation_payload(self, **overrides):
+        payload = {
+            'tipo': 'contado',
+            'nombre': 'Decision futura',
+            'monto': '1200.00',
+            'banco': None,
+            'tasa_anual': '0.00',
+            'plazo_meses': 1,
+            'colchon_minimo': '100.00',
+            'fecha_inicio': self._future_month_date(),
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_evaluar_pago_unico_impacta_exactamente_un_mes(self):
+        self.client.force_authenticate(user=self.user_a)
+
+        response = self.client.post(
+            '/api/simulador/evaluar/',
+            self._evaluation_payload(),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        impacts = [point['impacto_escenario'] for point in response.data['flow'] if point['impacto_escenario']]
+        self.assertEqual(impacts, [1200.0])
+        self.assertEqual(response.data['projection_mode'], 'simple')
+        self.assertEqual(response.data['meses_con_impacto'], 1)
+
+    def test_evaluar_cuotas_respeta_doce_meses_aunque_inicie_dia_quince(self):
+        self.client.force_authenticate(user=self.user_a)
+
+        response = self.client.post(
+            '/api/simulador/evaluar/',
+            self._evaluation_payload(
+                tipo='cuotas',
+                banco=self.banco_activo.id,
+                tasa_anual='12.00',
+                plazo_meses=12,
+            ),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        impacts = [point for point in response.data['flow'] if point['impacto_escenario']]
+        self.assertEqual(len(impacts), 12)
+        self.assertEqual(response.data['meses_con_impacto'], 12)
+        self.assertGreater(response.data['total_intereses'], 0)
+
+    def test_evaluar_gasto_mensual_aplica_toda_su_duracion(self):
+        self.client.force_authenticate(user=self.user_a)
+
+        response = self.client.post(
+            '/api/simulador/evaluar/',
+            self._evaluation_payload(
+                tipo='recurrente',
+                monto='350.00',
+                plazo_meses=6,
+            ),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        impacts = [point['impacto_escenario'] for point in response.data['flow'] if point['impacto_escenario']]
+        self.assertEqual(impacts, [350.0] * 6)
+        self.assertEqual(response.data['total_a_pagar'], 2100.0)
+
+    def test_evaluar_respeta_limites_del_banco(self):
+        self.client.force_authenticate(user=self.user_a)
+
+        response = self.client.post(
+            '/api/simulador/evaluar/',
+            self._evaluation_payload(
+                tipo='cuotas',
+                banco=self.banco_activo.id,
+                tasa_anual='20.00',
+                plazo_meses=12,
+            ),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('tasa_anual', response.data)
+    def test_evaluar_usa_el_modo_global_seleccionado_por_el_usuario(self):
+        plan = Plan.objects.get(slug='pro')
+        assign_plan_to_user(user=self.user_a, plan=plan, assigned_by=None)
+        self.user_a.projection_mode = 'conservadora'
+        self.user_a.save(update_fields=['projection_mode'])
+        self.client.force_authenticate(user=self.user_a)
+
+        response = self.client.post(
+            '/api/simulador/evaluar/',
+            self._evaluation_payload(),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['projection_mode'], 'conservadora')
     def test_simulacion_calcula_montos_en_backend(self):
         self.client.force_authenticate(user=self.user_a)
         payload = {

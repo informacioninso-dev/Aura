@@ -9,6 +9,7 @@ from .dates import local_today
 from apps.usuarios.models import (
     PROJECTION_MODE_AUTOMATICA,
     PROJECTION_MODE_CONSERVADORA,
+    PROJECTION_MODE_SIMPLE,
 )
 from apps.usuarios.plans import (
     get_user_projection_mode,
@@ -17,7 +18,10 @@ from apps.usuarios.plans import (
 MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 FINANZAS_CACHE_VERSION_PREFIX = 'finanzas:version'
 FINANZAS_DIRTY_FROM_PREFIX = 'finanzas:dirty-from'
-MIN_VARIABLE_HISTORY_MONTHS = 3
+VARIABLE_PROJECTION_HISTORY_MONTHS = 18
+VARIABLE_PROJECTION_RECENT_MONTHS = 12
+VARIABLE_PROJECTION_RECENT_WEIGHT = Decimal('2')
+CONSERVATIVE_PUNCTUAL_HISTORY_MONTHS = 12
 
 # Meses de historial real que se promedian para estimar un gasto variable
 # cuando el mes consultado todavia no tiene monto real cargado.
@@ -270,17 +274,6 @@ def _winsorized_weighted_average(values):
     return (weighted_total / total_weight).quantize(Decimal('0.01'))
 
 
-def _median_decimal(values):
-    ordered = sorted(_money(value) for value in values)
-    if not ordered:
-        return Decimal('0.00')
-
-    middle = len(ordered) // 2
-    if len(ordered) % 2:
-        return ordered[middle]
-    return ((ordered[middle - 1] + ordered[middle]) / Decimal('2')).quantize(Decimal('0.01'))
-
-
 def _quantile_decimal(ordered, percentile):
     if not ordered:
         return Decimal('0.00')
@@ -319,58 +312,12 @@ def _clamp_series_with_iqr(values):
     return clamped
 
 
-def _ewma_decimal(values, alpha=Decimal('0.35')):
-    series = [_money(value) for value in values]
-    if not series:
-        return Decimal('0.00')
-
-    alpha = Decimal(str(alpha))
-    smoothed = series[0]
-    for value in series[1:]:
-        smoothed = ((alpha * value) + ((Decimal('1.00') - alpha) * smoothed)).quantize(Decimal('0.01'))
-    return smoothed
-
-
 def _estimate_conservative_cushion(monthly_values):
-    """
-    Colchon de imprevistos del modo conservador.
-
-    Reparte el total de gastos puntuales de la ventana (12 meses) entre todos
-    los meses, para prever imprevistos futuros y amortiguar el saldo. Solo
-    aplica si hubo al menos MIN_VARIABLE_HISTORY_MONTHS meses con puntuales.
-    Ej: $500 en el ultimo ano con >=3 meses -> ~$41.67/mes.
-    """
-    series = [_money(value) for value in monthly_values]
-    total_meses = len(series)
-    meses_con_gasto = sum(1 for value in series if value != Decimal('0.00'))
-    if total_meses == 0 or meses_con_gasto < MIN_VARIABLE_HISTORY_MONTHS:
-        return Decimal('0.00')
-    return (sum(series) / Decimal(total_meses)).quantize(Decimal('0.01'))
-
-
-def _estimate_premium_variable_component(monthly_values):
+    """Convierte el gasto puntual seleccionado del ultimo ano en reserva mensual."""
     series = [_money(value) for value in monthly_values]
     if not series:
         return Decimal('0.00')
-
-    active_values = [value for value in series if value != Decimal('0.00')]
-    total_months = len(series)
-    active_months = len(active_values)
-    if total_months == 0 or active_months < MIN_VARIABLE_HISTORY_MONTHS:
-        return Decimal('0.00')
-
-    clamped_active = _clamp_series_with_iqr(active_values)
-    if active_months < 6:
-        typical_amount = _median_decimal(clamped_active)
-    else:
-        median_amount = _median_decimal(clamped_active)
-        ewma_amount = _ewma_decimal(clamped_active)
-        typical_amount = (
-            (ewma_amount * Decimal('0.65')) + (median_amount * Decimal('0.35'))
-        ).quantize(Decimal('0.01'))
-
-    frequency = Decimal(active_months) / Decimal(total_months)
-    return (typical_amount * frequency).quantize(Decimal('0.01'))
+    return (sum(series) / Decimal(len(series))).quantize(Decimal('0.01'))
 
 
 # Gastos que en la practica casi siempre cambian de monto mes a mes. Sirve
@@ -578,6 +525,39 @@ def _monto_base_gasto_mes(gasto_id, monto_estimado, tipo_monto, month_start, eje
         return (sum(ultimos) / Decimal(len(ultimos))).quantize(Decimal('0.01'))
 
     return monto_estimado
+
+
+def _monto_variable_proyectado_inteligente(gasto_id, monto_estimado, reference_month, ejecuciones):
+    """
+    Estima un gasto variable con hasta 18 meses reales.
+
+    Todos los registros cuentan, pero los ultimos 12 meses tienen peso doble.
+    Si hay al menos cuatro observaciones, los extremos se limitan con IQR. Sin
+    valores reales se conserva el estimado declarado por el usuario.
+    """
+    reference_month = _primer_dia_mes(reference_month)
+    history_start = _restar_meses(reference_month, VARIABLE_PROJECTION_HISTORY_MONTHS)
+    recent_start = _restar_meses(reference_month, VARIABLE_PROJECTION_RECENT_MONTHS)
+    reales = ejecuciones.get(gasto_id) or {}
+    observations = []
+
+    for (anio, mes), monto in sorted(reales.items()):
+        period = datetime.date(anio, mes, 1)
+        if history_start <= period < reference_month:
+            observations.append((period, _money(monto)))
+
+    if not observations:
+        return _money(monto_estimado)
+
+    clamped_values = _clamp_series_with_iqr([monto for _, monto in observations])
+    weighted_total = Decimal('0.00')
+    total_weight = Decimal('0.00')
+    for (period, _), monto in zip(observations, clamped_values):
+        weight = VARIABLE_PROJECTION_RECENT_WEIGHT if period >= recent_start else Decimal('1')
+        weighted_total += monto * weight
+        total_weight += weight
+
+    return (weighted_total / total_weight).quantize(Decimal('0.01'))
 
 
 SENAL_ESTACIONALIDAD = 'estacionalidad'
@@ -964,7 +944,7 @@ def obtener_o_sembrar_saldo_mes(usuario, anio, mes):
 
 
 def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, real_past_months=6, starting_balance=Decimal('0.00')):
-    from .models import Diferido, GastoCorriente, GastoNoCorriente, Ingreso, IngresoPuntual, SaldoMes
+    from .models import Diferido, GastoCorriente, GastoNoCorriente, Ingreso, IngresoPuntual, SaldoMes, TIPO_MONTO_VARIABLE
 
     today = local_today()
     current_month = datetime.date(today.year, today.month, 1)
@@ -1010,9 +990,31 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
         )
     )
     ejecuciones_variables = mapa_ejecuciones_variables(usuario)
-    # Fetch desde el mínimo entre history_start y real_start para cubrir toda la
-    # ventana visible del gráfico histórico (real_past_months puede superar history_months).
-    puntuales_start = min(history_start, real_start)
+    variable_history_start = _restar_meses(current_month, VARIABLE_PROJECTION_HISTORY_MONTHS)
+    variable_history_periods = set()
+    variable_history_observations = 0
+    intelligent_variable_amounts = {}
+    for item in gastos_corrientes:
+        if item.tipo_monto != TIPO_MONTO_VARIABLE:
+            continue
+        reales = ejecuciones_variables.get(item.id) or {}
+        eligible_periods = [
+            periodo for periodo in reales
+            if variable_history_start <= datetime.date(periodo[0], periodo[1], 1) < current_month
+        ]
+        variable_history_periods.update(eligible_periods)
+        variable_history_observations += len(eligible_periods)
+        intelligent_variable_amounts[item.id] = _monto_variable_proyectado_inteligente(
+            item.id,
+            item.monto,
+            current_month,
+            ejecuciones_variables,
+        )
+
+    # Los puntuales conservadores siempre miran el ultimo ano completo. La
+    # ventana visible del grafico puede ser mayor o menor y no cambia la reserva.
+    conservative_history_start = _restar_meses(current_month, CONSERVATIVE_PUNCTUAL_HISTORY_MONTHS)
+    puntuales_start = min(history_start, real_start, conservative_history_start)
     ingresos_puntuales = list(
         IngresoPuntual.objects.filter(
             usuario=usuario,
@@ -1027,7 +1029,7 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
             fecha__lte=current_month_end,
         )
     )
-    # Ingresos puntuales con fecha futura conocida (ej. décimo, utilidades)
+    # Ingresos puntuales con fecha futura conocida (ej. decimo, utilidades).
     ingresos_puntuales_futuros = list(
         IngresoPuntual.objects.filter(
             usuario=usuario,
@@ -1041,19 +1043,13 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
         ingresos_puntuales_futuros_por_mes[key] = (
             ingresos_puntuales_futuros_por_mes.get(key, Decimal('0.00')) + _money(item.monto)
         )
-    use_manual_eligibility = projection_mode == PROJECTION_MODE_CONSERVADORA
-    ingresos_puntuales_elegibles = [
-        item for item in ingresos_puntuales
-        if (item.incluir_en_proyeccion if use_manual_eligibility else True)
-    ]
-    # Un puntual que ya existe como gasto variable declarado no puede alimentar
-    # el colchon de imprevistos: ese gasto ya se proyecta por su propia via.
-    # Solo se excluye del suavizado; en el historico sigue contando, porque
-    # esa plata efectivamente se gasto.
+
+    # Un puntual que ya existe como variable declarado no puede alimentar el
+    # colchon: ese gasto ya se proyecta por su propia via.
     claves_variables = claves_gastos_variables(gastos_corrientes)
     gastos_puntuales_elegibles = [
         item for item in gastos_puntuales
-        if (item.incluir_en_proyeccion if use_manual_eligibility else True)
+        if item.incluir_en_proyeccion
         and _clave_gasto(item.descripcion, item.categoria) not in claves_variables
     ]
 
@@ -1067,49 +1063,42 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
         key = (item.fecha.year, item.fecha.month)
         gastos_puntuales_por_mes[key] = gastos_puntuales_por_mes.get(key, Decimal('0.00')) + _money(item.monto)
 
-    ingresos_puntuales_elegibles_por_mes = {}
-    for item in ingresos_puntuales_elegibles:
-        key = (item.fecha.year, item.fecha.month)
-        ingresos_puntuales_elegibles_por_mes[key] = (
-            ingresos_puntuales_elegibles_por_mes.get(key, Decimal('0.00')) + _money(item.monto)
-        )
-
     gastos_puntuales_elegibles_por_mes = {}
     for item in gastos_puntuales_elegibles:
+        if item.fecha < conservative_history_start:
+            continue
         key = (item.fecha.year, item.fecha.month)
         gastos_puntuales_elegibles_por_mes[key] = (
             gastos_puntuales_elegibles_por_mes.get(key, Decimal('0.00')) + _money(item.monto)
         )
 
-    # Compute smoothed variable incomes/expenses from full history window
-    history_cursor = history_start
-    variable_ingresos = []
-    variable_gastos = []
-    history_months_used = 0
+    conservative_monthly_values = []
+    history_cursor = conservative_history_start
     while history_cursor < current_month:
         key = (history_cursor.year, history_cursor.month)
-        ingreso_variable = ingresos_puntuales_elegibles_por_mes.get(key, Decimal('0.00'))
-        gasto_variable = gastos_puntuales_elegibles_por_mes.get(key, Decimal('0.00'))
-        variable_ingresos.append(ingreso_variable)
-        variable_gastos.append(gasto_variable)
-        if ingreso_variable or gasto_variable:
-            history_months_used += 1
+        conservative_monthly_values.append(
+            gastos_puntuales_elegibles_por_mes.get(key, Decimal('0.00'))
+        )
         history_cursor = _sumar_meses_fecha(history_cursor, 1)
 
-    variable_projection_applied = history_months_used >= MIN_VARIABLE_HISTORY_MONTHS
-    # Los ingresos puntuales nunca se proyectan (evita falsa sensacion de ingresos
-    # futuros). Los gastos puntuales solo se proyectan como colchon de imprevistos
-    # en el modo CONSERVADORA; en simple e inteligente cuentan solo en su mes real.
+    history_periods = {
+        (item.fecha.year, item.fecha.month)
+        for item in [*ingresos_puntuales, *gastos_puntuales]
+        if history_start <= _primer_dia_mes(item.fecha) < current_month
+    }
+    history_months_used = len(history_periods)
+    conservative_punctual_months_used = sum(
+        1 for value in conservative_monthly_values if value != Decimal('0.00')
+    )
+    conservative_punctual_total = sum(conservative_monthly_values, Decimal('0.00')).quantize(Decimal('0.01'))
     smoothed_variable_ingresos = Decimal('0.00')
-    if projection_mode == PROJECTION_MODE_CONSERVADORA:
-        smoothed_variable_gastos = _estimate_conservative_cushion(variable_gastos)
-    else:
-        smoothed_variable_gastos = Decimal('0.00')
-
-    if not variable_projection_applied:
-        smoothed_variable_gastos = Decimal('0.00')
+    smoothed_variable_gastos = (
+        _estimate_conservative_cushion(conservative_monthly_values)
+        if projection_mode == PROJECTION_MODE_CONSERVADORA
+        else Decimal('0.00')
+    )
     smoothed_variable_gap = (smoothed_variable_ingresos - smoothed_variable_gastos).quantize(Decimal('0.01'))
-
+    variable_projection_applied = True
     def _ing_fijos_mes(month_start, month_end):
         return sum(
             (_monto_efectivo_mes(item.monto, item.frecuencia, item.fecha_inicio, month_start)
@@ -1118,17 +1107,27 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
             Decimal('0.00'),
         )
 
-    def _gastos_fijos_mes(month_start, month_end):
-        return sum(
-            (_monto_efectivo_mes(
-                _monto_base_gasto_mes(
+    def _gastos_fijos_mes(month_start, month_end, *, projected=False):
+        total = Decimal('0.00')
+        for item in gastos_corrientes:
+            if item.fecha_inicio > month_end or (item.fecha_fin is not None and item.fecha_fin < month_start):
+                continue
+
+            if not projected:
+                base_amount = _monto_base_gasto_mes(
                     item.id, item.monto, item.tipo_monto, month_start, ejecuciones_variables,
-                ),
-                item.frecuencia, item.fecha_inicio, month_start)
-             for item in gastos_corrientes
-             if item.fecha_inicio <= month_end and (item.fecha_fin is None or item.fecha_fin >= month_start)),
-            Decimal('0.00'),
-        )
+                )
+            elif item.tipo_monto != TIPO_MONTO_VARIABLE:
+                base_amount = item.monto
+            elif projection_mode in {PROJECTION_MODE_AUTOMATICA, PROJECTION_MODE_CONSERVADORA}:
+                base_amount = intelligent_variable_amounts.get(item.id, _money(item.monto))
+            else:
+                base_amount = item.monto
+
+            total += _monto_efectivo_mes(
+                base_amount, item.frecuencia, item.fecha_inicio, month_start,
+            )
+        return total
 
     def _cuotas_mes(month_start, month_end):
         return sum(
@@ -1202,7 +1201,7 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
         month_end = _ultimo_dia_mes(month_start.year, month_start.month)
 
         total_ing_fijos = _ing_fijos_mes(month_start, month_end)
-        total_gastos_fijos = _gastos_fijos_mes(month_start, month_end)
+        total_gastos_fijos = _gastos_fijos_mes(month_start, month_end, projected=True)
         total_cuotas = _cuotas_mes(month_start, month_end)
         key = (month_start.year, month_start.month)
         ing_puntual_futuro = ingresos_puntuales_futuros_por_mes.get(key, Decimal('0.00'))
@@ -1243,7 +1242,14 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
         'smoothed_variable_gastos': float(smoothed_variable_gastos),
         'smoothed_variable_gap': float(smoothed_variable_gap),
         'variable_projection_applied': variable_projection_applied,
-        'min_variable_history_months': MIN_VARIABLE_HISTORY_MONTHS,
+        'min_variable_history_months': 0,
+        'variable_history_months_used': len(variable_history_periods),
+        'variable_history_observations': variable_history_observations,
+        'variable_history_cap_months': VARIABLE_PROJECTION_HISTORY_MONTHS,
+        'variable_recent_weight_months': VARIABLE_PROJECTION_RECENT_MONTHS,
+        'conservative_punctual_months_used': conservative_punctual_months_used,
+        'conservative_punctual_total': float(conservative_punctual_total),
+        'conservative_punctual_history_months': CONSERVATIVE_PUNCTUAL_HISTORY_MONTHS,
         'projection_mode': projection_mode,
         'current_month': f'{current_month.year}-{current_month.month:02d}',
         'series': series,
