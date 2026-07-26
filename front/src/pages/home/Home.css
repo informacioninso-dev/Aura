@@ -1294,3 +1294,218 @@
     transition-duration: 0.01ms !important;
   }
 }
+/* Aura home brand cohesion revision. */
+.home {
+  --home-ink: #0F172A;
+  --home-ink-2: #1A2540;
+  --home-ink-3: #1E2D4A;
+  --home-paper: #FFFFFF;
+  --home-paper-2: rgba(255,255,255,0.72);
+  --home-green: #10B981;
+  --home-green-soft: #6EE7B7;
+  --home-lila: #C487F6;
+  --home-coral: #C487F6;
+  --home-line: rgba(255,255,255,0.09);
+  background: var(--home-ink);
+  color: #FFFFFF;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.home-hero-wrap {
+  background-color: var(--home-ink);
+  background-image:
+    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px),
+    radial-gradient(circle at 78% 18%, rgba(196,135,246,0.12), transparent 34%);
+}
+
+.home-hero h1,
+.home-section-heading h2 {
+  font-family: inherit;
+  font-weight: 900;
+}
+
+.home-hero h1 {
+  max-width: 580px;
+  color: #FFFFFF;
+  font-size: 42px;
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+}
+
+.home-hero h1 em {
+  display: block;
+  color: var(--home-lila);
+  font-style: normal;
+}
+
+.home-hero h1 em::after {
+  display: none;
+}
+
+.home-hero-desc {
+  max-width: 540px;
+  color: rgba(255,255,255,0.72);
+}
+
+.home-btn-primary {
+  background: linear-gradient(135deg, var(--home-lila), var(--home-green));
+  color: #FFFFFF;
+  box-shadow: 0 12px 28px rgba(16,185,129,0.18);
+}
+
+.home-btn-primary:hover {
+  box-shadow: 0 16px 34px rgba(196,135,246,0.24);
+}
+
+.home-money-window {
+  border-color: rgba(196,135,246,0.24);
+  background: rgba(26,37,64,0.96);
+  box-shadow: 0 28px 64px rgba(0,0,0,0.34);
+}
+
+.home-money-window::before {
+  background: linear-gradient(90deg, var(--home-green), var(--home-lila));
+}
+
+.home-decision {
+  border-left-color: var(--home-lila);
+  background: rgba(196,135,246,0.08);
+}
+
+.home-decision-icon {
+  color: var(--home-lila);
+}
+
+.home-story-rail {
+  width: min(1180px, 100%);
+  margin: 36px auto 0;
+  border: 1px solid var(--home-line);
+  background: rgba(26,37,64,0.78);
+}
+
+.home-story-rail > div {
+  border-right-color: var(--home-line);
+}
+
+.home-value-section {
+  background: var(--home-ink-2);
+  box-shadow: 0 0 0 100vmax var(--home-ink-2);
+  color: #FFFFFF;
+}
+
+.home-section-label {
+  color: var(--home-green-soft);
+}
+
+.home-section-heading h2,
+.home-value-row h3 {
+  color: #FFFFFF;
+}
+
+.home-section-heading > p,
+.home-value-row p {
+  color: rgba(255,255,255,0.66);
+}
+
+.home-value-list,
+.home-value-row {
+  border-color: rgba(255,255,255,0.11);
+}
+
+.home-value-icon {
+  border-color: rgba(255,255,255,0.18);
+  color: rgba(255,255,255,0.82);
+}
+
+.home-value-row span {
+  color: rgba(255,255,255,0.46);
+}
+
+.home-value-row.is-green .home-value-icon {
+  border-color: rgba(16,185,129,0.34);
+  color: var(--home-green-soft);
+}
+
+.home-value-row.is-lila .home-value-icon,
+.home-value-row.is-coral .home-value-icon {
+  border-color: rgba(196,135,246,0.34);
+  color: var(--home-lila);
+}
+
+.home-value-arrow {
+  color: rgba(255,255,255,0.34);
+}
+
+.home-simulator-sheet {
+  border: 1px solid rgba(196,135,246,0.20);
+  border-radius: 20px;
+  background: var(--home-ink);
+  box-shadow: 0 20px 48px rgba(0,0,0,0.24);
+}
+
+.home-simulator-sheet::before {
+  background: linear-gradient(90deg, var(--home-lila), var(--home-green));
+}
+
+.home-pricing-section {
+  border-top-color: rgba(255,255,255,0.08);
+  background:
+    linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+    var(--home-ink);
+  background-size: 100% 40px;
+}
+
+.home-section-heading.is-pricing .home-section-label {
+  color: var(--home-lila);
+}
+
+.home-closing {
+  border: 1px solid rgba(196,135,246,0.22);
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(196,135,246,0.13), rgba(16,185,129,0.08));
+  color: #FFFFFF;
+}
+
+.home-closing span {
+  color: rgba(255,255,255,0.56);
+}
+
+.home-closing strong {
+  color: #FFFFFF;
+}
+
+@media (min-width: 760px) {
+  .home-hero h1 {
+    font-size: 50px;
+  }
+
+  .home-section-heading h2 {
+    font-size: 42px;
+  }
+}
+
+@media (min-width: 980px) {
+  .home-hero {
+    grid-template-columns: minmax(0, 0.96fr) minmax(500px, 1.04fr);
+    gap: 48px;
+  }
+
+  .home-hero h1 {
+    font-size: 56px;
+  }
+
+  .home-story-rail {
+    margin-top: 42px;
+  }
+}
+
+@media (max-width: 519px) {
+  .home-hero h1 {
+    font-size: 39px;
+  }
+
+  .home-section-heading h2 {
+    font-size: 32px;
+  }
+}

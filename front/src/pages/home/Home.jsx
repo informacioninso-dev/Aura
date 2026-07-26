@@ -111,14 +111,14 @@ export default function Home() {
             <div className="home-hero-copy">
               <div className="home-eyebrow">
                 <span />
-                Control financiero personal
+                Tus finanzas, sin adivinar
               </div>
               <h1>
-                Mira hasta donde llega tu plata.
-                <em> Antes de gastarla.</em>
+                Antes de gastar,
+                <em> mira si te alcanza.</em>
               </h1>
               <p className="home-hero-desc">
-                Aura une lo que ganas, lo que debes y lo que planeas para decirte si una decision cabe en tus finanzas, hoy y en los meses que vienen.
+                Aura organiza ingresos, gastos, cuotas y planes futuros para mostrarte cuanto te queda hoy y como cambia tu dinero si tomas esa decision.
               </p>
 
               <div className="home-hero-actions">
@@ -149,8 +149,8 @@ export default function Home() {
               <div className="home-balance">
                 <div>
                   <span>Saldo disponible proyectado</span>
-                  <strong>$1.400.000</strong>
-                  <small>Despues de cubrir todo el mes</small>
+                  <strong>$245.00</strong>
+                  <small>Despues de cubrir gastos y cuotas del mes</small>
                 </div>
                 <span className="home-health">Saludable</span>
               </div>
@@ -181,8 +181,8 @@ export default function Home() {
               <div className="home-decision">
                 <div className="home-decision-icon"><CalendarRange size={18} /></div>
                 <div>
-                  <span>Si haces una compra de $1.200.000</span>
-                  <strong>Tu saldo sigue positivo, pero octubre queda ajustado.</strong>
+                  <span>Si haces una compra de $360.00 en 6 cuotas</span>
+                  <strong>Tu saldo sigue positivo, pero septiembre queda ajustado.</strong>
                 </div>
               </div>
             </div>
@@ -199,7 +199,7 @@ export default function Home() {
           <div className="home-section-heading">
             <div>
               <span className="home-section-label">NO ES OTRO REGISTRO DE GASTOS</span>
-              <h2>Las tres preguntas que si cambian una decision.</h2>
+              <h2>Las tres respuestas que necesitas antes de mover tu dinero.</h2>
             </div>
             <p>
               Lo importante no es llenar cuadros. Es entender rapido que puedes hacer con tu dinero.
@@ -228,28 +228,28 @@ export default function Home() {
               </div>
               <div className="home-sheet-choice">
                 <span>Decision</span>
-                <strong>Moto nueva</strong>
-                <small>$4.800.000 a 18 meses</small>
+                <strong>Computadora para trabajar</strong>
+                <small>$900.00 a 12 meses</small>
               </div>
               <dl className="home-sheet-numbers">
                 <div>
                   <dt>Sin la compra</dt>
-                  <dd>$820.000</dd>
+                  <dd>$245.00</dd>
                 </div>
                 <div>
                   <dt>Con la compra</dt>
-                  <dd>$340.000</dd>
+                  <dd>$160.00</dd>
                 </div>
                 <div>
                   <dt>Cuota estimada</dt>
-                  <dd>-$310.000</dd>
+                  <dd>-$85.00</dd>
                 </div>
               </dl>
               <div className="home-sheet-verdict">
                 <Check size={16} />
                 <div>
-                  <strong>La compra cabe</strong>
-                  <span>Mantienes saldo positivo durante los 18 meses.</span>
+                  <strong>Cabe, con margen ajustado</strong>
+                  <span>Mantienes saldo positivo durante los 12 meses.</span>
                 </div>
               </div>
               <Link to={simulatorTarget} className="home-sheet-link">

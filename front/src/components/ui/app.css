@@ -4881,3 +4881,80 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Light mode needs opaque surfaces instead of dark-theme ink overlays. */
+.app-theme-root[data-theme='light'] .stat-card,
+.app-theme-root[data-theme='light'] .card,
+.app-theme-root[data-theme='light'] .dashboard-health-card,
+.app-theme-root[data-theme='light'] .dashboard-summary-detail-card,
+.app-theme-root[data-theme='light'] .dashboard-summary-detail-section,
+.app-theme-root[data-theme='light'] .dashboard-category-modal-item,
+.app-theme-root[data-theme='light'] .dashboard-mini-kpi {
+  background: rgba(255,255,255,0.76);
+  border-color: rgba(23,32,51,0.11);
+  box-shadow: 0 8px 24px rgba(35,45,63,0.055);
+}
+
+.app-theme-root[data-theme='light'] .stat-card:hover,
+.app-theme-root[data-theme='light'] .stat-card-button.is-active {
+  border-color: rgba(123,79,165,0.26);
+  box-shadow: 0 12px 28px rgba(35,45,63,0.09);
+}
+
+.app-theme-root[data-theme='light'] .dashboard-premium-card {
+  background:
+    linear-gradient(135deg, rgba(123,79,165,0.075), rgba(255,255,255,0.90) 42%, rgba(8,122,91,0.035));
+  border-color: rgba(123,79,165,0.17);
+}
+
+.app-theme-root[data-theme='light'] .dashboard-premium-stat {
+  background: rgba(255,255,255,0.78);
+  border-color: rgba(23,32,51,0.11);
+}
+
+.app-theme-root[data-theme='light'] .subtle-plan-badge.is-pro,
+.app-theme-root[data-theme='light'] .dashboard-premium-badge {
+  background: rgba(123,79,165,0.10);
+  border-color: rgba(123,79,165,0.24);
+  color: #68408C;
+}
+
+.app-theme-root[data-theme='light'] .dashboard-free-badge,
+.app-theme-root[data-theme='light'] .table-row-badge.is-active {
+  background: rgba(8,122,91,0.09);
+  border-color: rgba(8,122,91,0.22);
+  color: #086A50;
+}
+
+.app-theme-root[data-theme='light'] .table-row-badge.is-suggestion {
+  background: rgba(180,83,9,0.08);
+  border-color: rgba(180,83,9,0.22);
+  color: #92400E;
+}
+
+.app-theme-root[data-theme='light'] .dashboard-chart-toggle.active,
+.app-theme-root[data-theme='light'] .dashboard-chart-window-today {
+  background: rgba(123,79,165,0.11);
+  border-color: rgba(123,79,165,0.28);
+  color: #68408C;
+  box-shadow: none;
+}
+
+.app-theme-root[data-theme='light'] .dashboard-chart-icon-button:hover:not(:disabled),
+.app-theme-root[data-theme='light'] .dashboard-chart-window-button:hover:not(:disabled) {
+  background: rgba(123,79,165,0.09);
+  border-color: rgba(123,79,165,0.24);
+  color: var(--app-lila);
+}
+
+.app-theme-root[data-theme='light'] .stat-label,
+.app-theme-root[data-theme='light'] .dashboard-health-label,
+.app-theme-root[data-theme='light'] .dashboard-premium-stat-label {
+  color: rgba(var(--app-ink-rgb),0.57);
+}
+
+.app-theme-root[data-theme='light'] .stat-sub,
+.app-theme-root[data-theme='light'] .dashboard-health-hint,
+.app-theme-root[data-theme='light'] .dashboard-chart-note {
+  color: rgba(var(--app-ink-rgb),0.52);
+}
