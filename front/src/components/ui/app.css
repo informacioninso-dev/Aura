@@ -3792,3 +3792,135 @@
     padding: 5px 8px;
   }
 }
+
+.suggestions-panel {
+  margin-bottom: 14px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  overflow: hidden;
+}
+
+.suggestions-panel.is-warning {
+  background: rgba(251,191,36,0.08);
+  border-color: rgba(251,191,36,0.22);
+}
+
+.suggestions-panel-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.suggestions-panel-toggle-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.suggestions-panel-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(252,211,77,0.92);
+}
+
+.suggestions-panel-summary {
+  font-size: 13px;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+.suggestions-panel-toggle-icon {
+  flex-shrink: 0;
+  color: rgba(255,255,255,0.55);
+  transition: transform 0.18s ease;
+}
+
+.suggestions-panel-toggle.is-open .suggestions-panel-toggle-icon {
+  transform: rotate(180deg);
+}
+
+.suggestions-panel-body {
+  padding: 0 16px 14px;
+}
+
+.suggestions-panel-card {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.suggestions-panel-card-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.suggestions-panel-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+.suggestions-panel-card-text {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: rgba(255,255,255,0.58);
+}
+
+.suggestions-panel-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.suggestions-panel-actions .btn-modal-convert,
+.suggestions-panel-actions .btn-modal-cancel {
+  width: 100%;
+}
+
+.suggestions-panel-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.suggestions-panel-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.62);
+  cursor: pointer;
+}
+
+.suggestions-panel-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.suggestions-panel-nav-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.52);
+}

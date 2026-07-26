@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Lightbulb, Plus, Pencil, Trash2 } from 'lucide-react'
 
 import { getApiErrorMessage } from '../../api/errors'
 import api from '../../api/client'
 import { useAuth } from '../../context/useAuth'
 import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import ListControls from '../../components/ui/ListControls'
+import SuggestionsPanel from '../../components/ui/SuggestionsPanel'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import DateQuickActions from '../../components/ui/DateQuickActions'
 import Modal from '../../components/ui/Modal'
@@ -61,11 +62,9 @@ export default function GastosNoCorrientes({ embedded = false }) {
   const [confirmConvert, setConfirmConvert] = useState(false)
   const { categorias } = useCategorias()
   const canCustomizeProjection = Boolean(user?.feature_access?.advanced_projection_enabled)
-
-  // — aviso al escribir un nombre que suele ser gasto variable (luz, agua...) —
+  // Aviso al escribir un nombre que suele ser gasto variable.
   const [pareceVariable, setPareceVariable] = useState(false)
-
-  // — sugerencias de gastos variables mal cargados como puntuales —
+  // Sugerencias de gastos variables mal cargados como puntuales.
   const [sugerencias, setSugerencias] = useState([])
   const [sugerenciaAplicando, setSugerenciaAplicando] = useState(null)
   const [sugerenciasOcultas, setSugerenciasOcultas] = useState(new Set())
@@ -254,6 +253,20 @@ export default function GastosNoCorrientes({ embedded = false }) {
   const start = (safePage - 1) * pageSize
   const paginatedItems = filteredItems.slice(start, start + pageSize)
   const projectionStatusLabel = (item) => (item.incluir_en_proyeccion === false ? 'Fuera de proyeccion' : 'En proyeccion')
+  const visibleSuggestions = sugerencias.filter((sugerencia) => !sugerenciasOcultas.has(sugerencia.descripcion))
+  const suggestionItems = visibleSuggestions.map((sugerencia) => ({
+    summary: `Revisa ${sugerencia.descripcion}`,
+    title: sugerencia.motivo,
+    description: `${sugerencia.meses_detectados > 1 ? `Entre $${formatAmount(parseFloat(sugerencia.monto_minimo))} y $${formatAmount(parseFloat(sugerencia.monto_maximo))}. ` : ''}${sugerencia.destino === 'fijo' ? `Si lo pasas a gasto fijo ${sugerencia.frecuencia_sugerida}, tu proyeccion lo esperara en su mes.` : 'Si lo pasas a gasto variable, tu proyeccion lo tendra en cuenta cada mes y tu historial se conserva.'}`,
+    primaryActionLabel: sugerenciaAplicando === sugerencia.descripcion
+      ? 'Convirtiendo...'
+      : sugerencia.destino === 'fijo' ? 'Pasar a fijo anual' : 'Pasar a variable',
+    onPrimaryAction: () => aplicarSugerencia(sugerencia),
+    primaryDisabled: sugerenciaAplicando !== null,
+    secondaryActionLabel: 'Ahora no',
+    onSecondaryAction: () => descartarSugerencia(sugerencia.descripcion),
+    secondaryDisabled: sugerenciaAplicando !== null,
+  }))
 
   const bulkDeleteMax = user?.feature_access?.bulk_delete_max ?? 10
   const allPageSelected = paginatedItems.length > 0 && paginatedItems.every((i) => selectedIds.has(i.id))
@@ -371,63 +384,16 @@ export default function GastosNoCorrientes({ embedded = false }) {
 
       <FeedbackAlert type={feedback.type || 'error'} message={feedback.message} />
 
-      {(() => {
-        // Se muestra una sugerencia a la vez para no tapar la lista en movil.
-        // El resto queda contado; al resolver o descartar una, aparece la siguiente.
-        const visibles = sugerencias.filter((s) => !sugerenciasOcultas.has(s.descripcion))
-        if (visibles.length === 0) return null
-        const sugerencia = visibles[0]
-        const restantes = visibles.length - 1
-        return (
-          <div className="variable-suggestion">
-            <div className="variable-suggestion-copy">
-              <span className="variable-suggestion-title">
-                {sugerencia.motivo}
-              </span>
-              <span className="variable-suggestion-text">
-                {sugerencia.meses_detectados > 1 && (
-                  <>
-                    Entre ${formatAmount(parseFloat(sugerencia.monto_minimo))} y $
-                    {formatAmount(parseFloat(sugerencia.monto_maximo))}.{' '}
-                  </>
-                )}
-                {sugerencia.destino === 'fijo'
-                  ? `Si lo pasas a gasto fijo ${sugerencia.frecuencia_sugerida}, tu proyeccion lo esperara en su mes.`
-                  : 'Si lo pasas a gasto variable, tu proyeccion lo tendra en cuenta cada mes y tu historial se conserva.'}
-              </span>
-              {restantes > 0 && (
-                <span className="variable-suggestion-counter">
-                  y {restantes} sugerencia{restantes !== 1 ? 's' : ''} mas
-                </span>
-              )}
-            </div>
-            <div className="variable-suggestion-actions">
-              <button
-                type="button"
-                className="btn-modal-convert"
-                disabled={sugerenciaAplicando !== null}
-                onClick={() => aplicarSugerencia(sugerencia)}
-              >
-                {sugerenciaAplicando === sugerencia.descripcion
-                  ? 'Convirtiendo...'
-                  : sugerencia.destino === 'fijo' ? 'Pasar a fijo anual' : 'Pasar a variable'}
-              </button>
-              <button
-                type="button"
-                className="btn-modal-cancel"
-                onClick={() => descartarSugerencia(sugerencia.descripcion)}
-              >
-                Ahora no
-              </button>
-            </div>
-          </div>
-        )
-      })()}
+      <SuggestionsPanel
+        title="Sugerencias"
+        tone="warning"
+        items={suggestionItems}
+      />
 
       <div className="card" style={{ padding: 0 }}>
         {items.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">🧾</div>
+            <div className="empty-icon"><Lightbulb size={20} /></div>
             <p className="empty-text">No hay gastos puntuales</p>
             <p className="empty-sub">Suma compras, salidas o imprevistos</p>
           </div>
