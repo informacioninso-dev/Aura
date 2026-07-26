@@ -12,7 +12,6 @@ import {
 } from 'lucide-react'
 import {
   CartesianGrid,
-  Legend,
   Line,
   LineChart,
   ReferenceLine,
@@ -632,27 +631,57 @@ export default function Simulador() {
                   <div className="card simulator-chart-card">
                     <div className="simulator-chart-heading">
                       <div>
-                        <span>Impacto acumulado</span>
-                        <h2>Tu saldo durante {resultado.horizon_months} meses</h2>
+                        <span>Tu saldo proyectado</span>
+                        <h2>¿Cuánto dinero te quedaría?</h2>
                       </div>
                       <CalendarClock size={20} />
                     </div>
-                    <p>Compara tu proyeccion actual con el saldo que tendrias despues de asumir esta decision.</p>
-                    <div className="simulator-chart-wrap">
+                    <p className="simulator-chart-explanation">
+                      <strong>No son gastos.</strong> Cada punto muestra el dinero acumulado que te quedaría al cerrar ese mes, después de tus ingresos y gastos proyectados durante {resultado.horizon_months} meses.
+                      <span>La distancia entre las líneas es el efecto acumulado de este gasto en tus finanzas.</span>
+                    </p>
+                    <ul className="simulator-chart-guide" aria-label="Qué representa cada línea">
+                      <li>
+                        <span className="simulator-chart-dot simulator-chart-dot--base" aria-hidden="true" />
+                        <span><strong>Sin hacer este gasto</strong> Lo que te quedaría siguiendo tu plan actual.</span>
+                      </li>
+                      <li>
+                        <span className="simulator-chart-dot simulator-chart-dot--scenario" aria-hidden="true" />
+                        <span><strong>Incluyendo este gasto</strong> Lo que te quedaría después de pagarlo.</span>
+                      </li>
+                      <li>
+                        <span className="simulator-chart-line simulator-chart-line--minimum" aria-hidden="true" />
+                        <span><strong>Saldo mínimo</strong> El dinero que decidiste no tocar.</span>
+                      </li>
+                    </ul>
+                    <div
+                      className="simulator-chart-wrap"
+                      role="img"
+                      aria-label={`Dinero que te quedaría con y sin este gasto durante ${resultado.horizon_months} meses`}
+                    >
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={resultado.flow} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                           <XAxis dataKey="label" minTickGap={34} tick={{ fill: 'rgba(255,255,255,0.40)', fontSize: 10 }} />
-                          <YAxis width={66} tick={{ fill: 'rgba(255,255,255,0.40)', fontSize: 10 }} tickFormatter={(value) => Number(value).toLocaleString('es-CO', { notation: 'compact' })} />
+                          <YAxis
+                            width={66}
+                            tick={{ fill: 'rgba(255,255,255,0.40)', fontSize: 10 }}
+                            tickFormatter={(value) => formatMoney(value, {
+                              currency: moneda,
+                              notation: 'compact',
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 1,
+                            })}
+                          />
                           <Tooltip
                             contentStyle={{ background: 'rgba(15,23,42,0.97)', border: '1px solid rgba(196,135,246,0.22)', borderRadius: 12 }}
                             labelStyle={{ color: '#FFFFFF', fontWeight: 700 }}
-                            formatter={(value, name) => [fmt(value), name === 'saldo_base' ? 'Sin la decision' : 'Con la decision']}
+                            labelFormatter={(label) => `Al cerrar ${label}`}
+                            formatter={(value, name) => [fmt(value), name]}
                           />
-                          <Legend formatter={(value) => value === 'saldo_base' ? 'Sin la decision' : 'Con la decision'} />
                           <ReferenceLine y={resultado.colchon_minimo} stroke="#FBBF24" strokeDasharray="6 4" />
-                          <Line type="monotone" dataKey="saldo_base" stroke="#10B981" strokeWidth={2.2} dot={false} />
-                          <Line type="monotone" dataKey="saldo_escenario" stroke="#C487F6" strokeWidth={2.8} dot={false} />
+                          <Line name="Dinero sin este gasto" type="monotone" dataKey="saldo_base" stroke="#10B981" strokeWidth={2.2} dot={false} />
+                          <Line name="Dinero incluyendo este gasto" type="monotone" dataKey="saldo_escenario" stroke="#C487F6" strokeWidth={2.8} dot={false} />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>

@@ -4427,10 +4427,72 @@
   color: var(--sim-accent);
 }
 
+.simulator-chart-explanation strong {
+  color: rgba(255,255,255,0.78);
+}
+
+.simulator-chart-explanation span {
+  display: block;
+  margin-top: 3px;
+}
+
+.simulator-chart-guide {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 16px;
+  margin: 16px 0 0;
+  padding: 12px 0;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  list-style: none;
+}
+
+.simulator-chart-guide li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: start;
+  gap: 7px;
+  color: rgba(255,255,255,0.48);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.simulator-chart-guide strong {
+  display: block;
+  margin-bottom: 1px;
+  color: rgba(255,255,255,0.84);
+  font-size: 11px;
+}
+
+.simulator-chart-dot,
+.simulator-chart-line {
+  display: block;
+  width: 14px;
+  margin-top: 6px;
+}
+
+.simulator-chart-dot {
+  height: 3px;
+  border-radius: 999px;
+}
+
+.simulator-chart-dot--base {
+  background: #10B981;
+}
+
+.simulator-chart-dot--scenario {
+  background: #C487F6;
+}
+
+.simulator-chart-line--minimum {
+  height: 0;
+  border-top: 2px dashed #FBBF24;
+}
+
 .simulator-chart-wrap {
   width: 100%;
   height: 270px;
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
 .simulator-saved-card {
@@ -4503,6 +4565,15 @@
 
   .simulator-chart-wrap {
     height: 240px;
+  }
+
+  .simulator-chart-guide {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+
+  .simulator-chart-guide li {
+    grid-template-columns: 18px minmax(0, 1fr);
   }
 }
 
