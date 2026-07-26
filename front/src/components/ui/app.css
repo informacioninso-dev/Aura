@@ -4438,7 +4438,7 @@
 
 .simulator-chart-guide {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px 16px;
   margin: 16px 0 0;
   padding: 12px 0;
@@ -4464,8 +4464,7 @@
   font-size: 11px;
 }
 
-.simulator-chart-dot,
-.simulator-chart-line {
+.simulator-chart-dot {
   display: block;
   width: 14px;
   margin-top: 6px;
@@ -4484,9 +4483,48 @@
   background: #F87171;
 }
 
-.simulator-chart-line--minimum {
-  height: 0;
-  border-top: 2px dashed #FBBF24;
+.simulator-chart-reserve {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid;
+  border-radius: 11px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.simulator-chart-reserve svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.simulator-chart-reserve span {
+  color: rgba(255,255,255,0.52);
+}
+
+.simulator-chart-reserve strong {
+  display: block;
+  color: rgba(255,255,255,0.84);
+}
+
+.simulator-chart-reserve.is-safe {
+  border-color: rgba(16,185,129,0.22);
+  background: rgba(16,185,129,0.06);
+}
+
+.simulator-chart-reserve.is-safe svg {
+  color: #10B981;
+}
+
+.simulator-chart-reserve.is-risk {
+  border-color: rgba(248,113,113,0.25);
+  background: rgba(248,113,113,0.07);
+}
+
+.simulator-chart-reserve.is-risk svg {
+  color: #F87171;
 }
 
 .simulator-chart-wrap {

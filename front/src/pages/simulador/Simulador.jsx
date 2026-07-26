@@ -46,7 +46,7 @@ const PROJECTION_MODE_LABELS = {
 }
 const SCENARIO_TYPE_LABELS = {
   contado: 'Pago unico',
-  cuotas: 'A cuotas',
+  cuotas: 'Prestamo',
   recurrente: 'Gasto mensual',
 }
 const SCENARIO_TYPES = [
@@ -58,7 +58,7 @@ const SCENARIO_TYPES = [
   },
   {
     value: 'cuotas',
-    label: 'A cuotas',
+    label: 'Prestamo',
     description: 'Vehiculo, vivienda, equipo o prestamo.',
     icon: CreditCard,
   },
@@ -397,6 +397,14 @@ export default function Simulador() {
   const decisionStartPoint = visibleSimulationFlow.find(
     (point) => point.month === resultado?.fecha_inicio?.slice(0, 7),
   )
+  const visibleScenarioMinimum = visibleSimulationFlow.reduce(
+    (minimum, point) => Math.min(minimum, Number(point.saldo_escenario)),
+    Number.POSITIVE_INFINITY,
+  )
+  const reserveMargin = Number.isFinite(visibleScenarioMinimum)
+    ? visibleScenarioMinimum - Number(resultado?.colchon_minimo || 0)
+    : 0
+  const reserveAtRisk = reserveMargin < 0
   const showSimulationNavigator = simulationFlow.length > simulationWindowSize
   const canGoPreviousPeriod = simulationWindow.startIndex > 0
   const canGoNextPeriod = simulationWindow.endIndex < simulationFlow.length - 1
@@ -444,15 +452,15 @@ export default function Simulador() {
   function resultMessage() {
     if (!resultado) return ''
     if (resultado.factible) {
-      return `Tu saldo se mantiene por encima de ${fmt(resultado.colchon_minimo)} durante los ${resultado.horizon_months} meses analizados.`
+      return `Tu saldo se mantiene por encima de tu reserva de ${fmt(resultado.colchon_minimo)} durante los ${resultado.horizon_months} meses analizados.`
     }
     if (resultado.flujo_base_en_riesgo && !resultado.decision_genera_riesgo) {
-      return `Tu proyeccion ya baja del saldo minimo incluso sin esta decision. Con el gasto, el punto mas bajo seria ${fmt(resultado.saldo_minimo_escenario)}.`
+      return `Tu proyeccion ya baja de tu reserva incluso sin esta decision. Con el gasto, el punto mas bajo seria ${fmt(resultado.saldo_minimo_escenario)}.`
     }
     if (resultado.primer_mes_negativo) {
       return `Con esta decision tu saldo entraria en negativo por primera vez en ${resultado.primer_mes_negativo}.`
     }
-    return `Con esta decision bajarias de tu saldo minimo por primera vez en ${resultado.primer_mes_riesgo}.`
+    return `Con esta decision bajarias de tu reserva por primera vez en ${resultado.primer_mes_riesgo}.`
   }
   return (
     <div className="simulator-page">
@@ -599,7 +607,7 @@ export default function Simulador() {
                 )}
 
                 <div className="form-modal-group">
-                  <label className="form-modal-label">Saldo minimo que quieres conservar</label>
+                  <label className="form-modal-label">Reserva que quieres conservar</label>
                   <input
                     className="form-modal-input"
                     type="number"
@@ -694,9 +702,9 @@ export default function Simulador() {
                             <div><span>Total durante el periodo</span><strong>{fmt(resultado.total_a_pagar)}</strong></div>
                           </>
                         )}
-                        <div><span>Saldo minimo sin la decision</span><strong>{fmt(resultado.saldo_minimo_base)}</strong></div>
-                        <div><span>Saldo minimo incluyendo el gasto</span><strong>{fmt(resultado.saldo_minimo_escenario)}</strong></div>
-                        <div><span>Saldo que quieres conservar</span><strong>{fmt(resultado.colchon_minimo)}</strong></div>
+                        <div><span>Saldo mas bajo sin el gasto</span><strong>{fmt(resultado.saldo_minimo_base)}</strong></div>
+                        <div><span>Saldo mas bajo incluyendo el gasto</span><strong>{fmt(resultado.saldo_minimo_escenario)}</strong></div>
+                        <div><span>Reserva que quieres conservar</span><strong>{fmt(resultado.colchon_minimo)}</strong></div>
                         <div><span>Horizonte evaluado</span><strong>{resultado.horizon_months} meses</strong></div>
                       </div>
                     </details>
@@ -738,11 +746,16 @@ export default function Simulador() {
                         <span className="simulator-chart-dot simulator-chart-dot--scenario" aria-hidden="true" />
                         <span><strong>Incluyendo este gasto</strong> Lo que te quedaría después de pagarlo.</span>
                       </li>
-                      <li>
-                        <span className="simulator-chart-line simulator-chart-line--minimum" aria-hidden="true" />
-                        <span><strong>Saldo mínimo</strong> El dinero que decidiste no tocar.</span>
-                      </li>
                     </ul>
+                    <div className={`simulator-chart-reserve ${reserveAtRisk ? 'is-risk' : 'is-safe'}`}>
+                      {reserveAtRisk ? <XCircle size={16} /> : <CheckCircle size={16} />}
+                      <span>
+                        <strong>Reserva que quieres conservar: {fmt(resultado.colchon_minimo)}</strong>
+                        {reserveAtRisk
+                          ? `En este periodo tu saldo baja ${fmt(Math.abs(reserveMargin))} por debajo.`
+                          : `En este periodo tu saldo se mantiene al menos ${fmt(reserveMargin)} por encima.`}
+                      </span>
+                    </div>
                     <div
                       className="simulator-chart-wrap"
                       role="img"
@@ -776,7 +789,6 @@ export default function Simulador() {
                             labelFormatter={(label) => `Al cerrar ${label}`}
                             formatter={(value, name) => [fmt(value), name]}
                           />
-                          <ReferenceLine y={resultado.colchon_minimo} stroke="#FBBF24" strokeDasharray="6 4" />
                           <Line name="Dinero sin este gasto" type="monotone" dataKey="saldo_base" stroke="#10B981" strokeWidth={2.2} dot={false} />
                           <Line name="Dinero incluyendo este gasto" type="monotone" dataKey="saldo_escenario" stroke="#F87171" strokeWidth={2.8} dot={false} />
                         </LineChart>
@@ -866,7 +878,7 @@ export default function Simulador() {
                       {paginatedSimulaciones.map((item) => (
                         <tr key={item.id}>
                           <td style={{ fontWeight: 600 }}>{item.nombre}</td>
-                          <td><span className="simulator-type-pill">{SCENARIO_TYPE_LABELS[item.tipo] || 'A cuotas'}</span></td>
+                          <td><span className="simulator-type-pill">{SCENARIO_TYPE_LABELS[item.tipo] || 'Prestamo'}</span></td>
                           <td>{fmt(item.monto)}</td>
                           <td>{parseLocalDate(item.fecha_inicio)?.toLocaleDateString('es-EC', { month: 'short', year: 'numeric' })}</td>
                           <td className="table-amount positive">{fmt(item.cuota_mensual)}</td>
