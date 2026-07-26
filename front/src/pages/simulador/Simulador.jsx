@@ -681,7 +681,7 @@ export default function Simulador() {
                           />
                           <ReferenceLine y={resultado.colchon_minimo} stroke="#FBBF24" strokeDasharray="6 4" />
                           <Line name="Dinero sin este gasto" type="monotone" dataKey="saldo_base" stroke="#10B981" strokeWidth={2.2} dot={false} />
-                          <Line name="Dinero incluyendo este gasto" type="monotone" dataKey="saldo_escenario" stroke="#C487F6" strokeWidth={2.8} dot={false} />
+                          <Line name="Dinero incluyendo este gasto" type="monotone" dataKey="saldo_escenario" stroke="#F87171" strokeWidth={2.8} dot={false} />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
