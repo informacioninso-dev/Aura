@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router'
 import { TrendingUp, TrendingDown, Wallet, PiggyBank, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, Maximize2, X, LayoutList, Tag } from 'lucide-react'
 
 import api from '../../api/client'
@@ -45,6 +44,7 @@ const DEFAULT_FREE_PROJECTION_DISPLAY_MONTHS = 6
 const MOBILE_PROJECTION_WINDOW_MONTHS = 12
 const DESKTOP_PROJECTION_WINDOW_MONTHS = 12
 const MOBILE_CHART_BREAKPOINT = 768
+const ProjectionChartCanvas = lazy(() => import('../../components/charts/ProjectionChartCanvas'))
 
 
 function getProjectionAnalysisHelp(mode, variableHistoryMonths, variableHistoryObservations) {
@@ -175,6 +175,11 @@ export default function Dashboard() {
   const [showCategoryView, setShowCategoryView] = useState(false)
   const [selectedExpenseCategory, setSelectedExpenseCategory] = useState(null)
   const [selectedMonth, setSelectedMonth] = useState(() => startOfMonth(new Date()))
+  const [dashboardMonthBounds, setDashboardMonthBounds] = useState(() => {
+    const current = startOfMonth(new Date())
+    return { minMonth: current, maxMonth: addMonths(current, DASHBOARD_FUTURE_MONTHS) }
+  })
+  const [hasAnyMovement, setHasAnyMovement] = useState(false)
   const [isCompactProjectionChart, setIsCompactProjectionChart] = useState(
     () => typeof window !== 'undefined' && window.innerWidth < MOBILE_CHART_BREAKPOINT,
   )
@@ -183,7 +188,8 @@ export default function Dashboard() {
   const projectionDebounceRef = useRef(null)
   const projectionRequestIdRef = useRef(0)
   const loadProjectionChartRef = useRef(null)
-
+  const projectionChartAnchorRef = useRef(null)
+  const [shouldLoadProjectionCharts, setShouldLoadProjectionCharts] = useState(false)
   const advancedProjectionEnabled = Boolean(user?.feature_access?.advanced_projection_enabled)
   const projectionDisplayMonths = Math.max(2, normalizePositiveInt(
     user?.feature_access?.projection_months,
@@ -232,6 +238,20 @@ export default function Dashboard() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
+  useEffect(() => {
+    const anchor = projectionChartAnchorRef.current
+    if (!anchor || !('IntersectionObserver' in window)) {
+      setShouldLoadProjectionCharts(true)
+      return undefined
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return
+      observer.disconnect()
+      setShouldLoadProjectionCharts(true)
+    }, { rootMargin: '320px' })
+    observer.observe(anchor)
+    return () => observer.disconnect()
+  }, [])
   const loadProjectionChart = useCallback(async (fm = futureMonths, pm = pastMonths, { forceRecalculate = false } = {}) => {
     const requestId = projectionRequestIdRef.current + 1
     projectionRequestIdRef.current = requestId
@@ -271,13 +291,14 @@ export default function Dashboard() {
   ])
   loadProjectionChartRef.current = loadProjectionChart
 
-  const loadDashboard = useCallback(async ({ silent = false } = {}) => {
+  const loadDashboard = useCallback(async (month, { silent = false } = {}) => {
     if (silent) setRefreshing(true)
     else setLoading(true)
-    setProjectionError('')
 
     try {
-      const { data: resumen } = await api.get('/finanzas/dashboard/')
+      const { data: resumen } = await api.get('/finanzas/dashboard/', {
+        params: { anio: month.getFullYear(), mes: month.getMonth() + 1 },
+      })
 
       setData({
         ingresos: resumen.ingresos || [],
@@ -286,6 +307,13 @@ export default function Dashboard() {
         gastosNoCorrientes: resumen.gastos_no_corrientes || [],
         diferidos: resumen.diferidos || [],
       })
+      setHasAnyMovement(Boolean(resumen.has_any_movement))
+      if (resumen.bounds?.min_month && resumen.bounds?.max_month) {
+        setDashboardMonthBounds({
+          minMonth: startOfMonth(parseLocalDate(resumen.bounds.min_month)),
+          maxMonth: startOfMonth(parseLocalDate(resumen.bounds.max_month)),
+        })
+      }
       setFeedback({ type: '', message: '' })
     } catch (err) {
       setData({
@@ -295,26 +323,24 @@ export default function Dashboard() {
         gastosNoCorrientes: [],
         diferidos: [],
       })
-
       setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo cargar el dashboard.') })
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-
-    await loadProjectionChartRef.current()
   }, [])
 
   useEffect(() => {
-    void loadDashboard()
-  }, [loadDashboard])
+    void loadDashboard(selectedMonth)
+  }, [loadDashboard, selectedMonth])
+
+  useEffect(() => {
+    void loadProjectionChartRef.current()
+  }, [])
 
   function handleManualRefresh() {
-    if (advancedProjectionEnabled) {
-      void loadProjectionChart(futureMonths, pastMonths, { forceRecalculate: true })
-      return
-    }
-    void loadDashboard({ silent: true })
+    void loadDashboard(selectedMonth, { silent: true })
+    void loadProjectionChart(futureMonths, pastMonths, { forceRecalculate: advancedProjectionEnabled })
   }
 
   function toggleSummaryDetail(kind) {
@@ -360,50 +386,6 @@ export default function Dashboard() {
   })
   const mensualizado = (item) => montoEfectivoMes(item.monto, item.frecuencia, item.fecha_inicio, selectedMonth.getFullYear(), selectedMonth.getMonth() + 1)
   const realMonth = useMemo(() => startOfMonth(new Date()), [])
-
-  const dashboardMonthBounds = useMemo(() => {
-    const minCandidates = [realMonth]
-    const maxCandidates = [realMonth, addMonths(realMonth, DASHBOARD_FUTURE_MONTHS)]
-
-    data.ingresos.forEach((item) => {
-      if (item.fecha_inicio) minCandidates.push(startOfMonth(parseLocalDate(item.fecha_inicio)))
-      if (item.fecha_fin) maxCandidates.push(startOfMonth(parseLocalDate(item.fecha_fin)))
-      else maxCandidates.push(addMonths(realMonth, DASHBOARD_FUTURE_MONTHS))
-    })
-
-    data.gastosCorrientes.forEach((item) => {
-      if (item.fecha_inicio) minCandidates.push(startOfMonth(parseLocalDate(item.fecha_inicio)))
-      if (item.fecha_fin) maxCandidates.push(startOfMonth(parseLocalDate(item.fecha_fin)))
-      else maxCandidates.push(addMonths(realMonth, DASHBOARD_FUTURE_MONTHS))
-    })
-
-    data.diferidos.forEach((item) => {
-      if (item.fecha_inicio) minCandidates.push(startOfMonth(parseLocalDate(item.fecha_inicio)))
-      if (item.fecha_fin) maxCandidates.push(startOfMonth(parseLocalDate(item.fecha_fin)))
-      else maxCandidates.push(addMonths(realMonth, DASHBOARD_FUTURE_MONTHS))
-    })
-
-    data.ingresosPuntuales.forEach((item) => {
-      if (item.fecha) {
-        const monthDate = startOfMonth(parseLocalDate(item.fecha))
-        minCandidates.push(monthDate)
-        maxCandidates.push(monthDate)
-      }
-    })
-
-    data.gastosNoCorrientes.forEach((item) => {
-      if (item.fecha) {
-        const monthDate = startOfMonth(parseLocalDate(item.fecha))
-        minCandidates.push(monthDate)
-        maxCandidates.push(monthDate)
-      }
-    })
-
-    const minMonth = minCandidates.reduce((earliest, date) => (date < earliest ? date : earliest), minCandidates[0])
-    const maxMonth = maxCandidates.reduce((latest, date) => (date > latest ? date : latest), maxCandidates[0])
-
-    return { minMonth, maxMonth }
-  }, [data, realMonth])
 
   useEffect(() => {
     setSelectedMonth((current) => {
@@ -622,11 +604,7 @@ export default function Dashboard() {
     : `Aqui ves rapido los gastos guardados que cuentan en ${monthReferenceText}.`
 
 
-  const hasAnyMovement = data.ingresos.length > 0
-    || data.ingresosPuntuales.length > 0
-    || data.gastosCorrientes.length > 0
-    || data.gastosNoCorrientes.length > 0
-    || data.diferidos.length > 0
+
 
   const tasaAhorro = totalIng > 0 ? Math.round((balance / totalIng) * 100) : 0
 
@@ -798,81 +776,28 @@ export default function Dashboard() {
   )
 
   function renderProjectionAreaChart({ interactive = false } = {}) {
+    if (!shouldLoadProjectionCharts) {
+      return (
+        <div className="loading-screen" style={{ minHeight: '280px' }}>
+          <div className="spinner" />
+        </div>
+      )
+    }
     const chart = (
-      <ResponsiveContainer width="100%" height={isCompactProjectionChart ? 320 : 360}>
-        <AreaChart data={visibleProjectionSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id="gIngReal" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="var(--app-green)" stopOpacity={0.25} />
-              <stop offset="95%" stopColor="var(--app-green)" stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id="gIngProj" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="var(--app-green)" stopOpacity={0.10} />
-              <stop offset="95%" stopColor="var(--app-green)" stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id="gGastoReal" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="var(--app-danger)" stopOpacity={0.25} />
-              <stop offset="95%" stopColor="var(--app-danger)" stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id="gGastoProj" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="var(--app-danger)" stopOpacity={0.10} />
-              <stop offset="95%" stopColor="var(--app-danger)" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(var(--app-ink-rgb),0.06)" />
-          <XAxis dataKey="label" tick={{ fill: 'rgba(var(--app-ink-rgb),0.35)', fontSize: 11 }} />
-          <YAxis tick={{ fill: 'rgba(var(--app-ink-rgb),0.35)', fontSize: 11 }} tickFormatter={fmtAxis} width={82} />
-          {visibleCurrentMonthLabel && (
-            <ReferenceLine
-              x={visibleCurrentMonthLabel}
-              stroke="rgba(var(--app-ink-rgb),0.25)"
-              strokeDasharray="4 4"
-              label={{ value: 'Hoy', position: 'insideTopRight', fill: 'rgba(var(--app-ink-rgb),0.40)', fontSize: 11 }}
-            />
-          )}
-          <ReferenceLine y={0} stroke="rgba(248,113,113,0.35)" strokeDasharray="4 3" />
-          <Tooltip
-            content={renderProjectionTooltip}
-            contentStyle={{ background: 'var(--app-popover)', border: '1px solid rgba(196,135,246,0.2)', borderRadius: 12 }}
-            labelStyle={{ color: 'var(--app-text)', marginBottom: 6, fontWeight: 700 }}
-            itemSorter={(item) => ({
-              ing_real: 0,
-              ing_proj: 1,
-              gasto_real: 2,
-              gasto_proj: 3,
-            }[item?.dataKey] ?? 99)}
-            formatter={(value, name) => {
-              if (value == null) return null
-              const labels = {
-                ing_real: 'Total disponible este mes (real)',
-                ing_proj: 'Total disponible este mes (proyectado)',
-                gasto_real: 'Gastos del mes (real)',
-                gasto_proj: 'Gastos del mes (proyectado)',
-              }
-              return [fmt(value), labels[name] || name]
-            }}
-            labelFormatter={(label, payload) => {
-              const point = payload?.[0]?.payload
-              return point ? `${label} - ${point.is_real ? 'Real' : 'Proyectado'}` : label
-            }}
-          />
-          {!isCompactProjectionChart && <Legend content={renderProjectionLegend} />}
-          {shouldShowSeries('income') && (
-            <>
-              <Area connectNulls={false} type="monotone" dataKey="ing_real" stroke="var(--app-green)" strokeWidth={2.5} fill="url(#gIngReal)" dot={false} />
-              <Area connectNulls={false} type="monotone" dataKey="ing_proj" stroke="var(--app-green)" strokeWidth={2} fill="url(#gIngProj)" strokeDasharray="5 4" dot={false} />
-            </>
-          )}
-          {shouldShowSeries('expense') && (
-            <>
-              <Area connectNulls={false} type="monotone" dataKey="gasto_real" stroke="var(--app-danger)" strokeWidth={2.5} fill="url(#gGastoReal)" dot={false} />
-              <Area connectNulls={false} type="monotone" dataKey="gasto_proj" stroke="var(--app-danger)" strokeWidth={2} fill="url(#gGastoProj)" strokeDasharray="5 4" dot={false} />
-            </>
-          )}
-        </AreaChart>
-      </ResponsiveContainer>
+      <Suspense fallback={<div className="loading-screen" style={{ minHeight: '280px' }}><div className="spinner" /></div>}>
+        <ProjectionChartCanvas
+          data={visibleProjectionSeries}
+          height={isCompactProjectionChart ? 320 : 360}
+          compact={isCompactProjectionChart}
+          currentMonthLabel={visibleCurrentMonthLabel}
+          formatAxis={fmtAxis}
+          renderTooltip={renderProjectionTooltip}
+          renderLegend={renderProjectionLegend}
+          showIncome={shouldShowSeries('income')}
+          showExpense={shouldShowSeries('expense')}
+        />
+      </Suspense>
     )
-
     const rangeLabel = visibleProjectionSeries.length > 0
       ? `${visibleProjectionSeries[0].label} — ${visibleProjectionSeries.at(-1).label}`
       : null
@@ -912,60 +837,20 @@ export default function Dashboard() {
     )
 
     const fullChart = (
-      <ResponsiveContainer width="100%" height={420}>
-        <AreaChart data={chartSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id="gIngRealF" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="var(--app-green)" stopOpacity={0.25} />
-              <stop offset="95%" stopColor="var(--app-green)" stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id="gIngProjF" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="var(--app-green)" stopOpacity={0.10} />
-              <stop offset="95%" stopColor="var(--app-green)" stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id="gGastoRealF" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="var(--app-danger)" stopOpacity={0.25} />
-              <stop offset="95%" stopColor="var(--app-danger)" stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id="gGastoProjF" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="var(--app-danger)" stopOpacity={0.10} />
-              <stop offset="95%" stopColor="var(--app-danger)" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(var(--app-ink-rgb),0.06)" />
-          <XAxis dataKey="label" tick={{ fill: 'rgba(var(--app-ink-rgb),0.35)', fontSize: 10 }} interval="preserveStartEnd" />
-          <YAxis tick={{ fill: 'rgba(var(--app-ink-rgb),0.35)', fontSize: 11 }} tickFormatter={fmtAxis} width={82} />
-          {currentMonthKey && (
-            <ReferenceLine
-              x={chartSeries.find(p => p.month === currentMonthKey)?.label}
-              stroke="rgba(var(--app-ink-rgb),0.25)"
-              strokeDasharray="4 4"
-              label={{ value: 'Hoy', position: 'insideTopRight', fill: 'rgba(var(--app-ink-rgb),0.40)', fontSize: 11 }}
-            />
-          )}
-          <ReferenceLine y={0} stroke="rgba(248,113,113,0.35)" strokeDasharray="4 3" />
-          <Tooltip
-            content={renderProjectionTooltip}
-            contentStyle={{ background: 'var(--app-popover)', border: '1px solid rgba(196,135,246,0.2)', borderRadius: 12 }}
-            labelStyle={{ color: 'var(--app-text)', marginBottom: 6, fontWeight: 700 }}
-          />
-          <Legend content={renderProjectionLegend} />
-          {shouldShowSeries('income') && (
-            <>
-              <Area connectNulls={false} type="monotone" dataKey="ing_real" stroke="var(--app-green)" strokeWidth={2} fill="url(#gIngRealF)" dot={false} />
-              <Area connectNulls={false} type="monotone" dataKey="ing_proj" stroke="var(--app-green)" strokeWidth={1.5} fill="url(#gIngProjF)" strokeDasharray="5 4" dot={false} />
-            </>
-          )}
-          {shouldShowSeries('expense') && (
-            <>
-              <Area connectNulls={false} type="monotone" dataKey="gasto_real" stroke="var(--app-danger)" strokeWidth={2} fill="url(#gGastoRealF)" dot={false} />
-              <Area connectNulls={false} type="monotone" dataKey="gasto_proj" stroke="var(--app-danger)" strokeWidth={1.5} fill="url(#gGastoProjF)" strokeDasharray="5 4" dot={false} />
-            </>
-          )}
-        </AreaChart>
-      </ResponsiveContainer>
+      <Suspense fallback={<div className="loading-screen" style={{ minHeight: '360px' }}><div className="spinner" /></div>}>
+        <ProjectionChartCanvas
+          data={chartSeries}
+          height={420}
+          full
+          currentMonthLabel={chartSeries.find((point) => point.month === currentMonthKey)?.label}
+          formatAxis={fmtAxis}
+          renderTooltip={renderProjectionTooltip}
+          renderLegend={renderProjectionLegend}
+          showIncome={shouldShowSeries('income')}
+          showExpense={shouldShowSeries('expense')}
+        />
+      </Suspense>
     )
-
     if (!interactive) return chart
 
     return (
@@ -1322,8 +1207,8 @@ export default function Dashboard() {
         </div>
       )}
 
-      {advancedProjectionEnabled ? (
-        <div className="card dashboard-chart-card dashboard-premium-card">
+      <div ref={projectionChartAnchorRef} aria-hidden="true" />
+      {advancedProjectionEnabled ? (        <div className="card dashboard-chart-card dashboard-premium-card">
 
           {/* ── Header ── */}
           <div className="card-header dashboard-card-header-compact">

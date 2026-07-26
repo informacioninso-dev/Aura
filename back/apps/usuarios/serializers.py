@@ -1,6 +1,10 @@
+import ipaddress
+
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
+from django.conf import settings
+from django.db import transaction
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.tokens import default_token_generator
@@ -10,6 +14,7 @@ from .models import (
     EmailServerConfig,
     Feature,
     GastoOperativo,
+    LegalAcceptance,
     Plan,
     PROJECTION_MODE_CHOICES,
 )
@@ -28,10 +33,20 @@ User = get_user_model()
 
 class RegistroSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
+    privacy_notice_acknowledged = serializers.BooleanField(write_only=True)
+    terms_accepted = serializers.BooleanField(write_only=True)
 
     class Meta:
         model = User
-        fields = ('id', 'email', 'username', 'password', 'moneda_preferida')
+        fields = (
+            'id',
+            'email',
+            'username',
+            'password',
+            'moneda_preferida',
+            'privacy_notice_acknowledged',
+            'terms_accepted',
+        )
 
     def validate(self, attrs):
         # Use a temporary user instance so Django password validators can
@@ -41,10 +56,49 @@ class RegistroSerializer(serializers.ModelSerializer):
             username=attrs.get('username', ''),
         )
         validate_password(attrs.get('password'), user=temp_user)
+        if not attrs.get('privacy_notice_acknowledged'):
+            raise serializers.ValidationError({
+                'privacy_notice_acknowledged': 'Debes confirmar que leiste el Aviso de Privacidad.',
+            })
+        if not attrs.get('terms_accepted'):
+            raise serializers.ValidationError({
+                'terms_accepted': 'Debes aceptar los Terminos de Uso y el descargo financiero.',
+            })
         return attrs
 
     def create(self, validated_data):
-        return User.objects.create_user(**validated_data)
+        validated_data.pop('privacy_notice_acknowledged')
+        validated_data.pop('terms_accepted')
+        request = self.context.get('request')
+        ip_address = None
+        user_agent = ''
+        if request is not None:
+            raw_ip = request.META.get('HTTP_X_REAL_IP') or request.META.get('REMOTE_ADDR')
+            try:
+                ip_address = str(ipaddress.ip_address(raw_ip)) if raw_ip else None
+            except ValueError:
+                ip_address = None
+            user_agent = str(request.META.get('HTTP_USER_AGENT', ''))[:500]
+
+        with transaction.atomic():
+            user = User.objects.create_user(**validated_data)
+            LegalAcceptance.objects.bulk_create([
+                LegalAcceptance(
+                    user=user,
+                    document_type=LegalAcceptance.DOCUMENT_PRIVACY_NOTICE,
+                    version=settings.AURA_PRIVACY_NOTICE_VERSION,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                ),
+                LegalAcceptance(
+                    user=user,
+                    document_type=LegalAcceptance.DOCUMENT_TERMS_FINANCIAL,
+                    version=settings.AURA_TERMS_VERSION,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                ),
+            ])
+        return user
 
 
 class UsuarioSerializer(serializers.ModelSerializer):

@@ -116,15 +116,27 @@ export default function Diferidos() {
   const [pageSize, setPageSize] = useState(10)
   const [sortField, setSortField] = useState('fecha_fin')
   const [sortDir, setSortDir] = useState('asc')
+  const [totalItems, setTotalItems] = useState(0)
+  const [summary, setSummary] = useState({})
   const { categorias } = useCategorias()
 
   useEffect(() => {
-    void fetchItems()
-  }, [])
+    const timer = setTimeout(() => { void fetchItems() }, 250)
+    return () => clearTimeout(timer)
+  }, [page, pageSize, query, sortField, sortDir])
 
   async function fetchItems() {
-    const { data } = await api.get('/finanzas/diferidos/')
-    setItems(data)
+    const { data } = await api.get('/finanzas/diferidos/', {
+      params: {
+        page,
+        page_size: pageSize,
+        search: query.trim() || undefined,
+        ordering: `${sortDir === 'desc' ? '-' : ''}${sortField}`,
+      },
+    })
+    setItems(data.results || [])
+    setTotalItems(data.count || 0)
+    setSummary(data.summary || {})
   }
 
   function calcularCuota(monto, cuotas) {
@@ -227,70 +239,14 @@ export default function Diferidos() {
     }
   }), [items, todayDate, todayString])
 
-  const filteredItems = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase()
-
-    return enrichedItems
-      .filter((item) => {
-        if (!normalizedQuery) return true
-        return (
-          item.descripcion.toLowerCase().includes(normalizedQuery)
-          || (item.categoria || '').toLowerCase().includes(normalizedQuery)
-          || String(item.cuota_mensual).includes(normalizedQuery)
-          || String(item.monto_total).includes(normalizedQuery)
-        )
-      })
-      .sort((a, b) => {
-        if (sortField === 'fecha_fin') {
-          if (a.status.sortBucket !== b.status.sortBucket) {
-            return sortDir === 'asc'
-              ? a.status.sortBucket - b.status.sortBucket
-              : b.status.sortBucket - a.status.sortBucket
-          }
-
-          let comparison = 0
-          if (a.status.key === 'current') {
-            comparison = a.fecha_fin.localeCompare(b.fecha_fin)
-          } else if (a.status.key === 'upcoming') {
-            comparison = a.fecha_inicio.localeCompare(b.fecha_inicio)
-          } else {
-            comparison = b.fecha_fin.localeCompare(a.fecha_fin)
-          }
-
-          if (comparison !== 0) {
-            return sortDir === 'asc' ? comparison : -comparison
-          }
-
-          return a.descripcion.localeCompare(b.descripcion)
-        }
-
-        if (sortField === 'descripcion') {
-          const comparison = a.descripcion.localeCompare(b.descripcion)
-          return sortDir === 'asc' ? comparison : -comparison
-        }
-
-        const numericValueA = sortField === 'cuota_mensual' ? a.monthlyValue : a.totalValue
-        const numericValueB = sortField === 'cuota_mensual' ? b.monthlyValue : b.totalValue
-        if (numericValueA < numericValueB) return sortDir === 'asc' ? -1 : 1
-        if (numericValueA > numericValueB) return sortDir === 'asc' ? 1 : -1
-        return a.descripcion.localeCompare(b.descripcion)
-      })
-  }, [enrichedItems, query, sortDir, sortField])
-
-  const totalMensual = filteredItems
-    .filter((item) => item.status.key === 'current')
-    .reduce((sum, item) => sum + item.monthlyValue, 0)
-  const totalComprometido = filteredItems
-    .filter((item) => item.status.key === 'current' || item.status.key === 'upcoming')
-    .reduce((sum, item) => sum + item.totalValue, 0)
-  const activosHoy = filteredItems.filter((item) => item.status.key === 'current').length
-  const porComenzar = filteredItems.filter((item) => item.status.key === 'upcoming').length
-  const finalizados = filteredItems.filter((item) => item.status.key === 'finished' || item.status.key === 'inactive').length
-
-  const pageCount = Math.max(1, Math.ceil(filteredItems.length / pageSize))
+  const totalMensual = Number(summary.monthly_total || 0)
+  const totalComprometido = Number(summary.total_committed || 0)
+  const activosHoy = Number(summary.current || 0)
+  const porComenzar = Number(summary.upcoming || 0)
+  const finalizados = Number(summary.finished || 0)
+  const pageCount = Math.max(1, Math.ceil(totalItems / pageSize))
   const safePage = Math.min(page, pageCount)
-  const paginatedItems = filteredItems.slice((safePage - 1) * pageSize, safePage * pageSize)
-
+  const paginatedItems = enrichedItems
   return (
     <div className="finance-shell">
       <div className="page-header page-header-actions">
@@ -347,8 +303,8 @@ export default function Diferidos() {
               onNextPage={() => setPage((current) => Math.min(pageCount, current + 1))}
               pageSize={pageSize}
               onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
-              totalItems={items.length}
-              filteredItems={filteredItems.length}
+              totalItems={totalItems}
+              filteredItems={totalItems}
               sortField={sortField}
               sortDir={sortDir}
               onSortChange={(field, dir) => { setSortField(field); setSortDir(dir); setPage(1) }}

@@ -11,7 +11,7 @@ from django.utils.encoding import force_bytes
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import AdminActionLog, EmailServerConfig, Feature, PagoPayPhone, Plan, UserPlanAssignment
+from .models import AdminActionLog, EmailServerConfig, Feature, LegalAcceptance, PagoPayPhone, Plan, UserPlanAssignment
 from .plans import assign_plan_to_user
 
 
@@ -40,14 +40,48 @@ class TestUsuarioAPI(APITestCase):
             'username': 'nuevo',
             'password': 'clave12345',
             'moneda_preferida': 'USD',
+            'privacy_notice_acknowledged': True,
+            'terms_accepted': True,
         }
 
-        response = self.client.post('/api/usuarios/registro/', payload, format='json')
+        response = self.client.post(
+            '/api/usuarios/registro/',
+            payload,
+            format='json',
+            HTTP_X_REAL_IP='203.0.113.25',
+            HTTP_USER_AGENT='Aura registration test',
+        )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         user = User.objects.get(email=payload['email'])
         self.assertTrue(user.check_password(payload['password']))
         self.assertNotEqual(user.password, payload['password'])
+        acceptances = LegalAcceptance.objects.filter(user=user)
+        self.assertEqual(acceptances.count(), 2)
+        self.assertSetEqual(
+            set(acceptances.values_list('document_type', flat=True)),
+            {
+                LegalAcceptance.DOCUMENT_PRIVACY_NOTICE,
+                LegalAcceptance.DOCUMENT_TERMS_FINANCIAL,
+            },
+        )
+        self.assertTrue(all(item.version == '2026-07-26' for item in acceptances))
+        self.assertTrue(all(item.ip_address == '203.0.113.25' for item in acceptances))
+
+    def test_registro_rechaza_confirmaciones_legales_ausentes(self):
+        payload = {
+            'email': 'sinlegal@example.com',
+            'username': 'sinlegal',
+            'password': 'clave12345',
+            'moneda_preferida': 'USD',
+        }
+
+        response = self.client.post('/api/usuarios/registro/', payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('privacy_notice_acknowledged', response.data)
+        self.assertIn('terms_accepted', response.data)
+        self.assertFalse(User.objects.filter(email=payload['email']).exists())
 
     def test_perfil_requiere_autenticacion(self):
         response = self.client.get('/api/usuarios/perfil/')
@@ -258,6 +292,25 @@ class TestUsuarioAPI(APITestCase):
             response.data['refresh'],
         )
 
+    def test_refresh_no_expone_cookie_aunque_se_falsifique_cliente_mobile(self):
+        user = User.objects.create_user(
+            email='refreshspoof@example.com',
+            username='refreshspoof',
+            password='clave12345',
+        )
+        self.login_user(user)
+
+        response = self.client.post(
+            '/api/usuarios/token/refresh/',
+            {},
+            format='json',
+            HTTP_X_CLIENT='mobile',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', response.data)
+        self.assertNotIn('refresh', response.data)
+        self.assertIn(settings.AUTH_REFRESH_COOKIE_NAME, response.cookies)
     def test_logout_limpia_cookie_refresh(self):
         user = User.objects.create_user(
             email='logoutcookie@example.com',

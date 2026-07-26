@@ -16,12 +16,12 @@ echo "=============================="
 # ── 1. Sistema base ────────────────────────────────────────────────────────────
 apt-get update -y
 apt-get install -y python3 python3-pip python3-venv python3-dev \
-    postgresql postgresql-contrib nginx certbot python3-certbot-nginx \
+    postgresql postgresql-contrib redis-server nginx certbot python3-certbot-nginx \
     git curl build-essential libpq-dev
 
-# ── 2. Node.js 20 (para build de React) ───────────────────────────────────────
-if ! command -v node &> /dev/null; then
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+# ── 2. Node.js 22.22+ (para build de React) ───────────────────────────────────────
+if ! command -v node &> /dev/null || ! dpkg --compare-versions "$(node -p 'process.versions.node')" ge "22.22.0"; then
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
     apt-get install -y nodejs
 fi
 
@@ -31,8 +31,8 @@ if ! id "$APP_USER" &>/dev/null; then
 fi
 
 # ── 4. Directorios ────────────────────────────────────────────────────────────
-mkdir -p "$APP_DIR" /var/log/aura /var/www/aura/front
-chown -R "$APP_USER":www-data "$APP_DIR" /var/log/aura
+mkdir -p "$APP_DIR" /var/www/aura/front "$APP_DIR/back/media"
+chown -R "$APP_USER":www-data "$APP_DIR"
 
 echo ""
 echo "──────────────────────────────────────────────────"
@@ -67,6 +67,11 @@ if [ ! -f .env ]; then
     echo "  nano $APP_DIR/back/.env"
 fi
 
+if ! grep -q '^REDIS_URL=' .env; then
+    printf '\nREDIS_URL=redis://127.0.0.1:6379/1\n' >> .env
+fi
+systemctl enable --now redis-server
+
 # Entorno virtual + dependencias
 python3 -m venv .venv
 .venv/bin/pip install --upgrade pip
@@ -82,7 +87,7 @@ python3 -m venv .venv
     "gunicorn>=23.0.0" \
     "psycopg2-binary>=2.9.0" \
     "openpyxl>=3.1.0" \
-    "cryptography>=45.0.0" \
+    "cryptography>=48.0.1,<49.0.0" \
     "reportlab>=4.4.0"
 
 # Migraciones y archivos estáticos
@@ -94,21 +99,24 @@ chown -R "$APP_USER":www-data "$APP_DIR/back"
 # ── 7. Frontend React ──────────────────────────────────────────────────────────
 echo "[7/9] Compilando frontend..."
 cd "$APP_DIR/front"
-npm install
+npm ci
 npm run build
 rsync -a dist/ /var/www/aura/front/
 echo "  Frontend compilado y copiado a /var/www/aura/front/"
 
 # ── 8. Systemd ────────────────────────────────────────────────────────────────
 echo "[8/9] Configurando servicio systemd..."
-cp "$APP_DIR/systemd/aura.service" /etc/systemd/system/aura.service
+install -d -o "$APP_USER" -g www-data -m 0750 "$APP_DIR/back/media"
+cp "$APP_DIR/systemd/aura-api.service" /etc/systemd/system/aura-api.service
 systemctl daemon-reload
-systemctl enable aura
-systemctl restart aura
-systemctl status aura --no-pager
+systemctl enable aura-api
+systemctl restart aura-api
+systemctl status aura-api --no-pager
 
-# ── 9. Nginx + SSL ────────────────────────────────────────────────────────────
+# 9. Nginx + SSL
 echo "[9/9] Configurando Nginx y SSL..."
+install -d -m 0755 /etc/nginx/snippets
+cp "$APP_DIR/nginx/security-headers.conf" /etc/nginx/snippets/aura-security-headers.conf
 cp "$APP_DIR/nginx/aura.conf" /etc/nginx/sites-available/aura
 ln -sf /etc/nginx/sites-available/aura /etc/nginx/sites-enabled/aura
 rm -f /etc/nginx/sites-enabled/default
@@ -125,6 +133,6 @@ echo " ✓ Aura desplegado en https://$DOMAIN"
 echo "=============================="
 echo ""
 echo "Comandos útiles:"
-echo "  Ver logs Django:  journalctl -u aura -f"
-echo "  Reiniciar app:    systemctl restart aura"
+echo "  Ver logs Django:  journalctl -u aura-api -f"
+echo "  Reiniciar app:    systemctl restart aura-api"
 echo "  Ver logs Nginx:   tail -f /var/log/nginx/error.log"

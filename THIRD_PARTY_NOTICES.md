@@ -31,12 +31,12 @@ clearer distribution posture for your business model.
 | Package | Version | License |
 | --- | --- | --- |
 | `@headlessui/react` | `2.2.9` | `MIT` |
-| `axios` | `1.13.6` | `MIT` |
+| `axios` | `1.18.1` | `MIT` |
 | `lucide-react` | `1.7.0` | `ISC` |
-| `react` | `19.2.4` | `MIT` |
-| `react-dom` | `19.2.4` | `MIT` |
+| `react` | `19.2.8` | `MIT` |
+| `react-dom` | `19.2.8` | `MIT` |
 | `react-hook-form` | `7.72.0` | `MIT` |
-| `react-router-dom` | `7.13.2` | `MIT` |
+| `react-router` | `8.3.0` | `MIT` |
 | `recharts` | `3.8.1` | `MIT` |
 
 ## Frontend development dependencies

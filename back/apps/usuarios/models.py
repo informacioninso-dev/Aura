@@ -52,6 +52,47 @@ class Usuario(AbstractUser):
         return f'{self.email} ({self.username})'
 
 
+class LegalAcceptance(models.Model):
+    DOCUMENT_PRIVACY_NOTICE = 'privacy_notice'
+    DOCUMENT_TERMS_FINANCIAL = 'terms_financial'
+    DOCUMENT_CHOICES = [
+        (DOCUMENT_PRIVACY_NOTICE, 'Aviso de privacidad'),
+        (DOCUMENT_TERMS_FINANCIAL, 'Terminos y descargo financiero'),
+    ]
+
+    user = models.ForeignKey(
+        Usuario,
+        on_delete=models.CASCADE,
+        related_name='legal_acceptances',
+    )
+    document_type = models.CharField(max_length=32, choices=DOCUMENT_CHOICES)
+    version = models.CharField(max_length=32)
+    accepted_at = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=500, blank=True)
+    source = models.CharField(max_length=32, default='registration')
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'document_type', 'version'],
+                name='unique_user_legal_version',
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=['document_type', 'version', 'accepted_at'],
+                name='legal_doc_version_idx',
+            ),
+        ]
+        ordering = ['-accepted_at']
+        verbose_name = 'Aceptacion legal'
+        verbose_name_plural = 'Aceptaciones legales'
+
+    def __str__(self):
+        return f'{self.user.email} - {self.document_type} ({self.version})'
+
+
 class AdminActionLog(models.Model):
     actor = models.ForeignKey(
         Usuario,

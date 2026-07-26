@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router'
 
 import { getApiErrorMessage } from '../../api/errors'
 import BrandMark from '../../components/brand/BrandMark'
@@ -11,7 +11,15 @@ const MONEDAS = ['CLP', 'USD', 'EUR', 'ARS', 'COP', 'MXN', 'PEN']
 export default function Registro() {
   const { registro, user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
-  const [form, setForm] = useState({ email: '', username: '', password: '', confirm_password: '', moneda_preferida: 'CLP' })
+  const [form, setForm] = useState({
+    email: '',
+    username: '',
+    password: '',
+    confirm_password: '',
+    moneda_preferida: 'USD',
+    privacy_notice_acknowledged: false,
+    terms_accepted: false,
+  })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -28,6 +36,10 @@ export default function Registro() {
       setError('Las claves no coinciden.')
       return
     }
+    if (!form.privacy_notice_acknowledged || !form.terms_accepted) {
+      setError('Debes revisar el Aviso de Privacidad y aceptar los Terminos de Uso.')
+      return
+    }
 
     setLoading(true)
     try {
@@ -36,6 +48,8 @@ export default function Registro() {
         username: form.username,
         password: form.password,
         moneda_preferida: form.moneda_preferida,
+        privacy_notice_acknowledged: form.privacy_notice_acknowledged,
+        terms_accepted: form.terms_accepted,
       })
       navigate('/dashboard')
     } catch (err) {
@@ -140,6 +154,32 @@ export default function Registro() {
               >
                 {MONEDAS.map((m) => <option key={m} value={m}>{m}</option>)}
               </select>
+            </div>
+
+            <div className="auth-legal-confirmations">
+              <label className="auth-legal-check">
+                <input
+                  type="checkbox"
+                  required
+                  checked={form.privacy_notice_acknowledged}
+                  onChange={(e) => setForm({ ...form, privacy_notice_acknowledged: e.target.checked })}
+                />
+                <span>
+                  He leido el <Link to="/privacidad" target="_blank" rel="noreferrer">Aviso de Privacidad</Link> y entiendo como Aura tratara mis datos.
+                </span>
+              </label>
+
+              <label className="auth-legal-check">
+                <input
+                  type="checkbox"
+                  required
+                  checked={form.terms_accepted}
+                  onChange={(e) => setForm({ ...form, terms_accepted: e.target.checked })}
+                />
+                <span>
+                  Acepto los <Link to="/terminos" target="_blank" rel="noreferrer">Terminos de Uso</Link>. Entiendo que Aura es informativa, no reemplaza asesoria financiera y sus resultados dependen de los datos que ingreso.
+                </span>
+              </label>
             </div>
 
             <button type="submit" className="btn-submit" disabled={loading} style={{ marginTop: 12 }}>

@@ -5,6 +5,7 @@ from .models import (
     AdminActionLog,
     EmailServerConfig,
     Feature,
+    LegalAcceptance,
     Plan,
     PlanFeature,
     UserPlanAssignment,
@@ -22,6 +23,28 @@ class CustomUserAdmin(UserAdmin):
     fieldsets = UserAdmin.fieldsets + (
         ('Informacion financiera', {'fields': ('moneda_preferida', 'foto_perfil')}),
     )
+
+
+@admin.register(LegalAcceptance)
+class LegalAcceptanceAdmin(admin.ModelAdmin):
+    list_display = ('accepted_at', 'user', 'document_type', 'version', 'source', 'ip_address')
+    list_filter = ('document_type', 'version', 'source', 'accepted_at')
+    search_fields = ('user__email', 'user__username', 'ip_address')
+    readonly_fields = (
+        'user',
+        'document_type',
+        'version',
+        'accepted_at',
+        'ip_address',
+        'user_agent',
+        'source',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(AdminActionLog)

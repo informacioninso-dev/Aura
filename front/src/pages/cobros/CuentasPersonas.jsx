@@ -1,4 +1,4 @@
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router'
 
 import CuentasPersonasPanel from './LoQueMeDeben'
 import '../../components/ui/app.css'

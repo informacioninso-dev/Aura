@@ -1025,6 +1025,20 @@
   font-size: 12px;
 }
 
+.home-footer-legal {
+  display: inline-flex;
+  gap: 12px;
+}
+
+.home-footer-legal a {
+  color: rgba(243, 238, 223, 0.66);
+  text-decoration: none;
+}
+
+.home-footer-legal a:hover {
+  color: var(--home-mint);
+}
+
 .home :is(a, button):focus-visible {
   outline: 3px solid rgba(189, 139, 242, 0.68);
   outline-offset: 3px;

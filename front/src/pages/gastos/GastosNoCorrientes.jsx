@@ -54,6 +54,8 @@ export default function GastosNoCorrientes({ embedded = false }) {
   const [query, setQuery] = useState('')
   const [sortField, setSortField] = useState('fecha')
   const [sortDir, setSortDir] = useState('desc')
+  const [totalItems, setTotalItems] = useState(0)
+  const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [selectedIds, setSelectedIds] = useState(new Set())
@@ -69,8 +71,11 @@ export default function GastosNoCorrientes({ embedded = false }) {
   const [sugerenciaAplicando, setSugerenciaAplicando] = useState(null)
   const [sugerenciasOcultas, setSugerenciasOcultas] = useState(new Set())
 
-  useEffect(() => { fetchItems(); fetchSugerencias() }, [])
-
+  useEffect(() => {
+    const timer = setTimeout(() => { void fetchItems() }, 250)
+    return () => clearTimeout(timer)
+  }, [page, pageSize, query, sortField, sortDir])
+  useEffect(() => { void fetchSugerencias() }, [])
   function clampExpenseDate(value) {
     if (!value) return value
     return value > maxExpenseDate ? maxExpenseDate : value
@@ -78,8 +83,17 @@ export default function GastosNoCorrientes({ embedded = false }) {
 
   async function fetchItems() {
     try {
-      const { data } = await api.get('/finanzas/gastos-no-corrientes/')
-      setItems(data)
+      const { data } = await api.get('/finanzas/gastos-no-corrientes/', {
+        params: {
+          page,
+          page_size: pageSize,
+          search: query.trim() || undefined,
+          ordering: `${sortDir === 'desc' ? '-' : ''}${sortField}`,
+        },
+      })
+      setItems(data.results || [])
+      setTotalItems(data.count || 0)
+      setTotal(Number(data.summary?.total || 0))
     } catch (err) {
       setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudieron cargar los gastos puntuales.') })
     }
@@ -229,29 +243,9 @@ export default function GastosNoCorrientes({ embedded = false }) {
     }
   }
 
-  const total = items.reduce((s, i) => s + parseFloat(i.monto), 0)
-
-  const filteredItems = items.filter((item) => {
-    const q = query.trim().toLowerCase()
-    if (!q) return true
-    return (
-      item.descripcion.toLowerCase().includes(q)
-      || item.categoria.toLowerCase().includes(q)
-      || (item.notas || '').toLowerCase().includes(q)
-      || String(item.monto).toLowerCase().includes(q)
-    )
-  }).sort((a, b) => {
-    const av = sortField === 'monto' ? parseFloat(a[sortField]) : (a[sortField] || '')
-    const bv = sortField === 'monto' ? parseFloat(b[sortField]) : (b[sortField] || '')
-    if (av < bv) return sortDir === 'asc' ? -1 : 1
-    if (av > bv) return sortDir === 'asc' ? 1 : -1
-    return 0
-  })
-
-  const pageCount = Math.max(1, Math.ceil(filteredItems.length / pageSize))
+  const pageCount = Math.max(1, Math.ceil(totalItems / pageSize))
   const safePage = Math.min(page, pageCount)
-  const start = (safePage - 1) * pageSize
-  const paginatedItems = filteredItems.slice(start, start + pageSize)
+  const paginatedItems = items
   const projectionStatusLabel = (item) => (item.incluir_en_proyeccion === false ? 'Fuera de proyeccion' : 'En proyeccion')
   const visibleSuggestions = sugerencias.filter((sugerencia) => !sugerenciasOcultas.has(sugerencia.descripcion))
   const suggestionItems = visibleSuggestions.map((sugerencia) => ({
@@ -267,7 +261,6 @@ export default function GastosNoCorrientes({ embedded = false }) {
     onSecondaryAction: () => descartarSugerencia(sugerencia.descripcion),
     secondaryDisabled: sugerenciaAplicando !== null,
   }))
-
   const bulkDeleteMax = user?.feature_access?.bulk_delete_max ?? 10
   const allPageSelected = paginatedItems.length > 0 && paginatedItems.every((i) => selectedIds.has(i.id))
 
@@ -409,8 +402,8 @@ export default function GastosNoCorrientes({ embedded = false }) {
               onNextPage={() => setPage((p) => Math.min(pageCount, p + 1))}
               pageSize={pageSize}
               onPageSizeChange={(n) => { setPageSize(n); setPage(1) }}
-              totalItems={items.length}
-              filteredItems={filteredItems.length}
+              totalItems={totalItems}
+              filteredItems={totalItems}
               sortField={sortField}
               sortDir={sortDir}
               onSortChange={(f, d) => { setSortField(f); setSortDir(d); setPage(1) }}

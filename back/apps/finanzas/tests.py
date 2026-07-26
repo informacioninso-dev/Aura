@@ -152,6 +152,44 @@ class TestFinanzasAPI(APITestCase):
         self.assertEqual(response.data['gastos_no_corrientes'], [])
         self.assertEqual(response.data['diferidos'], [])
 
+    def test_ingresos_paginados_entregan_conteo_busqueda_y_resumen(self):
+        for index in range(15):
+            Ingreso.objects.create(
+                usuario=self.user_a,
+                descripcion=f'Sueldo {index:02d}',
+                monto=Decimal('100.00'),
+                frecuencia='mensual',
+                fecha_inicio='2026-01-01',
+                activo=True,
+            )
+        self.client.force_authenticate(user=self.user_a)
+
+        response = self.client.get(
+            '/api/finanzas/ingresos/',
+            {'page': 2, 'page_size': 10, 'search': 'Sueldo', 'ordering': 'descripcion'},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 15)
+        self.assertEqual(len(response.data['results']), 5)
+        self.assertEqual(Decimal(response.data['summary']['monthly_total']), Decimal('1500.00'))
+
+    def test_dashboard_devuelve_solo_el_mes_solicitado(self):
+        IngresoPuntual.objects.create(
+            usuario=self.user_a, descripcion='Bono julio', monto=Decimal('50.00'), fecha='2026-07-10',
+        )
+        IngresoPuntual.objects.create(
+            usuario=self.user_a, descripcion='Bono agosto', monto=Decimal('75.00'), fecha='2026-08-10',
+        )
+        self.client.force_authenticate(user=self.user_a)
+
+        response = self.client.get('/api/finanzas/dashboard/', {'anio': 2026, 'mes': 7})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual([item['descripcion'] for item in response.data['ingresos_puntuales']], ['Bono julio'])
+        self.assertTrue(response.data['has_any_movement'])
+        self.assertIn('bounds', response.data)
+
     def test_ingreso_puntual_free_fuerza_inclusion_en_proyeccion(self):
         self.client.force_authenticate(user=self.user_a)
 
@@ -1876,6 +1914,51 @@ class TestFinanzasAPI(APITestCase):
         self.assertTrue(all(not point['is_real'] for point in response.data['series'][7:]))
 
 
+    def test_asistente_aplica_rate_limit_por_usuario(self):
+        from rest_framework.throttling import ScopedRateThrottle
+
+        self.client.force_authenticate(user=self.user_a)
+        cache.clear()
+        with override_settings(GROQ_API_KEY=''), patch.dict(
+            ScopedRateThrottle.THROTTLE_RATES,
+            {'ai_parse': '2/min'},
+        ):
+            first = self.client.post('/api/finanzas/asistente/parsear/', {'texto': 'Gaste 10'}, format='json')
+            second = self.client.post('/api/finanzas/asistente/parsear/', {'texto': 'Gaste 10'}, format='json')
+            blocked = self.client.post('/api/finanzas/asistente/parsear/', {'texto': 'Gaste 10'}, format='json')
+
+        self.assertEqual(first.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertEqual(second.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertEqual(blocked.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    def test_transcripcion_rechaza_formato_desconocido(self):
+        self.client.force_authenticate(user=self.user_a)
+        audio = SimpleUploadedFile('audio.txt', b'not-audio', content_type='text/plain')
+
+        response = self.client.post(
+            '/api/finanzas/asistente/transcribir/',
+            {'audio': audio},
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('Formato', response.data['detail'])
+
+    def test_transcripcion_rechaza_audio_mayor_a_diez_mb(self):
+        self.client.force_authenticate(user=self.user_a)
+        audio = SimpleUploadedFile(
+            'audio.mp3', b'0' * (10 * 1024 * 1024 + 1), content_type='audio/mpeg',
+        )
+
+        response = self.client.post(
+            '/api/finanzas/asistente/transcribir/',
+            {'audio': audio},
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('10 MB', response.data['detail'])
+
 class TestGastosVariables(APITestCase):
     """Gastos recurrentes cuyo monto cambia mes a mes (luz, super, gasolina)."""
 
@@ -2793,6 +2876,18 @@ class TestImportacionRecurrentes(APITestCase):
         from apps.finanzas.importar import parsear_archivo
         return parsear_archivo('x.csv', csv_text.encode('utf-8'))
 
+    def test_xlsx_rechaza_expansion_superior_al_limite_seguro(self):
+        import io
+        import zipfile
+        from apps.finanzas.importar import _validar_contenedor_xlsx
+
+        payload = io.BytesIO()
+        with zipfile.ZipFile(payload, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr('xl/worksheets/sheet1.xml', b'x' * 128)
+
+        with patch('apps.finanzas.importar.MAX_XLSX_UNCOMPRESSED_BYTES', 64):
+            with self.assertRaisesRegex(ValueError, 'limite seguro'):
+                _validar_contenedor_xlsx(payload.getvalue())
     # -- Parseo --------------------------------------------------------------
 
     def test_columna_frecuencia_marca_recurrente(self):

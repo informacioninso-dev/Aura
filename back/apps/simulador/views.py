@@ -1,6 +1,9 @@
+from django.db import models
 from rest_framework import permissions, status, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from apps.finanzas.pagination import OptInPageNumberPagination
 
 from .models import Banco, Simulacion
 from .serializers import BancoSerializer, EvaluarEscenarioSerializer, SimulacionSerializer
@@ -28,9 +31,19 @@ class AdminBancoViewSet(viewsets.ModelViewSet):
 class SimulacionViewSet(viewsets.ModelViewSet):
     serializer_class = SimulacionSerializer
     permission_classes = (permissions.IsAuthenticated,)
+    pagination_class = OptInPageNumberPagination
 
     def get_queryset(self):
-        return Simulacion.objects.filter(usuario=self.request.user)
+        queryset = Simulacion.objects.filter(usuario=self.request.user).select_related('banco')
+        search = self.request.query_params.get('search', '').strip()
+        if search:
+            queryset = queryset.filter(
+                models.Q(nombre__icontains=search)
+                | models.Q(tipo__icontains=search)
+                | models.Q(banco__nombre__icontains=search)
+                | models.Q(monto__icontains=search)
+            )
+        return queryset
 
     def perform_create(self, serializer):
         serializer.save(usuario=self.request.user)

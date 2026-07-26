@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router'
 
 import { AuthProvider } from './context/AuthContext'
 import Home from './pages/home/Home'
@@ -22,6 +22,8 @@ const Importar = lazy(() => import('./pages/importar/Importar'))
 const SuperAdmin = lazy(() => import('./pages/superadmin/SuperAdmin'))
 const Planes = lazy(() => import('./pages/planes/Planes'))
 const PagoResultado = lazy(() => import('./pages/pago/PagoResultado'))
+const PrivacyNotice = lazy(() => import('./pages/legal/PrivacyNotice'))
+const TermsOfUse = lazy(() => import('./pages/legal/TermsOfUse'))
 
 function AppBootFallback() {
   return (
@@ -63,6 +65,8 @@ export default function App() {
             <Route path="/registro" element={<Registro />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/privacidad" element={<PrivacyNotice />} />
+            <Route path="/terminos" element={<TermsOfUse />} />
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/ingresos" element={<LoQueGanas />} />

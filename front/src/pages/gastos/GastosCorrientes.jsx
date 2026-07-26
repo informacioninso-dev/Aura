@@ -12,7 +12,7 @@ import Modal from '../../components/ui/Modal'
 import { useCategorias } from '../../hooks/useCategorias'
 import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../../utils/dateBounds'
 import { formatAmount } from '../../utils/formatters'
-import { FRECUENCIAS, montoEfectivoMes } from '../../utils/frecuencias'
+import { FRECUENCIAS } from '../../utils/frecuencias'
 import '../../components/ui/app.css'
 
 const FRECUENCIA_STORAGE_KEY = 'gastos_corrientes_last_frecuencia'
@@ -90,6 +90,8 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
   const [pageSize, setPageSize] = useState(10)
   const [sortField, setSortField] = useState('fecha_inicio')
   const [sortDir, setSortDir] = useState('desc')
+  const [totalItems, setTotalItems] = useState(0)
+  const [total, setTotal] = useState(0)
 
   // — modal crear/editar —
   const [modal, setModal] = useState(false)
@@ -125,8 +127,10 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
 
   const [feedback, setFeedback] = useState({ type: '', message: '' })
 
-  useEffect(() => { fetchItems() }, [tipoMonto])
-
+  useEffect(() => {
+    const timer = setTimeout(() => { void fetchItems() }, 250)
+    return () => clearTimeout(timer)
+  }, [tipoMonto, page, pageSize, query, sortField, sortDir])
   useEffect(() => {
     api.get('/finanzas/catalogo/')
       .then(({ data }) => setCatalogo(data[`gasto_${tipoMonto}`] || []))
@@ -154,8 +158,18 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
 
   async function fetchItems() {
     try {
-      const { data } = await api.get(`/finanzas/gastos-corrientes/?tipo_monto=${tipoMonto}`)
-      setItems(data)
+      const { data } = await api.get('/finanzas/gastos-corrientes/', {
+        params: {
+          tipo_monto: tipoMonto,
+          page,
+          page_size: pageSize,
+          search: query.trim() || undefined,
+          ordering: `${sortDir === 'desc' ? '-' : ''}${sortField}`,
+        },
+      })
+      setItems(data.results || [])
+      setTotalItems(data.count || 0)
+      setTotal(Number(data.summary?.monthly_total || 0))
     } catch (err) {
       setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudieron cargar los gastos.') })
     }
@@ -354,34 +368,9 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
   }
 
   // — computos derivados —
-  const hoy = getTodayDate()
-  const hoyDate = new Date(hoy + 'T00:00:00')
-  const total = items
-    .filter((i) => i.activo && i.fecha_inicio <= hoy && (!i.fecha_fin || i.fecha_fin >= hoy))
-    .reduce((s, i) => s + montoEfectivoMes(i.monto, i.frecuencia, i.fecha_inicio, hoyDate.getFullYear(), hoyDate.getMonth() + 1), 0)
-
-  const filteredItems = items.filter((item) => {
-    const q = query.trim().toLowerCase()
-    if (!q) return true
-    return (
-      item.descripcion.toLowerCase().includes(q)
-      || item.categoria.toLowerCase().includes(q)
-      || item.frecuencia.toLowerCase().includes(q)
-      || String(item.monto).toLowerCase().includes(q)
-    )
-  }).sort((a, b) => {
-    const av = sortField === 'monto' ? parseFloat(a[sortField]) : (a[sortField] || '')
-    const bv = sortField === 'monto' ? parseFloat(b[sortField]) : (b[sortField] || '')
-    if (av < bv) return sortDir === 'asc' ? -1 : 1
-    if (av > bv) return sortDir === 'asc' ? 1 : -1
-    return 0
-  })
-
-  const pageCount = Math.max(1, Math.ceil(filteredItems.length / pageSize))
+  const pageCount = Math.max(1, Math.ceil(totalItems / pageSize))
   const safePage = Math.min(page, pageCount)
-  const start = (safePage - 1) * pageSize
-  const paginatedItems = filteredItems.slice(start, start + pageSize)
-
+  const paginatedItems = items
   // — seleccion masiva (necesita paginatedItems) —
   const bulkDeleteMax = user?.feature_access?.bulk_delete_max ?? 10
   const allPageSelected = paginatedItems.length > 0 && paginatedItems.every((i) => selectedIds.has(i.id))
@@ -485,8 +474,8 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
               onNextPage={() => setPage((p) => Math.min(pageCount, p + 1))}
               pageSize={pageSize}
               onPageSizeChange={(n) => { setPageSize(n); setPage(1) }}
-              totalItems={items.length}
-              filteredItems={filteredItems.length}
+              totalItems={totalItems}
+              filteredItems={totalItems}
               sortField={sortField}
               sortDir={sortDir}
               onSortChange={(f, d) => { setSortField(f); setSortDir(d); setPage(1) }}

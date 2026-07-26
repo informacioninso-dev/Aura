@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { Plus, Pencil, Trash2, Check, X } from 'lucide-react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router'
 
 import api from '../../api/client'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'

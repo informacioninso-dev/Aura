@@ -12,7 +12,8 @@
   padding: 24px;
   font-family: 'Inter', system-ui, sans-serif;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* Glow decorativo */
@@ -334,11 +335,52 @@
   color: rgba(255,255,255,0.50);
 }
 
+.auth-legal-confirmations {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.auth-legal-check {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  align-items: start;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.035);
+  cursor: pointer;
+}
+
+.auth-legal-check input {
+  width: 17px;
+  height: 17px;
+  margin: 1px 0 0;
+  accent-color: #10B981;
+}
+
+.auth-legal-check span {
+  color: rgba(255,255,255,0.58);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.auth-legal-check a {
+  color: #D8B4FE;
+  font-weight: 700;
+}
+
 /* ══════════════════════════════════════════
    RESPONSIVE — Mobile
    ══════════════════════════════════════════ */
 
 @media (max-width: 480px) {
+  .auth-page {
+    align-items: flex-start;
+    padding: 20px 16px;
+  }
+
   .auth-card {
     padding: 24px 20px;
     border-radius: 20px;

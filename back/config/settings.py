@@ -158,6 +158,10 @@ if _redis_url:
         }
     }
 else:
+    if AURA_ENV == 'production':
+        raise ImproperlyConfigured(
+            'REDIS_URL es obligatorio en produccion para compartir cache y throttling entre workers.'
+        )
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
@@ -173,6 +177,10 @@ PAYPHONE_APP_ID = os.getenv('PAYPHONE_APP_ID', '')
 
 # Groq AI (asistente)
 GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
+
+# Versiones de los documentos confirmados durante el registro.
+AURA_PRIVACY_NOTICE_VERSION = os.getenv('AURA_PRIVACY_NOTICE_VERSION', '2026-07-26')
+AURA_TERMS_VERSION = os.getenv('AURA_TERMS_VERSION', '2026-07-26')
 
 
 # Password validation
@@ -217,6 +225,9 @@ STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+# Evita mantener archivos grandes completos en RAM durante las cargas.
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv('DJANGO_FILE_UPLOAD_MAX_MEMORY_SIZE', str(2 * 1024 * 1024)))
+DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv('DJANGO_DATA_UPLOAD_MAX_MEMORY_SIZE', str(12 * 1024 * 1024)))
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://127.0.0.1:5173').rstrip('/')
 DEFAULT_FROM_EMAIL = os.getenv('DJANGO_DEFAULT_FROM_EMAIL', 'no-reply@aura.local')
 
@@ -295,6 +306,9 @@ REST_FRAMEWORK = {
         'auth_password_change': os.getenv('DJANGO_RATE_AUTH_PASSWORD_CHANGE', '20/min'),
         'auth_token_refresh': os.getenv('DJANGO_RATE_AUTH_TOKEN_REFRESH', '20/min'),
         'superadmin_ops': os.getenv('DJANGO_RATE_SUPERADMIN_OPS', '120/min'),
+        'ai_parse': os.getenv('DJANGO_RATE_AI_PARSE', '20/hour'),
+        'ai_transcribe': os.getenv('DJANGO_RATE_AI_TRANSCRIBE', '10/hour'),
+        'historical_import': os.getenv('DJANGO_RATE_HISTORICAL_IMPORT', '20/hour'),
     },
 }
 
@@ -312,11 +326,15 @@ CONTENT_SECURITY_POLICY = (
     "base-uri 'self'; "
     "object-src 'none'; "
     "frame-ancestors 'none'; "
-    "script-src 'self' http://localhost:5173 http://127.0.0.1:5173 http://localhost:5174 http://127.0.0.1:5174; "
-    "style-src 'self' 'unsafe-inline' http://localhost:5173 http://127.0.0.1:5173 http://localhost:5174 http://127.0.0.1:5174; "
+    "script-src 'self'; "
+    "style-src 'self' 'unsafe-inline'; "
     "img-src 'self' data: blob: https:; "
     "font-src 'self' data:; "
-    "connect-src 'self' http://localhost:5173 http://127.0.0.1:5173 http://localhost:5174 http://127.0.0.1:5174 ws://localhost:5173 ws://127.0.0.1:5173 ws://localhost:5174 ws://127.0.0.1:5174 https://aura.binnso.com; "
-    "form-action 'self'"
+    "connect-src 'self'; "
+    "media-src 'self' blob:; "
+    "worker-src 'self'; "
+    "manifest-src 'self'; "
+    "form-action 'self'; "
+    "upgrade-insecure-requests"
 )
-PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=()'
+PERMISSIONS_POLICY = 'camera=(), microphone=(self), geolocation=()'

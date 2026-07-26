@@ -1,12 +1,15 @@
+import calendar
 import datetime
+import logging
 from decimal import Decimal
 from io import BytesIO
+from pathlib import Path
 
 from django.conf import settings
 from django.core.cache import cache
 from django.db import models, transaction
 from django.http import HttpResponse
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions, status, throttling
 from rest_framework.decorators import action
 from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.response import Response
@@ -20,6 +23,8 @@ from apps.usuarios.plans import (
     get_user_projection_mode,
     get_user_feature_value,
 )
+logger = logging.getLogger(__name__)
+
 from .dates import local_today
 from .models import (
     Categoria,
@@ -51,6 +56,7 @@ from .utils import (
     build_projection_cache_key,
     _monto_efectivo_mes,
 )
+from .pagination import OptInPageNumberPagination
 from .serializers import (
     CategoriaSerializer,
     CuentaPorCobrarSerializer,
@@ -67,9 +73,38 @@ from .serializers import (
 
 class BaseFinanzasViewSet(viewsets.ModelViewSet):
     permission_classes = (permissions.IsAuthenticated,)
+    pagination_class = OptInPageNumberPagination
+    search_fields = ()
+    ordering_fields = ()
 
     def get_queryset(self):
-        return self.queryset.filter(usuario=self.request.user)
+        queryset = self.queryset.filter(usuario=self.request.user)
+        search = self.request.query_params.get('search', '').strip()
+        if search and self.search_fields:
+            search_query = models.Q()
+            for field in self.search_fields:
+                search_query |= models.Q(**{f'{field}__icontains': search})
+            queryset = queryset.filter(search_query)
+
+        ordering = self.request.query_params.get('ordering', '').strip()
+        if ordering and ordering.lstrip('-') in self.ordering_fields:
+            queryset = queryset.order_by(ordering)
+        return queryset
+
+    def get_list_summary(self, queryset):
+        return None
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is None:
+            return super().list(request, *args, **kwargs)
+        serializer = self.get_serializer(page, many=True)
+        response = self.get_paginated_response(serializer.data)
+        summary = self.get_list_summary(queryset)
+        if summary is not None:
+            response.data['summary'] = summary
+        return response
 
     def perform_create(self, serializer):
         serializer.save(usuario=self.request.user)
@@ -97,44 +132,95 @@ class DashboardResumenView(APIView):
 
     def get(self, request):
         user = request.user
+        today = local_today()
+        try:
+            year = int(request.query_params.get('anio', today.year))
+            month = int(request.query_params.get('mes', today.month))
+            month_start = datetime.date(year, month, 1)
+        except (TypeError, ValueError):
+            return Response({'detail': 'Periodo invalido.'}, status=status.HTTP_400_BAD_REQUEST)
+        month_end = datetime.date(year, month, calendar.monthrange(year, month)[1])
+        overlap = models.Q(fecha_fin__isnull=True) | models.Q(fecha_fin__gte=month_start)
+
         try:
             from .utils import asegurar_notificacion_variables
             asegurar_notificacion_variables(user)
         except Exception:
-            pass  # el aviso es secundario: nunca debe tumbar el dashboard
-        return Response({
-            'ingresos': IngresoSerializer(
-                Ingreso.objects.filter(usuario=user),
-                many=True,
-                context={'request': request},
-            ).data,
-            'ingresos_puntuales': IngresoPuntualSerializer(
-                IngresoPuntual.objects.filter(usuario=user),
-                many=True,
-                context={'request': request},
-            ).data,
-            'gastos_corrientes': GastoCorrienteSerializer(
-                GastoCorriente.objects.filter(usuario=user),
-                many=True,
-                context={'request': request},
-            ).data,
-            'gastos_no_corrientes': GastoNoCorrienteSerializer(
-                GastoNoCorriente.objects.filter(usuario=user),
-                many=True,
-                context={'request': request},
-            ).data,
-            'diferidos': DeferidoSerializer(
-                Diferido.objects.filter(usuario=user),
-                many=True,
-                context={'request': request},
-            ).data,
-        })
+            pass  # el aviso es secundario: nunca debe tumbar el dashboard.
 
+        ingresos = Ingreso.objects.filter(
+            usuario=user, activo=True, fecha_inicio__lte=month_end,
+        ).filter(overlap)
+        gastos = GastoCorriente.objects.filter(
+            usuario=user, activo=True, fecha_inicio__lte=month_end,
+        ).filter(overlap)
+        diferidos = Diferido.objects.filter(
+            usuario=user, activo=True, fecha_inicio__lte=month_end,
+        ).filter(overlap)
+        ingresos_puntuales = IngresoPuntual.objects.filter(
+            usuario=user, fecha__range=(month_start, month_end),
+        )
+        gastos_puntuales = GastoNoCorriente.objects.filter(
+            usuario=user, fecha__range=(month_start, month_end),
+        )
+
+        aggregates = (
+            Ingreso.objects.filter(usuario=user).aggregate(
+                first=models.Min('fecha_inicio'), last_start=models.Max('fecha_inicio'), last_end=models.Max('fecha_fin'),
+            ),
+            IngresoPuntual.objects.filter(usuario=user).aggregate(first=models.Min('fecha'), last_start=models.Max('fecha')),
+            GastoCorriente.objects.filter(usuario=user).aggregate(
+                first=models.Min('fecha_inicio'), last_start=models.Max('fecha_inicio'), last_end=models.Max('fecha_fin'),
+            ),
+            GastoNoCorriente.objects.filter(usuario=user).aggregate(first=models.Min('fecha'), last_start=models.Max('fecha')),
+            Diferido.objects.filter(usuario=user).aggregate(
+                first=models.Min('fecha_inicio'), last_start=models.Max('fecha_inicio'), last_end=models.Max('fecha_fin'),
+            ),
+        )
+        first_dates = [item['first'] for item in aggregates if item.get('first')]
+        last_dates = [
+            value for item in aggregates for key in ('last_start', 'last_end')
+            if (value := item.get(key))
+        ]
+        default_max = datetime.date(today.year + 1, today.month, 1)
+        min_month = min(first_dates + [today]).replace(day=1)
+        max_month = max(last_dates + [default_max]).replace(day=1)
+
+        return Response({
+            'period': {'anio': year, 'mes': month},
+            'bounds': {
+                'min_month': min_month.isoformat(),
+                'max_month': max_month.isoformat(),
+            },
+            'has_any_movement': bool(first_dates),
+            'ingresos': IngresoSerializer(ingresos, many=True, context={'request': request}).data,
+            'ingresos_puntuales': IngresoPuntualSerializer(
+                ingresos_puntuales, many=True, context={'request': request},
+            ).data,
+            'gastos_corrientes': GastoCorrienteSerializer(gastos, many=True, context={'request': request}).data,
+            'gastos_no_corrientes': GastoNoCorrienteSerializer(
+                gastos_puntuales, many=True, context={'request': request},
+            ).data,
+            'diferidos': DeferidoSerializer(diferidos, many=True, context={'request': request}).data,
+        })
 
 class IngresoViewSet(BaseFinanzasViewSet):
     queryset = Ingreso.objects.all()
     serializer_class = IngresoSerializer
+    search_fields = ('descripcion', 'frecuencia', 'monto', 'fecha_inicio')
+    ordering_fields = ('descripcion', 'monto', 'frecuencia', 'fecha_inicio')
 
+    def get_list_summary(self, queryset):
+        today = local_today()
+        month_start = today.replace(day=1)
+        active = queryset.filter(
+            activo=True, fecha_inicio__lte=today,
+        ).filter(models.Q(fecha_fin__isnull=True) | models.Q(fecha_fin__gte=today))
+        monthly_total = sum(
+            (_monto_efectivo_mes(item.monto, item.frecuencia, item.fecha_inicio, month_start) for item in active.iterator()),
+            Decimal('0.00'),
+        )
+        return {'monthly_total': monthly_total}
     @action(detail=True, methods=['post'])
     def convertir_a_puntual(self, request, pk=None):
         ingreso = self.get_object()
@@ -164,7 +250,11 @@ class IngresoViewSet(BaseFinanzasViewSet):
 class IngresoPuntualViewSet(BaseFinanzasViewSet):
     queryset = IngresoPuntual.objects.all()
     serializer_class = IngresoPuntualSerializer
+    search_fields = ('descripcion', 'notas', 'monto', 'fecha')
+    ordering_fields = ('descripcion', 'monto', 'fecha')
 
+    def get_list_summary(self, queryset):
+        return {'total': queryset.aggregate(value=models.Sum('monto'))['value'] or Decimal('0.00')}
     @action(detail=True, methods=['post'])
     def convertir_a_fijo(self, request, pk=None):
         ingreso = self.get_object()
@@ -193,7 +283,20 @@ class IngresoPuntualViewSet(BaseFinanzasViewSet):
 class GastoCorrienteViewSet(BaseFinanzasViewSet):
     queryset = GastoCorriente.objects.all()
     serializer_class = GastoCorrienteSerializer
+    search_fields = ('descripcion', 'categoria', 'frecuencia', 'monto', 'fecha_inicio')
+    ordering_fields = ('descripcion', 'monto', 'categoria', 'fecha_inicio')
 
+    def get_list_summary(self, queryset):
+        today = local_today()
+        month_start = today.replace(day=1)
+        active = queryset.filter(
+            activo=True, fecha_inicio__lte=today,
+        ).filter(models.Q(fecha_fin__isnull=True) | models.Q(fecha_fin__gte=today))
+        monthly_total = sum(
+            (_monto_efectivo_mes(item.monto, item.frecuencia, item.fecha_inicio, month_start) for item in active.iterator()),
+            Decimal('0.00'),
+        )
+        return {'monthly_total': monthly_total}
     def get_queryset(self):
         qs = super().get_queryset()
         tipo_monto = self.request.query_params.get('tipo_monto')
@@ -345,7 +448,11 @@ class GastoCorrienteViewSet(BaseFinanzasViewSet):
 class GastoNoCorrienteViewSet(BaseFinanzasViewSet):
     queryset = GastoNoCorriente.objects.all()
     serializer_class = GastoNoCorrienteSerializer
+    search_fields = ('descripcion', 'categoria', 'notas', 'monto', 'fecha')
+    ordering_fields = ('descripcion', 'monto', 'categoria', 'fecha')
 
+    def get_list_summary(self, queryset):
+        return {'total': queryset.aggregate(value=models.Sum('monto'))['value'] or Decimal('0.00')}
     @action(detail=False, methods=['get'])
     def parece_variable(self, request):
         """
@@ -482,17 +589,51 @@ class GastoNoCorrienteViewSet(BaseFinanzasViewSet):
 class DeferidoViewSet(BaseFinanzasViewSet):
     queryset = Diferido.objects.all()
     serializer_class = DeferidoSerializer
+    search_fields = ('descripcion', 'categoria', 'cuota_mensual', 'monto_total')
+    ordering_fields = ('descripcion', 'cuota_mensual', 'monto_total', 'fecha_fin')
 
+    def get_list_summary(self, queryset):
+        today = local_today()
+        current = queryset.filter(activo=True, fecha_inicio__lte=today, fecha_fin__gte=today)
+        committed = queryset.filter(activo=True, fecha_fin__gte=today)
+        aggregates = committed.aggregate(total_committed=models.Sum('monto_total'))
+        return {
+            'monthly_total': current.aggregate(value=models.Sum('cuota_mensual'))['value'] or Decimal('0.00'),
+            'total_committed': aggregates['total_committed'] or Decimal('0.00'),
+            'current': current.count(),
+            'upcoming': queryset.filter(activo=True, fecha_inicio__gt=today).count(),
+            'finished': queryset.exclude(activo=True, fecha_fin__gte=today).count(),
+        }
 
 class CuentaPorCobrarViewSet(BaseFinanzasViewSet):
     queryset = CuentaPorCobrar.objects.all()
     serializer_class = CuentaPorCobrarSerializer
+    search_fields = ('persona', 'concepto', 'notas')
+    ordering_fields = ('persona', 'monto_total', 'monto_cobrado', 'fecha_prestamo', 'fecha_recordatorio')
 
+    def get_list_summary(self, queryset):
+        totals = queryset.aggregate(
+            total=models.Sum('monto_total'), collected=models.Sum('monto_cobrado'),
+        )
+        total = totals['total'] or Decimal('0.00')
+        collected = totals['collected'] or Decimal('0.00')
+        return {
+            'pending': total - collected,
+            'collected': collected,
+            'open_cases': queryset.filter(monto_total__gt=models.F('monto_cobrado')).count(),
+            'unique_people': queryset.values('persona').distinct().count(),
+        }
     def get_queryset(self):
         qs = super().get_queryset()
         direccion = self.request.query_params.get('direccion')
         if direccion in {CuentaPorCobrar.DIRECCION_ME_DEBEN, CuentaPorCobrar.DIRECCION_DEBO}:
             qs = qs.filter(direccion=direccion)
+        ordering = self.request.query_params.get('ordering', '').strip()
+        if ordering.lstrip('-') == 'saldo_pendiente':
+            prefix = '-' if ordering.startswith('-') else ''
+            qs = qs.annotate(
+                _saldo_pendiente=models.F('monto_total') - models.F('monto_cobrado'),
+            ).order_by(f'{prefix}_saldo_pendiente')
         return qs
 
 
@@ -712,6 +853,8 @@ class CatalogoView(APIView):
 
 class AsistenteParseView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
+    throttle_classes = (throttling.ScopedRateThrottle,)
+    throttle_scope = 'ai_parse'
 
     _PROMPT_SYSTEM = """Eres un asistente financiero. Extrae la intención del texto y devuelve SOLO un JSON válido con esta estructura:
 
@@ -750,7 +893,7 @@ Reglas:
         hoy = datetime.date.today().isoformat()
         try:
             from groq import Groq
-            client = Groq(api_key=api_key)
+            client = Groq(api_key=api_key, timeout=30.0, max_retries=1)
             completion = client.chat.completions.create(
                 model='llama-3.1-8b-instant',
                 messages=[
@@ -763,8 +906,12 @@ Reglas:
             )
             import json
             resultado = json.loads(completion.choices[0].message.content)
-        except Exception as exc:
-            return Response({'detail': f'Error al procesar: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
+        except Exception:
+            logger.exception('Error procesando una solicitud del asistente')
+            return Response(
+                {'detail': 'No se pudo procesar la solicitud en este momento.'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
 
         campos_requeridos = {'tipo', 'monto', 'descripcion'}
         if not campos_requeridos.issubset(resultado.keys()):
@@ -776,13 +923,27 @@ Reglas:
 class AsistenteTranscribirView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
     parser_classes = (MultiPartParser,)
+    throttle_classes = (throttling.ScopedRateThrottle,)
+    throttle_scope = 'ai_transcribe'
+
+    MAX_AUDIO_MB = 10
+    ALLOWED_EXTENSIONS = {'.flac', '.mp3', '.mp4', '.mpeg', '.mpga', '.m4a', '.ogg', '.wav', '.webm'}
 
     def post(self, request):
         audio = request.FILES.get('audio')
         if not audio:
             return Response({'detail': 'Se requiere un archivo de audio.'}, status=status.HTTP_400_BAD_REQUEST)
-        if audio.size > 25 * 1024 * 1024:
-            return Response({'detail': 'El audio supera los 25 MB.'}, status=status.HTTP_400_BAD_REQUEST)
+        if audio.size > self.MAX_AUDIO_MB * 1024 * 1024:
+            return Response(
+                {'detail': f'El audio supera los {self.MAX_AUDIO_MB} MB.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        extension = Path(audio.name or '').suffix.lower()
+        if extension not in self.ALLOWED_EXTENSIONS:
+            return Response(
+                {'detail': 'Formato de audio no permitido.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         api_key = getattr(settings, 'GROQ_API_KEY', '')
         if not api_key:
@@ -790,21 +951,27 @@ class AsistenteTranscribirView(APIView):
 
         try:
             from groq import Groq
-            client = Groq(api_key=api_key)
+            client = Groq(api_key=api_key, timeout=90.0, max_retries=1)
             transcripcion = client.audio.transcriptions.create(
-                file=(audio.name or 'audio.m4a', audio.read(), audio.content_type or 'audio/m4a'),
+                file=(audio.name or 'audio.m4a', audio, audio.content_type or 'audio/m4a'),
                 model='whisper-large-v3-turbo',
                 language='es',
                 response_format='json',
             )
             return Response({'texto': transcripcion.text})
-        except Exception as exc:
-            return Response({'detail': f'Error al transcribir: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
+        except Exception:
+            logger.exception('Error transcribiendo audio')
+            return Response(
+                {'detail': 'No se pudo transcribir el audio en este momento.'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
 
 
 class ImportarView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
     parser_classes = (MultiPartParser, JSONParser)
+    throttle_classes = (throttling.ScopedRateThrottle,)
+    throttle_scope = 'historical_import'
 
     MAX_MB = 5
 

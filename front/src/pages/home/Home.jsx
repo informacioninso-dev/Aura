@@ -8,7 +8,7 @@ import {
   Wallet,
   Zap,
 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 
 import BrandMark from '../../components/brand/BrandMark'
 import { useAuth } from '../../context/useAuth'
@@ -319,6 +319,10 @@ export default function Home() {
             <span className="home-brand-copy"><strong>AURA</strong></span>
           </Link>
           <span>Aura no reemplaza asesoria financiera profesional.</span>
+          <span className="home-footer-legal">
+            <Link to="/privacidad">Privacidad</Link>
+            <Link to="/terminos">Terminos</Link>
+          </span>
           <span>(c) {new Date().getFullYear()} Aura</span>
         </div>
       </footer>

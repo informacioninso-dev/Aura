@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 
 import { useAuth } from '../../context/useAuth'
 import { getApiErrorMessage } from '../../api/errors'

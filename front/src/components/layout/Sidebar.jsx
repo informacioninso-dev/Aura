@@ -12,7 +12,7 @@ import {
   UserRound,
   Wallet,
 } from 'lucide-react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router'
 
 import BrandMark from '../brand/BrandMark'
 import { useAuth } from '../../context/useAuth'

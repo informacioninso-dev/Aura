@@ -48,6 +48,8 @@ export default function IngresosPuntuales({ embedded = false }) {
   const [pageSize, setPageSize] = useState(10)
   const [sortField, setSortField] = useState('fecha')
   const [sortDir, setSortDir] = useState('desc')
+  const [totalItems, setTotalItems] = useState(0)
+  const [total, setTotal] = useState(0)
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
@@ -55,12 +57,24 @@ export default function IngresosPuntuales({ embedded = false }) {
   const canCustomizeProjection = Boolean(user?.feature_access?.advanced_projection_enabled)
   const bulkDeleteMax = user?.feature_access?.bulk_delete_max ?? 10
 
-  useEffect(() => { fetchItems() }, [])
+  useEffect(() => {
+    const timer = setTimeout(() => { void fetchItems() }, 250)
+    return () => clearTimeout(timer)
+  }, [page, pageSize, query, sortField, sortDir])
 
   async function fetchItems() {
     try {
-      const { data } = await api.get('/finanzas/ingresos-puntuales/')
-      setItems(data)
+      const { data } = await api.get('/finanzas/ingresos-puntuales/', {
+        params: {
+          page,
+          page_size: pageSize,
+          search: query.trim() || undefined,
+          ordering: `${sortDir === 'desc' ? '-' : ''}${sortField}`,
+        },
+      })
+      setItems(data.results || [])
+      setTotalItems(data.count || 0)
+      setTotal(Number(data.summary?.total || 0))
     } catch (err) {
       setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudieron cargar los ingresos puntuales.') })
     }
@@ -209,23 +223,9 @@ export default function IngresosPuntuales({ embedded = false }) {
     }
   }
 
-  const normalizedQuery = query.trim().toLowerCase()
-  const filtered = items.filter((item) => (
-    item.descripcion.toLowerCase().includes(normalizedQuery)
-    || (item.notas || '').toLowerCase().includes(normalizedQuery)
-    || item.fecha.includes(normalizedQuery)
-  )).sort((a, b) => {
-    const av = sortField === 'monto' ? parseFloat(a[sortField]) : (a[sortField] || '')
-    const bv = sortField === 'monto' ? parseFloat(b[sortField]) : (b[sortField] || '')
-    if (av < bv) return sortDir === 'asc' ? -1 : 1
-    if (av > bv) return sortDir === 'asc' ? 1 : -1
-    return 0
-  })
-  const total = filtered.reduce((sum, item) => sum + parseFloat(item.monto), 0)
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const pageCount = Math.max(1, Math.ceil(totalItems / pageSize))
   const safePage = Math.min(page, pageCount)
-  const start = (safePage - 1) * pageSize
-  const paginated = filtered.slice(start, start + pageSize)
+  const paginated = items
   const pageAllSelected = paginated.length > 0 && paginated.every((item) => selectedIds.has(item.id))
   const projectionStatusLabel = (item) => (item.incluir_en_proyeccion === false ? 'Fuera de proyeccion' : 'En proyeccion')
 
@@ -280,8 +280,8 @@ export default function IngresosPuntuales({ embedded = false }) {
               onNextPage={() => setPage((p) => Math.min(pageCount, p + 1))}
               pageSize={pageSize}
               onPageSizeChange={(size) => { setPageSize(size); setPage(1); setSelectedIds(new Set()) }}
-              totalItems={items.length}
-              filteredItems={filtered.length}
+              totalItems={totalItems}
+              filteredItems={totalItems}
               sortField={sortField}
               sortDir={sortDir}
               onSortChange={(f, d) => { setSortField(f); setSortDir(d); setPage(1) }}

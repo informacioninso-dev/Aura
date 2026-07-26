@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Navigate, Outlet } from 'react-router-dom'
+import { Navigate, Outlet } from 'react-router'
 import { useAuth } from '../../context/useAuth'
 import BrandMark from '../brand/BrandMark'
 import Sidebar from './Sidebar'

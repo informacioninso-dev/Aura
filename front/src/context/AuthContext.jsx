@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { clearAuthTokens, setAccessToken } from '../api/authStorage'
+import { clearAuthTokens, hasSessionHint, setAccessToken } from '../api/authStorage'
 import api, { refreshAccessToken } from '../api/client'
 import AuthContext from './auth-context'
 
@@ -19,6 +19,10 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     let cancelled = false
+    const publicPaths = new Set([
+      '/', '/login', '/registro', '/forgot-password', '/reset-password', '/privacidad', '/terminos',
+    ])
+    const isPublicPage = publicPaths.has(window.location.pathname)
 
     async function bootstrapAuth() {
       try {
@@ -34,7 +38,12 @@ export function AuthProvider({ children }) {
       }
     }
 
-    void bootstrapAuth()
+    // Las visitas anonimas a landing, acceso y legales no necesitan consultar sesion.
+    if (isPublicPage && !hasSessionHint()) {
+      setCheckingAuth(false)
+    } else {
+      void bootstrapAuth()
+    }
     return () => {
       cancelled = true
     }

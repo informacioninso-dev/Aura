@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate } from 'react-router'
 import { RefreshCw, ShieldCheck } from 'lucide-react'
 
 import api from '../../api/client'

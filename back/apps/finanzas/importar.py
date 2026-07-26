@@ -15,6 +15,7 @@ import csv
 import datetime
 import io
 import unicodedata
+import zipfile
 from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
@@ -34,6 +35,9 @@ ALIAS_COLUMNAS = {
 
 FORMATOS_FECHA = ['%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y', '%m/%d/%Y', '%Y/%m/%d']
 MAX_FILAS = 2000
+MAX_IMPORT_COLUMNS = 100
+MAX_XLSX_ARCHIVE_FILES = 1000
+MAX_XLSX_UNCOMPRESSED_BYTES = 30 * 1024 * 1024
 MIN_ALLOWED_YEAR = 2000
 MAX_ALLOWED_YEAR = 2100
 
@@ -137,8 +141,12 @@ def _parse_monto(s) -> Decimal | None:
         return None
 
 
-def _leer_filas_csv(file_bytes: bytes) -> tuple[list, list[list]]:
-    """Retorna (cabeceras, filas)."""
+def _max_filas_escaneadas(max_filas: int) -> int:
+    return max(max_filas * 5, max_filas + 100)
+
+
+def _leer_filas_csv(file_bytes: bytes, max_filas: int) -> tuple[list, list[list]]:
+    """Retorna (cabeceras, filas) sin acumular mas filas de las permitidas."""
     text = file_bytes.decode('utf-8-sig', errors='replace')
     sample = text[:2048]
 
@@ -148,26 +156,81 @@ def _leer_filas_csv(file_bytes: bytes) -> tuple[list, list[list]]:
         dialect = csv.excel
 
     reader = csv.reader(io.StringIO(text), dialect)
-    rows = list(reader)
-    if not rows:
+    try:
+        cabeceras = next(reader)
+    except StopIteration:
         return [], []
-    return rows[0], rows[1:]
+
+    if len(cabeceras) > MAX_IMPORT_COLUMNS:
+        raise ValueError(f'El archivo supera el maximo de {MAX_IMPORT_COLUMNS} columnas.')
+
+    filas = []
+    filas_no_vacias = 0
+    limite_escaneo = _max_filas_escaneadas(max_filas)
+    for numero_fila, fila in enumerate(reader, start=2):
+        if numero_fila > limite_escaneo + 1:
+            raise ValueError('El archivo contiene demasiadas filas vacias o fuera del limite permitido.')
+        if len(fila) > MAX_IMPORT_COLUMNS:
+            raise ValueError(f'El archivo supera el maximo de {MAX_IMPORT_COLUMNS} columnas.')
+        filas.append(fila)
+        if any(str(celda).strip() for celda in fila):
+            filas_no_vacias += 1
+            if filas_no_vacias > max_filas:
+                raise ValueError(f'Tu plan permite maximo {max_filas} filas por importacion.')
+
+    return cabeceras, filas
 
 
-def _leer_filas_xlsx(file_bytes: bytes) -> tuple[list, list[list]]:
+def _validar_contenedor_xlsx(file_bytes: bytes) -> None:
+    try:
+        with zipfile.ZipFile(io.BytesIO(file_bytes)) as archive:
+            members = archive.infolist()
+            if len(members) > MAX_XLSX_ARCHIVE_FILES:
+                raise ValueError('El archivo XLSX contiene demasiados elementos internos.')
+            uncompressed_size = sum(member.file_size for member in members)
+            if uncompressed_size > MAX_XLSX_UNCOMPRESSED_BYTES:
+                raise ValueError('El archivo XLSX se expande por encima del limite seguro de 30 MB.')
+    except zipfile.BadZipFile as exc:
+        raise ValueError('El archivo XLSX esta danado o no es valido.') from exc
+
+
+def _leer_filas_xlsx(file_bytes: bytes, max_filas: int) -> tuple[list, list[list]]:
     import openpyxl
 
-    wb = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
-    ws = wb.active
-    rows = list(ws.iter_rows(values_only=True))
-    wb.close()
+    _validar_contenedor_xlsx(file_bytes)
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
+    except (OSError, ValueError, KeyError, zipfile.BadZipFile) as exc:
+        raise ValueError('El archivo XLSX esta danado o no es valido.') from exc
 
-    if not rows:
-        return [], []
+    try:
+        ws = wb.active
+        if ws.max_column > MAX_IMPORT_COLUMNS:
+            raise ValueError(f'El archivo supera el maximo de {MAX_IMPORT_COLUMNS} columnas.')
 
-    cabeceras = [str(c) if c is not None else '' for c in rows[0]]
-    filas = [[str(c) if c is not None else '' for c in r] for r in rows[1:]]
-    return cabeceras, filas
+        rows = ws.iter_rows(values_only=True)
+        try:
+            primera_fila = next(rows)
+        except StopIteration:
+            return [], []
+
+        cabeceras = [str(c) if c is not None else '' for c in primera_fila]
+        filas = []
+        filas_no_vacias = 0
+        limite_escaneo = _max_filas_escaneadas(max_filas)
+        for numero_fila, row in enumerate(rows, start=2):
+            if numero_fila > limite_escaneo + 1:
+                raise ValueError('El archivo contiene demasiadas filas vacias o fuera del limite permitido.')
+            fila = [str(c) if c is not None else '' for c in row]
+            filas.append(fila)
+            if any(celda.strip() for celda in fila):
+                filas_no_vacias += 1
+                if filas_no_vacias > max_filas:
+                    raise ValueError(f'Tu plan permite maximo {max_filas} filas por importacion.')
+
+        return cabeceras, filas
+    finally:
+        wb.close()
 
 
 def parsear_archivo(nombre: str, file_bytes: bytes, max_filas: int = MAX_FILAS) -> dict:
@@ -182,9 +245,9 @@ def parsear_archivo(nombre: str, file_bytes: bytes, max_filas: int = MAX_FILAS) 
     """
     ext = nombre.rsplit('.', 1)[-1].lower()
     if ext == 'xlsx':
-        cabeceras, filas = _leer_filas_xlsx(file_bytes)
+        cabeceras, filas = _leer_filas_xlsx(file_bytes, max_filas)
     elif ext == 'csv':
-        cabeceras, filas = _leer_filas_csv(file_bytes)
+        cabeceras, filas = _leer_filas_csv(file_bytes, max_filas)
     elif ext == 'xls':
         raise ValueError('Formato .xls no soportado. Convierte el archivo a .xlsx o .csv.')
     else:

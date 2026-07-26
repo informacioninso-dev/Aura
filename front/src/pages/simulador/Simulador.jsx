@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import {
   Calculator,
   CalendarClock,
@@ -12,16 +12,6 @@ import {
   WalletCards,
   XCircle,
 } from 'lucide-react'
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
 
 import { getApiErrorMessage } from '../../api/errors'
 import api from '../../api/client'
@@ -33,6 +23,8 @@ import { useAuth } from '../../context/useAuth'
 import { DATE_INPUT_MAX } from '../../utils/dateBounds'
 import { formatMoney } from '../../utils/formatters'
 import '../../components/ui/app.css'
+
+const SimulationBalanceChart = lazy(() => import('../../components/charts/SimulationBalanceChart'))
 
 const COLCHON_STORAGE_KEY = 'simulador_colchon_minimo'
 const PAST_SIMULATION_DATE_MESSAGE = 'El simulador solo permite fechas desde hoy hacia adelante.'
@@ -181,7 +173,24 @@ export default function Simulador() {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [totalSimulaciones, setTotalSimulaciones] = useState(0)
+  const savedMinimumInitializedRef = useRef(false)
 
+  const fetchSimulaciones = useCallback(async () => {
+    const { data } = await api.get('/simulador/simulaciones/', {
+      params: { page, page_size: pageSize, search: query.trim() || undefined },
+    })
+    const results = data.results || []
+    setSimulaciones(results)
+    setTotalSimulaciones(data.count || 0)
+    if (!savedMinimumInitializedRef.current && !getInitialColchonMinimo() && results.length > 0) {
+      savedMinimumInitializedRef.current = true
+      const savedMinimum = Number(results[0].colchon_minimo)
+      if (savedMinimum > 0) {
+        setForm((previous) => ({ ...previous, colchon_minimo: String(savedMinimum) }))
+      }
+    }
+  }, [page, pageSize, query])
   useEffect(() => {
     if (typeof window === 'undefined') return undefined
 
@@ -195,21 +204,11 @@ export default function Simulador() {
   }, [])
 
   useEffect(() => {
-    async function loadInitialData() {
+    async function loadBanks() {
       setLoadingData(true)
       try {
-        const [bancosRes, simulacionesRes] = await Promise.all([
-          api.get('/simulador/bancos/'),
-          api.get('/simulador/simulaciones/'),
-        ])
-        setBancos(bancosRes.data)
-        setSimulaciones(simulacionesRes.data)
-        if (!getInitialColchonMinimo() && simulacionesRes.data.length > 0) {
-          const savedMinimum = Number(simulacionesRes.data[0].colchon_minimo)
-          if (savedMinimum > 0) {
-            setForm((previous) => ({ ...previous, colchon_minimo: String(savedMinimum) }))
-          }
-        }
+        const { data } = await api.get('/simulador/bancos/')
+        setBancos(data)
       } catch (error) {
         setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo cargar el simulador.') })
       } finally {
@@ -217,8 +216,17 @@ export default function Simulador() {
       }
     }
 
-    void loadInitialData()
+    void loadBanks()
   }, [])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void fetchSimulaciones().catch((error) => {
+        setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudieron cargar los escenarios.') })
+      })
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [fetchSimulaciones])
 
   function updateForm(patch) {
     setForm((previous) => ({ ...previous, ...patch }))
@@ -298,8 +306,8 @@ export default function Simulador() {
     setFeedback({ type: '', message: '' })
     try {
       await api.post('/simulador/simulaciones/', buildPayload())
-      const { data } = await api.get('/simulador/simulaciones/')
-      setSimulaciones(data)
+      if (page === 1) await fetchSimulaciones()
+      else setPage(1)
       setFeedback({ type: 'success', message: 'Escenario guardado correctamente.' })
     } catch (error) {
       setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo guardar el escenario.') })
@@ -354,7 +362,7 @@ export default function Simulador() {
     setFeedback({ type: '', message: '' })
     try {
       await api.delete(`/simulador/simulaciones/${id}/`)
-      setSimulaciones((previous) => previous.filter((item) => item.id !== id))
+      await fetchSimulaciones()
       setFeedback({ type: 'success', message: 'Escenario eliminado correctamente.' })
     } catch (error) {
       setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo eliminar el escenario.') })
@@ -420,21 +428,9 @@ export default function Simulador() {
     })
   }
 
-  const filteredSimulaciones = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase()
-    if (!normalizedQuery) return simulaciones
-    return simulaciones.filter((item) => (
-      item.nombre.toLowerCase().includes(normalizedQuery)
-      || (item.banco_nombre || '').toLowerCase().includes(normalizedQuery)
-      || (SCENARIO_TYPE_LABELS[item.tipo] || '').toLowerCase().includes(normalizedQuery)
-      || String(item.monto).includes(normalizedQuery)
-    ))
-  }, [simulaciones, query])
-  const pageCount = Math.max(1, Math.ceil(filteredSimulaciones.length / pageSize))
+  const pageCount = Math.max(1, Math.ceil(totalSimulaciones / pageSize))
   const safePage = Math.min(page, pageCount)
-  const start = (safePage - 1) * pageSize
-  const paginatedSimulaciones = filteredSimulaciones.slice(start, start + pageSize)
-
+  const paginatedSimulaciones = simulaciones
   function buildDuplicateDiferidoMessage() {
     if (!duplicateDiferidoWarning) return ''
     const duplicates = duplicateDiferidoWarning.duplicates || []
@@ -761,38 +757,14 @@ export default function Simulador() {
                       role="img"
                       aria-label={`Dinero que te quedaría con y sin este gasto durante ${resultado.horizon_months} meses`}
                     >
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={visibleSimulationFlow} margin={{ top: 18, right: 8, left: 0, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(var(--app-ink-rgb),0.06)" />
-                          {decisionStartPoint && (
-                            <ReferenceLine
-                              x={decisionStartPoint.label}
-                              stroke="var(--app-danger)"
-                              strokeDasharray="4 4"
-                              label={{ value: 'Empieza el gasto', position: 'insideTopRight', fill: '#FCA5A5', fontSize: 10 }}
-                            />
-                          )}
-                          <XAxis dataKey="label" minTickGap={34} tick={{ fill: 'rgba(var(--app-ink-rgb),0.40)', fontSize: 10 }} />
-                          <YAxis
-                            width={66}
-                            tick={{ fill: 'rgba(var(--app-ink-rgb),0.40)', fontSize: 10 }}
-                            tickFormatter={(value) => formatMoney(value, {
-                              currency: moneda,
-                              notation: 'compact',
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 1,
-                            })}
-                          />
-                          <Tooltip
-                            contentStyle={{ background: 'var(--app-popover)', border: '1px solid rgba(196,135,246,0.22)', borderRadius: 12 }}
-                            labelStyle={{ color: 'var(--app-text)', fontWeight: 700 }}
-                            labelFormatter={(label) => `Al cerrar ${label}`}
-                            formatter={(value, name) => [fmt(value), name]}
-                          />
-                          <Line name="Dinero sin este gasto" type="monotone" dataKey="saldo_base" stroke="var(--app-green)" strokeWidth={2.2} dot={false} />
-                          <Line name="Dinero incluyendo este gasto" type="monotone" dataKey="saldo_escenario" stroke="var(--app-danger)" strokeWidth={2.8} dot={false} />
-                        </LineChart>
-                      </ResponsiveContainer>
+                      <Suspense fallback={<div className="loading-screen"><div className="spinner" /></div>}>
+                        <SimulationBalanceChart
+                          data={visibleSimulationFlow}
+                          decisionStartPoint={decisionStartPoint}
+                          currency={moneda}
+                          formatValue={fmt}
+                        />
+                      </Suspense>
                     </div>
                     {showSimulationNavigator && (
                       <div className="simulator-chart-navigator">
@@ -849,7 +821,7 @@ export default function Simulador() {
               </div>
             </div>
 
-            {simulaciones.length === 0 ? (
+            {totalSimulaciones === 0 ? (
               <div className="empty-state simulator-saved-empty">
                 <p className="empty-text">Aun no guardas escenarios</p>
                 <p className="empty-sub">Simula una decision y guardala para revisarla despues.</p>
@@ -866,8 +838,8 @@ export default function Simulador() {
                   onNextPage={() => setPage((previous) => Math.min(pageCount, previous + 1))}
                   pageSize={pageSize}
                   onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
-                  totalItems={simulaciones.length}
-                  filteredItems={filteredSimulaciones.length}
+                  totalItems={totalSimulaciones}
+                  filteredItems={totalSimulaciones}
                 />
                 <div className="table-wrap" style={{ border: 'none' }}>
                   <table className="table">

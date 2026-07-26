@@ -1,4 +1,4 @@
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router'
 
 import Ingresos from './Ingresos'
 import IngresosPuntuales from './IngresosPuntuales'

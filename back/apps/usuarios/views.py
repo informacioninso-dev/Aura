@@ -82,18 +82,20 @@ def _is_mobile_client(request):
     return request.META.get('HTTP_X_CLIENT') == 'mobile'
 
 
-def _get_refresh_token_from_request(request):
-    refresh_token = request.COOKIES.get(settings.AUTH_REFRESH_COOKIE_NAME)
-    if refresh_token:
-        return refresh_token
-
+def _get_refresh_token_from_body(request):
     data = getattr(request, 'data', None)
     if hasattr(data, 'get'):
         body_refresh = str(data.get('refresh', '') or '').strip()
         if body_refresh:
             return body_refresh
-
     return None
+
+
+def _get_refresh_token_from_request(request):
+    return (
+        _get_refresh_token_from_body(request)
+        or request.COOKIES.get(settings.AUTH_REFRESH_COOKIE_NAME)
+    )
 
 
 def _client_ip(request):
@@ -254,7 +256,11 @@ class RefreshCookieTokenView(APIView):
     throttle_scope = 'auth_token_refresh'
 
     def post(self, request):
-        refresh_token = _get_refresh_token_from_request(request)
+        body_refresh_token = _get_refresh_token_from_body(request)
+        refresh_token = (
+            body_refresh_token
+            or request.COOKIES.get(settings.AUTH_REFRESH_COOKIE_NAME)
+        )
         if not refresh_token:
             return Response({'detail': 'No hay sesion para renovar.'}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -275,7 +281,7 @@ class RefreshCookieTokenView(APIView):
         new_refresh_token = serializer.validated_data.get('refresh')
         effective_refresh_token = new_refresh_token or refresh_token
         response_body = {'access': serializer.validated_data['access']}
-        if _is_mobile_client(request):
+        if _is_mobile_client(request) and body_refresh_token:
             response_body['refresh'] = effective_refresh_token
 
         response = Response(response_body, status=status.HTTP_200_OK)

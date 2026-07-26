@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { CheckCircle, Crown, RotateCcw, User } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 
 import { getApiErrorMessage } from '../../api/errors'
 import { useAuth } from '../../context/useAuth'

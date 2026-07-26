@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Pencil, Plus, Rat, Trash2 } from 'lucide-react'
 
 import api from '../../api/client'
@@ -131,20 +131,33 @@ export default function CuentasPersonasPanel({ embedded = false, direction = 'me
   const [pageSize, setPageSize] = useState(10)
   const [sortField, setSortField] = useState('fecha_prestamo')
   const [sortDir, setSortDir] = useState('desc')
+  const [totalItems, setTotalItems] = useState(0)
+  const [summary, setSummary] = useState({})
   const [feedback, setFeedback] = useState({ type: '', message: '' })
   const [form, setForm] = useState(buildEmptyForm(direction))
 
   const fetchItems = useCallback(async () => {
     try {
-      const { data } = await api.get('/finanzas/cuentas-por-cobrar/', { params: { direccion: direction } })
-      setItems(data)
+      const { data } = await api.get('/finanzas/cuentas-por-cobrar/', {
+        params: {
+          direccion: direction,
+          page,
+          page_size: pageSize,
+          search: query.trim() || undefined,
+          ordering: `${sortDir === 'desc' ? '-' : ''}${sortField}`,
+        },
+      })
+      setItems(data.results || [])
+      setTotalItems(data.count || 0)
+      setSummary(data.summary || {})
     } catch (err) {
       setFeedback({ type: 'error', message: getApiErrorMessage(err, config.fetchError) })
     }
-  }, [config.fetchError, direction])
+  }, [config.fetchError, direction, page, pageSize, query, sortDir, sortField])
 
   useEffect(() => {
-    void fetchItems()
+    const timer = setTimeout(() => { void fetchItems() }, 250)
+    return () => clearTimeout(timer)
   }, [fetchItems])
 
   function openNew() {
@@ -216,30 +229,13 @@ export default function CuentasPersonasPanel({ embedded = false, direction = 'me
     }
   }
 
-  const normalizedQuery = query.trim().toLowerCase()
-  const filtered = useMemo(() => items.filter((item) => (
-    item.persona.toLowerCase().includes(normalizedQuery)
-    || item.concepto.toLowerCase().includes(normalizedQuery)
-    || (item.notas || '').toLowerCase().includes(normalizedQuery)
-  )).sort((a, b) => {
-    const numFields = ['monto_total', 'monto_cobrado', 'saldo_pendiente']
-    const av = numFields.includes(sortField) ? parseFloat(a[sortField] || 0) : (a[sortField] || '')
-    const bv = numFields.includes(sortField) ? parseFloat(b[sortField] || 0) : (b[sortField] || '')
-    if (av < bv) return sortDir === 'asc' ? -1 : 1
-    if (av > bv) return sortDir === 'asc' ? 1 : -1
-    return 0
-  }), [items, normalizedQuery, sortField, sortDir])
-
-  const totalPendiente = filtered.reduce((sum, item) => sum + Number(item.saldo_pendiente || 0), 0)
-  const totalCobrado = filtered.reduce((sum, item) => sum + Number(item.monto_cobrado || 0), 0)
-  const casosAbiertos = filtered.filter((item) => Number(item.saldo_pendiente || 0) > 0).length
-  const personasUnicas = new Set(filtered.map((item) => item.persona.trim().toLowerCase())).size
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const totalPendiente = Number(summary.pending || 0)
+  const totalCobrado = Number(summary.collected || 0)
+  const casosAbiertos = Number(summary.open_cases || 0)
+  const personasUnicas = Number(summary.unique_people || 0)
+  const pageCount = Math.max(1, Math.ceil(totalItems / pageSize))
   const safePage = Math.min(page, pageCount)
-  const start = (safePage - 1) * pageSize
-  const paginated = filtered.slice(start, start + pageSize)
-
+  const paginated = items
   return (
     <div className={`cuentas-personas-panel is-${direction}`}>
       {embedded ? (
@@ -313,8 +309,8 @@ export default function CuentasPersonasPanel({ embedded = false, direction = 'me
               onNextPage={() => setPage((p) => Math.min(pageCount, p + 1))}
               pageSize={pageSize}
               onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
-              totalItems={items.length}
-              filteredItems={filtered.length}
+              totalItems={totalItems}
+              filteredItems={totalItems}
               sortField={sortField}
               sortDir={sortDir}
               onSortChange={(field, dir) => { setSortField(field); setSortDir(dir); setPage(1) }}

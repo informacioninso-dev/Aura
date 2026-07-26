@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Lightbulb, Plus, Pencil, Trash2 } from 'lucide-react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router'
 
 import { getApiErrorMessage } from '../../api/errors'
 import api from '../../api/client'

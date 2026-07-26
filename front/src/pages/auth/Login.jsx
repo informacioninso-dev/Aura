@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router'
 
 import { getApiErrorMessage } from '../../api/errors'
 import BrandMark from '../../components/brand/BrandMark'
