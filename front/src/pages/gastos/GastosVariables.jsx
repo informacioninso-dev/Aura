@@ -119,7 +119,12 @@ export default function GastosVariables({ autoNew = false }) {
       .then(({ data }) => setCatalogo(data.gasto_variable || []))
       .catch(() => {})
   }, [])
-  const totalEstimado = filas.reduce((sum, fila) => sum + parseFloat(fila.estimado || 0), 0)
+  // Total del mes: lo que ya registraste; si un rubro sigue pendiente, usa su
+  // sugerencia (o el estimado guardado). Sin jergas de "estimado" a la vista.
+  const totalMes = filas.reduce((sum, fila) => {
+    const valor = fila.real != null ? fila.real : (fila.sugerido ?? fila.estimado ?? 0)
+    return sum + parseFloat(valor || 0)
+  }, 0)
 
   const suggestionItems = esMesActual && pendientes > 0 && filas.length > 0
   ? [{
@@ -302,7 +307,7 @@ export default function GastosVariables({ autoNew = false }) {
       await fetchResumen()
       setFeedback({
         type: 'success',
-        message: `Se crearon ${data.creados} gasto(s) con el valor estimado. Edita los que hayan cambiado.`,
+        message: `Se crearon ${data.creados} gasto(s) con tu promedio. Ajusta los que hayan cambiado.`,
       })
     } catch (err) {
       setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudieron crear los gastos del mes.') })
@@ -373,8 +378,8 @@ export default function GastosVariables({ autoNew = false }) {
         <div>
           <h2 className="finance-panel-kicker">Gastos variables</h2>
           <p className="finance-panel-kpi">
-            Estimado al mes:&nbsp;
-            <span style={{ color: 'var(--app-danger)', fontWeight: 700 }}>${formatAmount(totalEstimado)}</span>
+            Este mes:&nbsp;
+            <span style={{ color: 'var(--app-danger)', fontWeight: 700 }}>${formatAmount(totalMes)}</span>
           </p>
         </div>
         <button className="btn-add page-primary-action" onClick={openNew}><Plus size={16} /> Agregar</button>
