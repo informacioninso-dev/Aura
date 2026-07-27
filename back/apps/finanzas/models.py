@@ -196,6 +196,9 @@ class Notificacion(models.Model):
     mes       = models.PositiveSmallIntegerField()
     leida     = models.BooleanField(default=False)
     creada_en = models.DateTimeField(auto_now_add=True)
+    # Ultimo dia en que se "reasomo" (marco como no leida) para no molestar
+    # mas de una vez al dia mientras siga pendiente.
+    ultimo_aviso = models.DateField(null=True, blank=True)
 
     class Meta:
         # Una notificación por tipo/categoría/mes — se reemplaza si ya existe

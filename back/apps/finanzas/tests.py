@@ -3328,6 +3328,32 @@ class TestNotificacionVariables(APITestCase):
         asegurar_notificacion_variables(self.user)
         self.assertEqual(Notificacion.objects.filter(usuario=self.user, tipo='variables_pendientes').count(), 0)
 
+    def test_no_remolesta_dos_veces_el_mismo_dia(self):
+        from apps.finanzas.utils import asegurar_notificacion_variables
+        from apps.finanzas.models import Notificacion
+        self._var('Luz')
+        asegurar_notificacion_variables(self.user)
+        n = Notificacion.objects.get(usuario=self.user, tipo='variables_pendientes')
+        n.leida = True
+        n.save()  # el usuario la lee
+        asegurar_notificacion_variables(self.user)  # otra visita el mismo dia
+        n.refresh_from_db()
+        self.assertTrue(n.leida)  # no la reasoma dentro del mismo dia
+
+    def test_reasoma_al_dia_siguiente_si_sigue_pendiente(self):
+        from apps.finanzas.utils import asegurar_notificacion_variables
+        from apps.finanzas.models import Notificacion
+        self._var('Luz')
+        asegurar_notificacion_variables(self.user)
+        n = Notificacion.objects.get(usuario=self.user, tipo='variables_pendientes')
+        n.leida = True
+        n.ultimo_aviso = self.hoy - datetime.timedelta(days=1)  # avisado ayer
+        n.save()
+        asegurar_notificacion_variables(self.user)  # nuevo dia, sigue pendiente
+        n.refresh_from_db()
+        self.assertFalse(n.leida)  # se reasoma una vez al dia
+        self.assertEqual(n.ultimo_aviso, self.hoy)
+
     def test_sin_variables_no_crea_nada(self):
         from apps.finanzas.utils import asegurar_notificacion_variables
         from apps.finanzas.models import Notificacion
