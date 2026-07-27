@@ -4,9 +4,11 @@ import { useSearchParams } from 'react-router'
 
 import { getApiErrorMessage } from '../../api/errors'
 import api from '../../api/client'
+import { useAuth } from '../../context/useAuth'
 import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import ListControls from '../../components/ui/ListControls'
+import ListPager from '../../components/ui/ListPager'
 import SuggestionsPanel from '../../components/ui/SuggestionsPanel'
 import Modal from '../../components/ui/Modal'
 import MonthNavigator from '../../components/ui/MonthNavigator'
@@ -39,8 +41,9 @@ function getSituacionLabel(situacion) {
   return (SITUACION[situacion] || SITUACION.pendiente).label
 }
 
-export default function GastosVariables() {
+export default function GastosVariables({ autoNew = false }) {
   const [searchParams] = useSearchParams()
+  const { user } = useAuth()
   const notificationYear = Number(searchParams.get('anio'))
   const notificationMonth = Number(searchParams.get('mes'))
   const { categorias } = useCategorias()
@@ -66,12 +69,19 @@ export default function GastosVariables() {
   const [editId, setEditId] = useState(null)
   const [saving, setSaving] = useState(false)
 
-  const [realItem, setRealItem] = useState(null)
-  const [realMonto, setRealMonto] = useState('')
-  const [savingReal, setSavingReal] = useState(false)
+  // — detalle de rubro: consumos individuales del mes —
+  const [rubro, setRubro] = useState(null)
+  const [consumos, setConsumos] = useState([])
+  const [consumoForm, setConsumoForm] = useState({ monto: '', descripcion: '', fecha: '' })
+  const [savingConsumo, setSavingConsumo] = useState(false)
 
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [creandoMes, setCreandoMes] = useState(false)
+
+  // — seleccion masiva —
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   const anio = selectedMonth.getFullYear()
   const mes = selectedMonth.getMonth() + 1
@@ -129,8 +139,9 @@ export default function GastosVariables() {
         return String(fila[field] || '').toLowerCase()
       case 'estimado':
         return parseFloat(fila.estimado || 0)
+      case 'valor':
       case 'real':
-        return parseFloat(fila.real ?? fila.sugerido ?? 0)
+        return parseFloat(fila.real ?? fila.sugerido ?? fila.estimado ?? 0)
       case 'situacion':
         return SITUACION_ORDEN[fila.situacion] ?? 0
       default:
@@ -165,11 +176,66 @@ export default function GastosVariables() {
   const start = (safePage - 1) * pageSize
   const paginatedRows = filteredRows.slice(start, start + pageSize)
 
+  // — seleccion masiva (necesita paginatedRows) —
+  const bulkDeleteMax = user?.feature_access?.bulk_delete_max ?? 10
+  const allPageSelected = paginatedRows.length > 0 && paginatedRows.every((f) => selectedIds.has(f.id))
+
+  function toggleSelectAll() {
+    if (allPageSelected) {
+      setSelectedIds((prev) => { const next = new Set(prev); paginatedRows.forEach((f) => next.delete(f.id)); return next })
+    } else {
+      const excedido = paginatedRows.filter((f) => !selectedIds.has(f.id)).length + selectedIds.size > bulkDeleteMax
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        let count = next.size
+        for (const f of paginatedRows) {
+          if (next.has(f.id)) continue
+          if (count >= bulkDeleteMax) break
+          next.add(f.id)
+          count++
+        }
+        return next
+      })
+      if (excedido) setFeedback({ type: 'error', message: `Tu plan permite seleccionar hasta ${bulkDeleteMax} registros a la vez.` })
+    }
+  }
+
+  function toggleSelect(id) {
+    setSelectedIds((prev) => {
+      if (prev.has(id)) { const next = new Set(prev); next.delete(id); return next }
+      if (prev.size >= bulkDeleteMax) {
+        setFeedback({ type: 'error', message: `Tu plan permite seleccionar hasta ${bulkDeleteMax} registros a la vez.` })
+        return prev
+      }
+      const next = new Set(prev); next.add(id); return next
+    })
+  }
+
+  async function handleBulkDelete() {
+    setBulkDeleting(true)
+    setConfirmBulkDelete(false)
+    setFeedback({ type: '', message: '' })
+    const ids = [...selectedIds]
+    let errors = 0
+    for (const id of ids) {
+      try { await api.delete(`/finanzas/gastos-corrientes/${id}/`) } catch { errors++ }
+    }
+    setSelectedIds(new Set())
+    await fetchResumen()
+    setBulkDeleting(false)
+    if (errors === 0) setFeedback({ type: 'success', message: `${ids.length} gasto${ids.length !== 1 ? 's' : ''} eliminado${ids.length !== 1 ? 's' : ''}.` })
+    else setFeedback({ type: 'error', message: `Se eliminaron ${ids.length - errors} de ${ids.length}. Algunos fallaron.` })
+  }
+
   function openNew() {
     setForm(buildEmptyForm())
     setEditId(null)
     setModal(true)
   }
+
+  useEffect(() => {
+    if (autoNew) openNew()
+  }, [autoNew])
 
   function openEdit(fila) {
     setForm({ descripcion: fila.descripcion, categoria: fila.categoria, monto: fila.estimado })
@@ -187,10 +253,11 @@ export default function GastosVariables() {
     setSaving(true)
     setFeedback({ type: '', message: '' })
     try {
+      // El estimado ya no se pide: se aprende del historial. Se crea en 0.
       const payload = {
         descripcion: form.descripcion,
         categoria: form.categoria,
-        monto: form.monto,
+        monto: 0,
         tipo_monto: 'variable',
         frecuencia: 'mensual',
         fecha_inicio: new Date().toISOString().slice(0, 10),
@@ -199,7 +266,6 @@ export default function GastosVariables() {
         await api.patch(`/finanzas/gastos-corrientes/${editId}/`, {
           descripcion: form.descripcion,
           categoria: form.categoria,
-          monto: form.monto,
         })
       } else {
         await api.post('/finanzas/gastos-corrientes/', payload)
@@ -245,59 +311,61 @@ export default function GastosVariables() {
     }
   }
 
-  function openReal(fila) {
-    setRealItem(fila)
-    setRealMonto(fila.real ?? fila.sugerido ?? '')
+  function hoyDelMes() {
+    // Fecha por defecto para un consumo: hoy si el mes seleccionado es el
+    // actual; si no, el primer dia del mes que se esta viendo.
+    const now = new Date()
+    if (anio === now.getFullYear() && mes === now.getMonth() + 1) return now.toISOString().slice(0, 10)
+    return `${anio}-${String(mes).padStart(2, '0')}-01`
   }
 
-  async function handleSubmitReal(e) {
-    e.preventDefault()
-    if (savingReal || !realItem) return
-    setSavingReal(true)
-    setFeedback({ type: '', message: '' })
+  async function cargarConsumos(rubroId) {
     try {
-      await api.post(`/finanzas/gastos-corrientes/${realItem.id}/ejecuciones/`, {
-        anio,
-        mes,
-        monto_real: realMonto === '' ? '0' : realMonto,
-      })
-      setRealItem(null)
-      await fetchResumen()
-      setFeedback({ type: 'success', message: 'Monto real guardado.' })
-    } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo guardar el monto real.') })
-    } finally {
-      setSavingReal(false)
+      const { data } = await api.get(`/finanzas/gastos-corrientes/${rubroId}/ejecuciones/?anio=${anio}&mes=${mes}`)
+      setConsumos(data)
+    } catch {
+      setConsumos([])
     }
   }
 
-  function renderSituacion(fila) {
-    const situacion = SITUACION[fila.situacion] || SITUACION.pendiente
-    const pct = fila.delta_pct
-    return (
-      <div>
-        <span style={{ color: situacion.color, fontWeight: 600, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <span
-            aria-hidden="true"
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: '999px',
-              backgroundColor: situacion.color,
-              display: 'inline-block',
-            }}
-          />
-          {situacion.label}
-        </span>
-        {fila.situacion !== 'pendiente' && fila.situacion !== 'sin_gasto' && fila.delta_abs != null && (
-          <div style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
-            {parseFloat(fila.delta_abs) >= 0 ? '+' : ''}${formatAmount(Math.abs(parseFloat(fila.delta_abs)))}
-            {pct != null ? ` (${pct >= 0 ? '+' : ''}${pct}%)` : ''}
-          </div>
-        )}
-      </div>
-    )
+  function openRubro(fila) {
+    setRubro(fila)
+    setConsumoForm({ monto: '', descripcion: '', fecha: hoyDelMes() })
+    cargarConsumos(fila.id)
   }
+
+  async function handleAddConsumo(e) {
+    e.preventDefault()
+    if (savingConsumo || !rubro) return
+    setSavingConsumo(true)
+    setFeedback({ type: '', message: '' })
+    try {
+      await api.post(`/finanzas/gastos-corrientes/${rubro.id}/ejecuciones/`, {
+        fecha: consumoForm.fecha,
+        descripcion: consumoForm.descripcion,
+        monto_real: consumoForm.monto || '0',
+      })
+      await cargarConsumos(rubro.id)
+      await fetchResumen()
+      setConsumoForm({ monto: '', descripcion: '', fecha: hoyDelMes() })
+    } catch (err) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo anadir la compra.') })
+    } finally {
+      setSavingConsumo(false)
+    }
+  }
+
+  async function handleDeleteConsumo(id) {
+    try {
+      await api.delete(`/finanzas/gastos-corrientes/${rubro.id}/ejecuciones/${id}/`)
+      await cargarConsumos(rubro.id)
+      await fetchResumen()
+    } catch (err) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo eliminar la compra.') })
+    }
+  }
+
+  const acumuladoRubro = consumos.reduce((s, c) => s + parseFloat(c.monto_real || 0), 0)
 
   return (
     <div>
@@ -327,7 +395,7 @@ export default function GastosVariables() {
           <>
             <ListControls
               query={query}
-              onQueryChange={(value) => { setQuery(value); setPage(1) }}
+              onQueryChange={(value) => { setQuery(value); setPage(1); setSelectedIds(new Set()) }}
               placeholder="Buscar por gasto o categoria..."
               page={safePage}
               pageCount={pageCount}
@@ -337,25 +405,24 @@ export default function GastosVariables() {
               onPageSizeChange={(value) => { setPageSize(value); setPage(1) }}
               totalItems={filas.length}
               filteredItems={filteredRows.length}
+              showPagination={false}
               sortField={sortField}
               sortDir={sortDir}
               onSortChange={(field, dir) => { setSortField(field); setSortDir(dir); setPage(1) }}
               sortOptions={[
                 { value: 'descripcion', label: 'Nombre' },
-                { value: 'estimado', label: 'Estimado' },
-                { value: 'real', label: 'Real' },
+                { value: 'valor', label: 'Valor' },
                 { value: 'categoria', label: 'Categoria' },
-                { value: 'situacion', label: 'Estado' },
               ]}
               showSearch={filas.length > 0}
               showSort={filas.length > 0}
-              showPagination={filas.length > 0}
             >
               <MonthNavigator
                 value={selectedMonth}
                 onChange={(nextMonth) => {
                   setSelectedMonth(nextMonth)
                   setPage(1)
+                  setSelectedIds(new Set())
                 }}
               />
             </ListControls>
@@ -372,38 +439,55 @@ export default function GastosVariables() {
                 <p className="empty-sub">Prueba con otro nombre, categoria o cambia de mes.</p>
               </div>
             ) : (
+              <>
+              {selectedIds.size > 0 && (
+                <div className="table-bulk-bar">
+                  <span className="table-bulk-info">{selectedIds.size} seleccionado{selectedIds.size !== 1 ? 's' : ''}</span>
+                  <div className="table-bulk-actions">
+                    <button className="btn-modal-danger table-bulk-danger" disabled={bulkDeleting} onClick={() => setConfirmBulkDelete(true)}>
+                      {bulkDeleting ? 'Eliminando...' : 'Eliminar seleccionados'}
+                    </button>
+                    <button className="btn-modal-cancel table-bulk-cancel" onClick={() => setSelectedIds(new Set())}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="table-wrap" style={{ border: 'none', borderRadius: 20 }}>
                 <table className="table">
                   <thead>
                     <tr>
-                      {['Gasto', 'Categoria', 'Estimado', 'Real del mes', 'Situacion vs. estimado', 'Accion'].map((header) => <th key={header}>{header}</th>)}
+                      <th style={{ width: 36, paddingRight: 0 }}>
+                        <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAll} style={{ cursor: 'pointer', accentColor: 'var(--app-lila)' }} />
+                      </th>
+                      {['Gasto', 'Categoria', 'Este mes', 'Accion'].map((header) => <th key={header}>{header}</th>)}
                     </tr>
                   </thead>
                   <tbody>
                     {paginatedRows.map((fila) => (
                       <tr key={fila.id}>
+                        <td style={{ width: 36, paddingRight: 0 }}>
+                          <input type="checkbox" checked={selectedIds.has(fila.id)} onChange={() => toggleSelect(fila.id)} style={{ cursor: 'pointer', accentColor: 'var(--app-lila)' }} />
+                        </td>
                         <td style={{ fontWeight: 600 }}>{fila.descripcion}</td>
                         <td><span className="badge badge-gray" style={{ textTransform: 'capitalize' }}>{fila.categoria}</span></td>
-                        <td className="table-amount">${formatAmount(parseFloat(fila.estimado))}</td>
                         <td>
                           {fila.real != null ? (
                             <span className="table-amount negative">${formatAmount(parseFloat(fila.real))}</span>
                           ) : (
-                            <div>
-                              <span style={{ color: 'rgba(var(--app-ink-rgb),0.5)', fontSize: 13 }}>~${formatAmount(parseFloat(fila.sugerido))}</span>
-                              <div style={{ fontSize: 11, color: 'rgba(var(--app-ink-rgb),0.3)' }}>estimado</div>
-                            </div>
+                            <button type="button" className="rubro-pendiente-btn" onClick={() => openRubro(fila)}>
+                              Pendiente
+                            </button>
                           )}
                         </td>
-                        <td>{renderSituacion(fila)}</td>
                         <td className="table-actions-cell">
                           <div className="table-actions-row">
                             <button
                               className="btn-modal-convert"
                               style={{ minWidth: 0, padding: '7px 12px', fontSize: 12 }}
-                              onClick={() => openReal(fila)}
+                              onClick={() => openRubro(fila)}
                             >
-                              {fila.real != null ? 'Editar' : 'Registrar gasto'}
+                              {fila.consumos > 0 ? 'Ver / Añadir' : 'Añadir'}
                             </button>
                             <button className="btn-icon edit" title="Editar gasto" onClick={() => openEdit(fila)}><Pencil size={15} /></button>
                             <button className="btn-icon danger" title="Eliminar" onClick={() => setConfirmDeleteId(fila.id)}><Trash2 size={15} /></button>
@@ -414,7 +498,18 @@ export default function GastosVariables() {
                   </tbody>
                 </table>
               </div>
+              </>
             )}
+            <ListPager
+              page={safePage}
+              pageCount={pageCount}
+              onPrevPage={() => setPage((prev) => Math.max(1, prev - 1))}
+              onNextPage={() => setPage((prev) => Math.min(pageCount, prev + 1))}
+              pageSize={pageSize}
+              onPageSizeChange={(value) => { setPageSize(value); setPage(1) }}
+              totalItems={filas.length}
+              filteredItems={filteredRows.length}
+            />
           </>
         )}
       </div>
@@ -448,22 +543,16 @@ export default function GastosVariables() {
             <input className="form-modal-input" required placeholder="Ej: Luz, agua, super, gasolina..." value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />
           </div>
 
-          <div className="form-modal-row">
-            <div className="form-modal-group">
-              <label className="form-modal-label">Categoria</label>
-              <select className="form-modal-select" value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })}>
-                {categorias.length > 0
-                  ? categorias.map((categoria) => <option key={categoria.nombre} value={categoria.nombre}>{categoria.icono} {categoria.nombre}</option>)
-                  : <option value="servicios">servicios</option>}
-              </select>
-            </div>
-            <div className="form-modal-group">
-              <label className="form-modal-label">Monto estimado</label>
-              <input className="form-modal-input" type="number" required min="0" step="0.01" placeholder="0" value={form.monto} onChange={(e) => setForm({ ...form, monto: e.target.value })} />
-              <p style={{ marginTop: 6, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
-                Lo iremos ajustando con lo que realmente pagues cada mes.
-              </p>
-            </div>
+          <div className="form-modal-group">
+            <label className="form-modal-label">Categoria</label>
+            <select className="form-modal-select" value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })}>
+              {categorias.length > 0
+                ? categorias.map((categoria) => <option key={categoria.nombre} value={categoria.nombre}>{categoria.icono} {categoria.nombre}</option>)
+                : <option value="servicios">servicios</option>}
+            </select>
+            <p style={{ marginTop: 6, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
+              No necesitas poner un monto: cada mes registras lo que gastaste y Aura aprende tu promedio.
+            </p>
           </div>
 
           <div className="form-modal-actions">
@@ -475,24 +564,80 @@ export default function GastosVariables() {
         </form>
       </Modal>
 
-      <Modal open={realItem !== null} onClose={() => setRealItem(null)} title="Cuanto pagaste?">
-        {realItem && (
-          <form onSubmit={handleSubmitReal}>
-            <p style={{ marginTop: -8, marginBottom: 16, fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.5)', lineHeight: 1.5 }}>
-              Registra lo que pagaste de <strong>{realItem.descripcion}</strong> este mes.
-              Si este mes no gastaste en esto, pon <strong>0</strong>.
-            </p>
-            <div className="form-modal-group">
-              <label className="form-modal-label">Monto real</label>
-              <input className="form-modal-input" type="number" min="0" step="0.01" placeholder="0" autoFocus value={realMonto} onChange={(e) => setRealMonto(e.target.value)} />
+      <Modal open={rubro !== null} onClose={() => setRubro(null)} title={rubro ? rubro.descripcion : ''}>
+        {rubro && (
+          <div>
+            {/* Lo que llevas gastado este mes */}
+            <div className="rubro-cards">
+              <div className="rubro-card">
+                <span className="rubro-card-label">Este mes</span>
+                <span className="rubro-card-value">${formatAmount(acumuladoRubro)}</span>
+              </div>
             </div>
-            <div className="form-modal-actions">
-              <button type="button" className="btn-modal-cancel" onClick={() => setRealItem(null)}>Cancelar</button>
-              <button type="submit" className="btn-modal-save" disabled={savingReal}>
-                {savingReal ? 'Guardando...' : 'Guardar'}
+
+            {/* Sugerencia aprendida del historial (ultimos 6 meses, mas peso a los 3 recientes) */}
+            {parseFloat(rubro.sugerido) > 0 && (
+              <div className="rubro-sugerido">
+                <span>Sueles gastar cerca de <strong>${formatAmount(parseFloat(rubro.sugerido))}</strong> aqui.</span>
+                {consumos.length === 0 && (
+                  <button
+                    type="button"
+                    className="rubro-sugerido-btn"
+                    onClick={() => setConsumoForm((prev) => ({ ...prev, monto: String(parseFloat(rubro.sugerido)) }))}
+                  >
+                    Usar ese valor
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Anadir una compra */}
+            <form onSubmit={handleAddConsumo} className="rubro-add-form">
+              <div className="form-modal-row">
+                <div className="form-modal-group" style={{ flex: '1 1 120px' }}>
+                  <label className="form-modal-label">Cuanto gastaste?</label>
+                  <input className="form-modal-input" type="number" min="0" step="0.01" placeholder="0" required autoFocus
+                    value={consumoForm.monto} onChange={(e) => setConsumoForm({ ...consumoForm, monto: e.target.value })} />
+                </div>
+                <div className="form-modal-group" style={{ flex: '1 1 120px' }}>
+                  <label className="form-modal-label">Dia</label>
+                  <input className="form-modal-input" type="date" required value={consumoForm.fecha}
+                    onChange={(e) => setConsumoForm({ ...consumoForm, fecha: e.target.value })} />
+                </div>
+              </div>
+              <div className="form-modal-group">
+                <label className="form-modal-label">Donde? <span style={{ color: 'rgba(var(--app-ink-rgb),0.4)' }}>(opcional)</span></label>
+                <input className="form-modal-input" placeholder="Ej: Fybeca, Sana Sana..."
+                  value={consumoForm.descripcion} onChange={(e) => setConsumoForm({ ...consumoForm, descripcion: e.target.value })} />
+              </div>
+              <button type="submit" className="btn-modal-save" style={{ width: '100%' }} disabled={savingConsumo}>
+                {savingConsumo ? 'Guardando...' : '+ Anadir compra'}
               </button>
-            </div>
-          </form>
+            </form>
+
+            {/* Lista de consumos del mes */}
+            <p className="rubro-list-title">Compras de este mes</p>
+            {consumos.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.4)', textAlign: 'center', padding: '12px 0' }}>
+                Aun no anades compras. Cada compra suma al total del mes.
+              </p>
+            ) : (
+              <div className="rubro-consumos">
+                {consumos.map((c) => (
+                  <div key={c.id} className="rubro-consumo">
+                    <div>
+                      <div className="rubro-consumo-desc">{c.descripcion || 'Compra'}</div>
+                      <div className="rubro-consumo-fecha">{c.fecha}</div>
+                    </div>
+                    <div className="rubro-consumo-right">
+                      <span className="rubro-consumo-monto">${formatAmount(parseFloat(c.monto_real))}</span>
+                      <button className="btn-icon danger" title="Eliminar" onClick={() => handleDeleteConsumo(c.id)}><Trash2 size={14} /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </Modal>
 
@@ -504,6 +649,17 @@ export default function GastosVariables() {
         cancelText="Cancelar"
         onConfirm={handleDelete}
         onClose={() => setConfirmDeleteId(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        title="Eliminar seleccionados"
+        message={`Se eliminaran ${selectedIds.size} gasto${selectedIds.size !== 1 ? 's' : ''} variable${selectedIds.size !== 1 ? 's' : ''} y sus consumos. Esta accion no se puede deshacer.`}
+        confirmText="Eliminar todos"
+        cancelText="Cancelar"
+        loading={bulkDeleting}
+        onConfirm={handleBulkDelete}
+        onClose={() => setConfirmBulkDelete(false)}
       />
     </div>
   )

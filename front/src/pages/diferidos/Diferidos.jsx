@@ -1,15 +1,49 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronRight } from 'lucide-react'
 
 import api from '../../api/client'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import DateQuickActions from '../../components/ui/DateQuickActions'
 import ListControls from '../../components/ui/ListControls'
+import ListPager from '../../components/ui/ListPager'
 import Modal from '../../components/ui/Modal'
 import { useCategorias } from '../../hooks/useCategorias'
 import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../../utils/dateBounds'
 import { formatAmount } from '../../utils/formatters'
 import '../../components/ui/app.css'
+
+const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+
+// "Termina en jul 2026" a partir de la fecha de fin (mas humano que la fecha cruda).
+function terminaEnLabel(item) {
+  if (!item.fecha_fin) return '—'
+  const [y, m] = item.fecha_fin.split('-').map(Number)
+  const prefijo = item.status?.key === 'finished' ? 'Termino en' : 'Termina en'
+  return `${prefijo} ${MESES_CORTOS[m - 1]} ${y}`
+}
+
+// Anillo de progreso de cuotas (pagadas / total) al estilo del mockup.
+function CuotasRing({ pagadas, total }) {
+  const size = 46
+  const stroke = 4
+  const radius = (size - stroke) / 2
+  const circ = 2 * Math.PI * radius
+  const ratio = total > 0 ? Math.min(1, Math.max(0, pagadas / total)) : 0
+  const color = ratio >= 1 ? 'var(--app-green)' : 'var(--app-lila)'
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
+      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(var(--app-ink-rgb),0.10)" strokeWidth={stroke} />
+      <circle
+        cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color} strokeWidth={stroke}
+        strokeDasharray={circ} strokeDashoffset={circ * (1 - ratio)} strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        style={{ transition: 'stroke-dashoffset 0.4s' }}
+      />
+      <text x="50%" y="50%" dominantBaseline="central" textAnchor="middle"
+        fontSize="12" fontWeight="700" fill="var(--app-text)">{pagadas}/{total}</text>
+    </svg>
+  )
+}
 
 const EMPTY = {
   descripcion: '',
@@ -103,7 +137,7 @@ function getRemainingInstallments(item, todayDate, statusKey) {
   return Math.max(0, diffMonths(todayDate, parseLocalDate(item.fecha_fin)) + 1)
 }
 
-export default function Diferidos() {
+export default function Diferidos({ embedded = false, autoNew = false }) {
   const [items, setItems] = useState([])
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState(EMPTY)
@@ -124,6 +158,11 @@ export default function Diferidos() {
     const timer = setTimeout(() => { void fetchItems() }, 250)
     return () => clearTimeout(timer)
   }, [page, pageSize, query, sortField, sortDir])
+
+  // Abre el form al llegar desde el selector "que quieres registrar".
+  useEffect(() => {
+    if (autoNew) openNew()
+  }, [autoNew])
 
   async function fetchItems() {
     const { data } = await api.get('/finanzas/diferidos/', {
@@ -248,16 +287,26 @@ export default function Diferidos() {
   const safePage = Math.min(page, pageCount)
   const paginatedItems = enrichedItems
   return (
-    <div className="finance-shell">
-      <div className="page-header page-header-actions">
-        <div className="page-header-main">
-          <h1 className="page-title">Gastos a cuotas</h1>
-          <p className="page-subtitle">Vista compacta para manejar muchas deudas sin perder de vista lo que vence primero.</p>
+    <div className={embedded ? '' : 'finance-shell'}>
+      {embedded ? (
+        <div className="finance-panel-header">
+          <div>
+            <h2 className="finance-panel-kicker">Gastos a cuotas</h2>
+            <p className="finance-panel-kpi">Lo que ya cae este mes: <span style={{ color: '#F87171', fontWeight: 700 }}>${formatAmount(totalMensual)}</span></p>
+          </div>
+          <button className="btn-add page-primary-action" onClick={openNew}><Plus size={16} /> Agregar</button>
         </div>
-        <button className="btn-add page-primary-action" onClick={openNew}>
-          <Plus size={16} /> Agregar
-        </button>
-      </div>
+      ) : (
+        <div className="page-header page-header-actions">
+          <div className="page-header-main">
+            <h1 className="page-title">Gastos a cuotas</h1>
+            <p className="page-subtitle">Vista compacta para manejar muchas deudas sin perder de vista lo que vence primero.</p>
+          </div>
+          <button className="btn-add page-primary-action" onClick={openNew}>
+            <Plus size={16} /> Agregar
+          </button>
+        </div>
+      )}
 
       {items.length > 0 && (
         <div className="stats-grid diferidos-stats-grid">
@@ -287,7 +336,7 @@ export default function Diferidos() {
       <div className="card" style={{ padding: 0 }}>
         {items.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">ðŸ’³</div>
+            <div className="empty-icon">💳</div>
             <p className="empty-text">No hay gastos a cuotas</p>
             <p className="empty-sub">Suma una compra a cuotas y la ves en tu flujo.</p>
           </div>
@@ -307,11 +356,12 @@ export default function Diferidos() {
               filteredItems={totalItems}
               sortField={sortField}
               sortDir={sortDir}
+              showPagination={false}
               onSortChange={(field, dir) => { setSortField(field); setSortDir(dir); setPage(1) }}
               sortOptions={[
                 { value: 'descripcion', label: 'Nombre' },
+                { value: 'monto_total', label: 'Valor' },
                 { value: 'cuota_mensual', label: 'Cuota' },
-                { value: 'monto_total', label: 'Total' },
                 { value: 'fecha_fin', label: 'Vence' },
               ]}
             />
@@ -338,6 +388,9 @@ export default function Diferidos() {
                           <div style={{ fontWeight: 700 }}>{item.descripcion}</div>
                           <div style={{ color: 'rgba(var(--app-ink-rgb),0.45)', fontSize: 12 }}>
                             {item.num_cuotas} cuotas
+                            {item.remainingInstallments > 0 && (
+                              <span style={{ color: '#FB923C', fontWeight: 600 }}> · {item.remainingInstallments} {item.remainingInstallments === 1 ? 'falta' : 'faltan'}</span>
+                            )}
                           </div>
                         </td>
                         <td>
@@ -352,36 +405,23 @@ export default function Diferidos() {
                           </div>
                         </td>
                         <td>
-                          <div>{item.fecha_fin}</div>
+                          <div style={{ fontWeight: 600 }}>{terminaEnLabel(item)}</div>
                           <div style={{ color: 'rgba(var(--app-ink-rgb),0.45)', fontSize: 12 }}>
-                            {item.status.key === 'current' && `${item.remainingInstallments} cuotas aprox. restantes`}
+                            {item.status.key === 'current' && 'En curso'}
                             {item.status.key === 'upcoming' && 'Pendiente de iniciar'}
-                            {item.status.key === 'finished' && 'Ya finalizo'}
+                            {item.status.key === 'finished' && 'Ya termino'}
                             {item.status.key === 'inactive' && 'Fuera del flujo'}
                           </div>
                         </td>
                         <td className="table-amount">${formatAmount(item.totalValue)}</td>
                         <td className="table-amount" style={{ color: 'var(--app-lila)' }}>${formatAmount(item.monthlyValue)}</td>
-                        <td style={{ minWidth: 180 }}>
-                          <div style={{ display: 'grid', gap: 8 }}>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <CuotasRing
+                              pagadas={Math.max(0, Number(item.num_cuotas || 0) - item.remainingInstallments)}
+                              total={Number(item.num_cuotas || 0)}
+                            />
                             <span className={item.status.badgeClass}>{item.status.label}</span>
-                            <div style={{ display: 'grid', gap: 4 }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'rgba(var(--app-ink-rgb),0.40)' }}>
-                                <span>Progreso</span>
-                                <span>{item.progress}%</span>
-                              </div>
-                              <div style={{ background: 'rgba(var(--app-ink-rgb),0.08)', borderRadius: 99, height: 6 }}>
-                                <div
-                                  style={{
-                                    width: `${item.progress}%`,
-                                    height: 6,
-                                    borderRadius: 99,
-                                    background: 'linear-gradient(90deg, var(--app-lila), var(--app-green))',
-                                    transition: 'width 0.4s',
-                                  }}
-                                />
-                              </div>
-                            </div>
                           </div>
                         </td>
                         <td className="table-actions-cell">
@@ -399,11 +439,21 @@ export default function Diferidos() {
               </div>
             ) : (
               <div className="empty-state">
-                <div className="empty-icon">ðŸ”Ž</div>
+                <div className="empty-icon">🔎</div>
                 <p className="empty-text">No encontramos cuotas con ese filtro</p>
                 <p className="empty-sub">Prueba con otro nombre, categoria o monto.</p>
               </div>
             )}
+            <ListPager
+              page={safePage}
+              pageCount={pageCount}
+              onPrevPage={() => setPage((current) => Math.max(1, current - 1))}
+              onNextPage={() => setPage((current) => Math.min(pageCount, current + 1))}
+              pageSize={pageSize}
+              onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
+              totalItems={totalItems}
+              filteredItems={totalItems}
+            />
           </>
         )}
       </div>

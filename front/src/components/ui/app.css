@@ -1708,6 +1708,211 @@
   gap: 6px;
 }
 
+/* Paginacion al pie de una lista */
+.list-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-top: 1px solid rgba(var(--app-ink-rgb),0.06);
+}
+@media (max-width: 480px) {
+  .list-pager { justify-content: space-between; }
+}
+
+/* ── Vista de rubro (consumos de un gasto variable) ── */
+.rubro-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin: -4px 0 16px;
+}
+
+/* Estado "Pendiente" clickeable en la lista de gastos variables */
+.rubro-pendiente-btn {
+  background: rgba(251,191,36,0.12);
+  border: 1px solid rgba(251,191,36,0.35);
+  color: #FBBF24;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.rubro-pendiente-btn:hover { background: rgba(251,191,36,0.22); }
+
+/* Sugerencia aprendida del historial dentro del modal del rubro */
+.rubro-sugerido {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(var(--app-ink-rgb),0.04);
+  border: 1px solid rgba(var(--app-ink-rgb),0.08);
+  font-size: 13px;
+  color: rgba(var(--app-ink-rgb),0.7);
+  margin-bottom: 14px;
+}
+.rubro-sugerido strong { color: var(--app-text); }
+.rubro-sugerido-btn {
+  background: var(--app-lila);
+  border: none;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rubro-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(var(--app-ink-rgb),0.04);
+  border: 1px solid rgba(var(--app-ink-rgb),0.08);
+}
+.rubro-card-label { font-size: 11.5px; color: rgba(var(--app-ink-rgb),0.5); font-weight: 600; }
+.rubro-card-value { font-size: 20px; font-weight: 800; color: var(--app-text); }
+
+.rubro-add-form {
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(196,135,246,0.07);
+  border: 1px solid rgba(196,135,246,0.18);
+  margin-bottom: 16px;
+}
+
+.rubro-list-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: rgba(var(--app-ink-rgb),0.45);
+  margin: 0 0 8px;
+}
+.rubro-consumos { display: flex; flex-direction: column; gap: 8px; }
+.rubro-consumo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(var(--app-ink-rgb),0.03);
+  border: 1px solid rgba(var(--app-ink-rgb),0.06);
+}
+.rubro-consumo-desc { font-size: 14px; font-weight: 600; color: var(--app-text); }
+.rubro-consumo-fecha { font-size: 12px; color: rgba(var(--app-ink-rgb),0.4); }
+.rubro-consumo-right { display: flex; align-items: center; gap: 10px; }
+.rubro-consumo-monto { font-size: 15px; font-weight: 700; color: var(--app-text); }
+
+/* ── Hub de "Lo que gastas" ── */
+.gastos-hub-proj {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 20px 22px;
+  border-radius: 20px;
+  background: rgba(196,135,246,0.08);
+  border: 1px solid rgba(196,135,246,0.18);
+  margin-bottom: 16px;
+}
+.gastos-hub-proj-label { font-size: 13px; font-weight: 600; color: var(--app-lila); }
+.gastos-hub-proj-value { font-size: 34px; font-weight: 800; color: var(--app-text); letter-spacing: -0.5px; margin: 4px 0; }
+.gastos-hub-proj-sub { font-size: 12.5px; color: rgba(var(--app-ink-rgb),0.45); }
+.gastos-hub-proj-icon {
+  flex-shrink: 0;
+  width: 46px; height: 46px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(196,135,246,0.14); color: var(--app-lila);
+}
+
+.gastos-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.gastos-hub-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(var(--app-ink-rgb),0.04);
+  border: 1px solid rgba(var(--app-ink-rgb),0.08);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.gastos-hub-card:hover { background: rgba(var(--app-ink-rgb),0.06); border-color: rgba(196,135,246,0.35); }
+.gastos-hub-card:active { transform: scale(0.99); }
+.gastos-hub-card-icon {
+  width: 38px; height: 38px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 6px;
+}
+.gastos-hub-card-title { font-size: 13.5px; font-weight: 700; color: var(--app-text); }
+.gastos-hub-card-value { font-size: 19px; font-weight: 800; color: var(--app-text); }
+.gastos-hub-card-value em { font-size: 11.5px; font-weight: 500; font-style: normal; color: rgba(var(--app-ink-rgb),0.4); }
+.gastos-hub-card-sub { font-size: 12px; color: var(--app-lila); }
+.gastos-hub-add { width: 100%; justify-content: center; padding: 14px; font-size: 15px; }
+
+.gastos-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--app-lila);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 4px;
+  width: fit-content;
+}
+.gastos-back:hover { opacity: 0.8; }
+
+/* Selector "que quieres registrar" */
+.gastos-chooser-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.gastos-chooser-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(var(--app-ink-rgb),0.04);
+  border: 1px solid rgba(var(--app-ink-rgb),0.10);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+.gastos-chooser-card:hover { background: rgba(196,135,246,0.10); border-color: rgba(196,135,246,0.40); }
+.gastos-chooser-icon {
+  width: 42px; height: 42px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+}
+.gastos-chooser-title { font-size: 14px; font-weight: 700; color: var(--app-text); }
+.gastos-chooser-desc { font-size: 12px; line-height: 1.45; color: rgba(var(--app-ink-rgb),0.5); }
+.gastos-chooser-arrow { color: var(--app-lila); margin-top: 2px; }
+
 /* Grilla de sugerencias del catalogo al crear un gasto */
 .catalogo-grid {
   display: grid;
@@ -4952,6 +5157,68 @@
 .app-theme-root[data-theme='light'] .dashboard-premium-stat-label {
   color: rgba(var(--app-ink-rgb),0.57);
 }
+
+/* ── Score de salud financiera ── */
+.salud-card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 20px;
+  border-radius: 20px;
+  background: rgba(var(--app-ink-rgb),0.035);
+  border: 1px solid rgba(var(--app-ink-rgb),0.08);
+  margin-bottom: 16px;
+}
+.salud-card-empty {
+  gap: 10px;
+  font-size: 13.5px;
+  color: rgba(var(--app-ink-rgb),0.55);
+}
+.salud-ring { flex-shrink: 0; }
+.salud-ring-num { font-size: 26px; font-weight: 800; fill: var(--app-text); }
+.salud-card-body { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.salud-card-kicker {
+  font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  color: rgba(var(--app-ink-rgb),0.5);
+}
+.salud-card-banda { font-size: 19px; font-weight: 800; }
+.salud-card-sub { font-size: 12.5px; color: rgba(var(--app-ink-rgb),0.5); }
+.salud-card-detalle {
+  flex-shrink: 0;
+  background: var(--app-lila);
+  border: none;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.salud-detalle-head {
+  display: flex; align-items: center; gap: 16px; margin-bottom: 18px;
+}
+.salud-detalle-banda { font-size: 20px; font-weight: 800; }
+.salud-detalle-sub { font-size: 13px; color: rgba(var(--app-ink-rgb),0.55); margin-top: 2px; }
+.salud-comps { display: flex; flex-direction: column; gap: 14px; }
+.salud-comp-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.salud-comp-label { font-size: 14px; font-weight: 600; color: var(--app-text); }
+.salud-comp-val { font-size: 13px; font-weight: 700; color: rgba(var(--app-ink-rgb),0.7); }
+.salud-comp-bar {
+  height: 8px; border-radius: 999px; background: rgba(var(--app-ink-rgb),0.1);
+  overflow: hidden; margin: 5px 0 4px;
+}
+.salud-comp-fill { height: 100%; border-radius: 999px; transition: width 0.3s ease; }
+.salud-comp-meta { font-size: 11.5px; color: rgba(var(--app-ink-rgb),0.45); }
+.salud-consejos {
+  margin-top: 18px; padding: 14px; border-radius: 14px;
+  background: rgba(196,135,246,0.07); border: 1px solid rgba(196,135,246,0.18);
+}
+.salud-consejos-title {
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  color: rgba(var(--app-ink-rgb),0.55); display: block; margin-bottom: 6px;
+}
+.salud-consejo { font-size: 13px; color: var(--app-text); margin: 4px 0; line-height: 1.4; }
 
 .app-theme-root[data-theme='light'] .stat-sub,
 .app-theme-root[data-theme='light'] .dashboard-health-hint,

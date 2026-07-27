@@ -7,6 +7,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import DateQuickActions from '../../components/ui/DateQuickActions'
 import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import ListControls from '../../components/ui/ListControls'
+import ListPager from '../../components/ui/ListPager'
 import Modal from '../../components/ui/Modal'
 import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../../utils/dateBounds'
 import { formatAmount } from '../../utils/formatters'
@@ -311,6 +312,7 @@ export default function CuentasPersonasPanel({ embedded = false, direction = 'me
               onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
               totalItems={totalItems}
               filteredItems={totalItems}
+              showPagination={false}
               sortField={sortField}
               sortDir={sortDir}
               onSortChange={(field, dir) => { setSortField(field); setSortDir(dir); setPage(1) }}
@@ -365,6 +367,16 @@ export default function CuentasPersonasPanel({ embedded = false, direction = 'me
                 </tbody>
               </table>
             </div>
+            <ListPager
+              page={safePage}
+              pageCount={pageCount}
+              onPrevPage={() => setPage((p) => Math.max(1, p - 1))}
+              onNextPage={() => setPage((p) => Math.min(pageCount, p + 1))}
+              pageSize={pageSize}
+              onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
+              totalItems={totalItems}
+              filteredItems={totalItems}
+            />
           </>
         )}
       </div>
