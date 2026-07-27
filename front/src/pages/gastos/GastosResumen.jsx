@@ -33,7 +33,11 @@ export default function GastosResumen({ onOpenTipo, onAgregar }) {
       const fijosTotal = fijos.reduce((s, g) => s + montoEfectivoMes(g.monto, g.frecuencia, g.fecha_inicio, anio, mes), 0)
 
       const variables = gc.filter((g) => g.tipo_monto === 'variable' && g.activo)
-      const varTotal = variables.reduce((s, g) => s + parseFloat(g.monto || 0), 0)
+      // Total del mes por rubro: lo registrado o, si sigue pendiente, su sugerencia.
+      const varTotal = (vars.data || []).reduce((s, f) => {
+        const valor = f.real != null ? f.real : (f.sugerido ?? f.estimado ?? 0)
+        return s + parseFloat(valor || 0)
+      }, 0)
       const varPend = (vars.data || []).filter((f) => f.situacion === 'pendiente').length
 
       const dif = (d.diferidos || []).filter((x) => x.activo && overlapsMes(x, anio, mes))
@@ -57,7 +61,7 @@ export default function GastosResumen({ onOpenTipo, onAgregar }) {
 
   const cards = t && [
     { id: 'fijos', icon: Home, tint: '#4ADE80', title: 'Gastos fijos', valor: `$${formatAmount(t.fijosTotal)}`, unidad: '/ mes', sub: `${t.fijosCount} gasto${t.fijosCount !== 1 ? 's' : ''}` },
-    { id: 'variables', icon: Activity, tint: '#C487F6', title: 'Gastos variables', valor: `$${formatAmount(t.varTotal)}`, unidad: '/ estimado', sub: t.varPend > 0 ? `${t.varPend} por registrar` : `${t.varCount} gasto${t.varCount !== 1 ? 's' : ''}` },
+    { id: 'variables', icon: Activity, tint: '#C487F6', title: 'Gastos variables', valor: `$${formatAmount(t.varTotal)}`, unidad: '/ este mes', sub: t.varPend > 0 ? `${t.varPend} por registrar` : `${t.varCount} gasto${t.varCount !== 1 ? 's' : ''}` },
     { id: 'cuotas', icon: CreditCard, tint: '#C487F6', title: 'Gastos a cuotas', valor: `$${formatAmount(t.cuotasTotal)}`, unidad: '/ cuota del mes', sub: `${t.cuotasCount} cuota${t.cuotasCount !== 1 ? 's' : ''} activa${t.cuotasCount !== 1 ? 's' : ''}` },
     { id: 'puntuales', icon: Calendar, tint: '#4ADE80', title: 'Gastos puntuales', valor: `${t.puntuales} registrado${t.puntuales !== 1 ? 's' : ''}`, unidad: '', sub: 'No afectan tu proyeccion' },
   ]
@@ -68,7 +72,7 @@ export default function GastosResumen({ onOpenTipo, onAgregar }) {
         <div>
           <span className="gastos-hub-proj-label">Tu gasto mensual proyectado</span>
           <div className="gastos-hub-proj-value">${t ? formatAmount(t.proyeccion) : '—'}</div>
-          <span className="gastos-hub-proj-sub">Incluye fijos, variables estimados y cuotas activas.</span>
+          <span className="gastos-hub-proj-sub">Incluye fijos, variables y cuotas activas.</span>
         </div>
         <div className="gastos-hub-proj-icon"><LineChart size={22} /></div>
       </div>
