@@ -461,8 +461,10 @@ def resumen_variables_mes(usuario, anio, mes):
 def asegurar_notificacion_variables(usuario):
     """
     Aviso in-app perezoso: si el mes en curso tiene gastos variables sin
-    registrar, deja una notificacion (una por mes). Si ya no quedan pendientes,
-    la borra. Se llama al entrar al dashboard, sin cron.
+    registrar, deja UNA sola notificacion con todos los pendientes (nunca una
+    por rubro). Mientras sigan pendientes, se "reasoma" como maximo una vez al
+    dia para no llenar de avisos. Si ya no quedan pendientes, la borra. Se
+    llama al entrar al dashboard, sin cron.
     """
     from .models import (
         GastoCorriente, GastoCorrienteEjecucion, Notificacion, TIPO_MONTO_VARIABLE,
@@ -489,16 +491,27 @@ def asegurar_notificacion_variables(usuario):
         Notificacion.objects.filter(**filtro).delete()
         return
 
-    Notificacion.objects.update_or_create(
-        **filtro,
-        defaults={
-            'titulo': 'Registra tus gastos variables',
-            'mensaje': (
-                'Tienes {} gasto{} variable{} sin registrar este mes. '
-                'Puedes crearlos con el valor del mes anterior y ajustar lo que cambio.'
-            ).format(pendientes, 's' if pendientes != 1 else '', 's' if pendientes != 1 else ''),
-        },
-    )
+    plural = 's' if pendientes != 1 else ''
+    titulo = 'Registra tus gastos variables'
+    mensaje = (
+        'Tienes {} gasto{} variable{} sin registrar este mes. '
+        'Toca "Pendiente" en cada uno para anotar lo que gastaste.'
+    ).format(pendientes, plural, plural)
+
+    noti = Notificacion.objects.filter(**filtro).first()
+    if noti is None:
+        Notificacion.objects.create(
+            **filtro, titulo=titulo, mensaje=mensaje, leida=False, ultimo_aviso=hoy,
+        )
+        return
+
+    noti.titulo = titulo
+    noti.mensaje = mensaje
+    # Reasomar (marcar no leida) como maximo una vez al dia.
+    if noti.ultimo_aviso is None or noti.ultimo_aviso < hoy:
+        noti.leida = False
+        noti.ultimo_aviso = hoy
+    noti.save()
 
 
 def mapa_ejecuciones_variables(usuario):
