@@ -22,7 +22,6 @@ const FINANCE_NAV_ITEMS = [
   { to: '/dashboard', icon: Wallet, label: 'Mi dinero' },
   { to: '/ingresos', icon: ArrowDownCircle, label: 'Lo que ganas' },
   { to: '/gastos', icon: ArrowUpCircle, label: 'Lo que gastas' },
-  { to: '/diferidos', icon: CreditCard, label: 'Gastos a cuotas' },
   { to: '/cuentas-personas', icon: Rat, label: 'Cuentas con personas' },
 ]
 

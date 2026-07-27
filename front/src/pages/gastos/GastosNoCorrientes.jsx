@@ -6,6 +6,7 @@ import api from '../../api/client'
 import { useAuth } from '../../context/useAuth'
 import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import ListControls from '../../components/ui/ListControls'
+import ListPager from '../../components/ui/ListPager'
 import SuggestionsPanel from '../../components/ui/SuggestionsPanel'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import DateQuickActions from '../../components/ui/DateQuickActions'
@@ -38,7 +39,7 @@ function buildEmptyForm() {
   }
 }
 
-export default function GastosNoCorrientes({ embedded = false }) {
+export default function GastosNoCorrientes({ embedded = false, autoNew = false }) {
   const { user } = useAuth()
   const maxExpenseDate = getTodayDate()
   const [items, setItems] = useState([])
@@ -181,6 +182,11 @@ export default function GastosNoCorrientes({ embedded = false }) {
     setPareceVariable(false)
     setModal(true)
   }
+
+  useEffect(() => {
+    if (autoNew) openNew()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoNew])
 
   function openEdit(item) {
     setForm({
@@ -404,6 +410,7 @@ export default function GastosNoCorrientes({ embedded = false }) {
               onPageSizeChange={(n) => { setPageSize(n); setPage(1) }}
               totalItems={totalItems}
               filteredItems={totalItems}
+              showPagination={false}
               sortField={sortField}
               sortDir={sortDir}
               onSortChange={(f, d) => { setSortField(f); setSortDir(d); setPage(1) }}
@@ -474,6 +481,16 @@ export default function GastosNoCorrientes({ embedded = false }) {
                 </tbody>
               </table>
             </div>
+            <ListPager
+              page={safePage}
+              pageCount={pageCount}
+              onPrevPage={() => setPage((p) => Math.max(1, p - 1))}
+              onNextPage={() => setPage((p) => Math.min(pageCount, p + 1))}
+              pageSize={pageSize}
+              onPageSizeChange={(n) => { setPageSize(n); setPage(1) }}
+              totalItems={totalItems}
+              filteredItems={totalItems}
+            />
           </>
         )}
       </div>

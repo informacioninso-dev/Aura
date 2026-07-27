@@ -130,19 +130,24 @@ class GastoCorriente(models.Model):
 
 
 class GastoCorrienteEjecucion(models.Model):
-    """Monto realmente pagado de un gasto variable en un mes concreto."""
-    gasto      = models.ForeignKey(GastoCorriente, on_delete=models.CASCADE, related_name='ejecuciones')
-    anio       = models.PositiveIntegerField()
-    mes        = models.PositiveSmallIntegerField()   # 1–12
-    monto_real = models.DecimalField(max_digits=12, decimal_places=2)
-    creado_en  = models.DateTimeField(auto_now_add=True)
+    """
+    Un consumo individual de un gasto variable (rubro), ej: una compra de
+    farmacia en Fybeca. Puede haber varios por mes; el monto real del mes es
+    la suma de los consumos de ese mes.
+    """
+    gasto       = models.ForeignKey(GastoCorriente, on_delete=models.CASCADE, related_name='ejecuciones')
+    anio        = models.PositiveIntegerField()
+    mes         = models.PositiveSmallIntegerField()   # 1–12
+    fecha       = models.DateField(null=True, blank=True)   # dia exacto del consumo
+    descripcion = models.CharField(max_length=200, blank=True)  # ej. "Fybeca"
+    monto_real  = models.DecimalField(max_digits=12, decimal_places=2)  # monto del consumo
+    creado_en   = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ('gasto', 'anio', 'mes')
-        ordering = ['-anio', '-mes']
-        verbose_name = 'Ejecución de gasto variable'
-        verbose_name_plural = 'Ejecuciones de gastos variables'
+        ordering = ['-fecha', '-creado_en']
+        verbose_name = 'Consumo de gasto variable'
+        verbose_name_plural = 'Consumos de gastos variables'
         indexes = [
             models.Index(fields=['gasto', 'anio', 'mes'], name='gce_gasto_periodo_idx'),
         ]

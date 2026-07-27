@@ -18,6 +18,7 @@ from .models import (
     IngresoPuntual,
     Notificacion,
     SaldoMes,
+    TIPO_MONTO_VARIABLE,
 )
 
 
@@ -172,11 +173,15 @@ class IngresoPuntualSerializer(ProjectionEligibilitySerializerMixin, serializers
 class GastoCorrienteSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         monto        = attrs.get('monto',        getattr(self.instance, 'monto',        None))
+        tipo_monto   = attrs.get('tipo_monto',   getattr(self.instance, 'tipo_monto',   None))
         fecha_inicio = attrs.get('fecha_inicio', getattr(self.instance, 'fecha_inicio', None))
         fecha_fin    = attrs.get('fecha_fin',    getattr(self.instance, 'fecha_fin',    None))
 
         errors = {}
-        if monto is not None and monto <= 0:
+        # Un gasto variable (rubro) puede crearse sin estimado: el sistema lo
+        # aprende del historial. Los fijos si exigen un monto mayor que 0.
+        es_variable = tipo_monto == TIPO_MONTO_VARIABLE
+        if monto is not None and monto <= 0 and not es_variable:
             errors['monto'] = 'El monto debe ser mayor que 0.'
         validate_reasonable_date(errors, 'fecha_inicio', fecha_inicio, label='inicio')
         validate_reasonable_date(errors, 'fecha_fin', fecha_fin, label='fin')
@@ -194,32 +199,38 @@ class GastoCorrienteSerializer(serializers.ModelSerializer):
 
 
 class GastoCorrienteEjecucionSerializer(serializers.ModelSerializer):
-    """Monto realmente pagado de un gasto variable en un mes."""
+    """
+    Un consumo individual de un gasto variable (ej: una compra de farmacia).
+    anio/mes se derivan de la fecha. El total del mes es la suma de consumos.
+    """
 
     def validate(self, attrs):
         monto_real = attrs.get('monto_real', getattr(self.instance, 'monto_real', None))
-        mes        = attrs.get('mes',        getattr(self.instance, 'mes',        None))
-        anio       = attrs.get('anio',       getattr(self.instance, 'anio',       None))
+        fecha      = attrs.get('fecha',      getattr(self.instance, 'fecha',      None))
 
         errors = {}
-        # Se permite 0: significa "este mes no gaste en esto", distinto de
-        # "pendiente" (aun no lo registro). Negativo si es invalido.
         if monto_real is not None and monto_real < 0:
             errors['monto_real'] = 'El monto no puede ser negativo.'
-        if mes is not None and not (1 <= mes <= 12):
-            errors['mes'] = 'El mes debe estar entre 1 y 12.'
-        if anio is not None and mes is not None and 1 <= mes <= 12:
-            hoy = local_today()
-            if (anio, mes) > (hoy.year, hoy.month):
-                errors['mes'] = 'No se puede registrar un monto real de un mes futuro.'
+        if fecha is None:
+            errors['fecha'] = 'La fecha es obligatoria.'
+        elif fecha > local_today():
+            errors['fecha'] = 'No se puede registrar un consumo con fecha futura.'
         if errors:
             raise serializers.ValidationError(errors)
         return attrs
 
+    def save(self, **kwargs):
+        # anio/mes siempre coherentes con la fecha del consumo.
+        fecha = self.validated_data.get('fecha') or getattr(self.instance, 'fecha', None)
+        if fecha is not None:
+            kwargs.setdefault('anio', fecha.year)
+            kwargs.setdefault('mes', fecha.month)
+        return super().save(**kwargs)
+
     class Meta:
         model = GastoCorrienteEjecucion
         fields = '__all__'
-        read_only_fields = ('gasto', 'creado_en', 'actualizado_en')
+        read_only_fields = ('gasto', 'anio', 'mes', 'creado_en', 'actualizado_en')
 
 
 class GastoNoCorrienteSerializer(ProjectionEligibilitySerializerMixin, serializers.ModelSerializer):

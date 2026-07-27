@@ -19,6 +19,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import DateQuickActions from '../../components/ui/DateQuickActions'
 import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import ListControls from '../../components/ui/ListControls'
+import ListPager from '../../components/ui/ListPager'
 import { useAuth } from '../../context/useAuth'
 import { DATE_INPUT_MAX } from '../../utils/dateBounds'
 import { formatMoney } from '../../utils/formatters'
@@ -840,6 +841,7 @@ export default function Simulador() {
                   onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
                   totalItems={totalSimulaciones}
                   filteredItems={totalSimulaciones}
+                  showPagination={false}
                 />
                 <div className="table-wrap" style={{ border: 'none' }}>
                   <table className="table">
@@ -870,6 +872,16 @@ export default function Simulador() {
                     </tbody>
                   </table>
                 </div>
+                <ListPager
+                  page={safePage}
+                  pageCount={pageCount}
+                  onPrevPage={() => setPage((previous) => Math.max(1, previous - 1))}
+                  onNextPage={() => setPage((previous) => Math.min(pageCount, previous + 1))}
+                  pageSize={pageSize}
+                  onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
+                  totalItems={totalSimulaciones}
+                  filteredItems={totalSimulaciones}
+                />
               </>
             )}
           </section>

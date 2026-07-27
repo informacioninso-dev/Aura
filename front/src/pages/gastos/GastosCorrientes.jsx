@@ -6,6 +6,7 @@ import api from '../../api/client'
 import { useAuth } from '../../context/useAuth'
 import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import ListControls from '../../components/ui/ListControls'
+import ListPager from '../../components/ui/ListPager'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import DateQuickActions from '../../components/ui/DateQuickActions'
 import Modal from '../../components/ui/Modal'
@@ -76,7 +77,7 @@ function buildEmptyForm(tipoMonto = 'fijo') {
   }
 }
 
-export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' }) {
+export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo', autoNew = false }) {
   const { user } = useAuth()
   const { categorias } = useCategorias()
   const maxExpenseDate = getTodayDate()
@@ -182,6 +183,11 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
     setShowAdvanced(false)
     setModal(true)
   }
+
+  useEffect(() => {
+    if (autoNew) openNew()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoNew])
 
   function openEdit(item) {
     setForm({
@@ -476,6 +482,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
               onPageSizeChange={(n) => { setPageSize(n); setPage(1) }}
               totalItems={totalItems}
               filteredItems={totalItems}
+              showPagination={false}
               sortField={sortField}
               sortDir={sortDir}
               onSortChange={(f, d) => { setSortField(f); setSortDir(d); setPage(1) }}
@@ -539,6 +546,16 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo' 
                 </tbody>
               </table>
             </div>
+            <ListPager
+              page={safePage}
+              pageCount={pageCount}
+              onPrevPage={() => setPage((p) => Math.max(1, p - 1))}
+              onNextPage={() => setPage((p) => Math.min(pageCount, p + 1))}
+              pageSize={pageSize}
+              onPageSizeChange={(n) => { setPageSize(n); setPage(1) }}
+              totalItems={totalItems}
+              filteredItems={totalItems}
+            />
           </>
         )}
       </div>

@@ -7,6 +7,7 @@ import { getApiErrorMessage } from '../../api/errors'
 import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import ListControls from '../../components/ui/ListControls'
+import ListPager from '../../components/ui/ListPager'
 import { useAuth } from '../../context/useAuth'
 import '../../components/ui/app.css'
 
@@ -1379,6 +1380,7 @@ export default function SuperAdmin() {
           }}
           totalItems={usersTotal}
           filteredItems={users.length}
+          showPagination={false}
         />
 
         <div className="table-wrap">
@@ -1519,6 +1521,16 @@ export default function SuperAdmin() {
             </tbody>
           </table>
         </div>
+        <ListPager
+          page={usersPage}
+          pageCount={usersPageCount}
+          onPrevPage={() => setUsersPage((page) => Math.max(1, page - 1))}
+          onNextPage={() => setUsersPage((page) => Math.min(usersPageCount, page + 1))}
+          pageSize={usersPageSize}
+          onPageSizeChange={(size) => { setUsersPage(1); setUsersPageSize(size) }}
+          totalItems={usersTotal}
+          filteredItems={users.length}
+        />
       </div>
       )}
 

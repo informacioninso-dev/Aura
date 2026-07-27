@@ -6,6 +6,7 @@ import api from '../../api/client'
 import { getApiErrorMessage } from '../../api/errors'
 import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import Modal from '../../components/ui/Modal'
+import SaludFinancieraCard from './SaludFinancieraCard'
 import { useAuth } from '../../context/useAuth'
 import { formatMoney } from '../../utils/formatters'
 import { montoEfectivoMes } from '../../utils/frecuencias'
@@ -191,6 +192,7 @@ export default function Dashboard() {
   const projectionChartAnchorRef = useRef(null)
   const [shouldLoadProjectionCharts, setShouldLoadProjectionCharts] = useState(false)
   const advancedProjectionEnabled = Boolean(user?.feature_access?.advanced_projection_enabled)
+  const healthScoreEnabled = Boolean(user?.feature_access?.health_score_enabled)
   const projectionDisplayMonths = Math.max(2, normalizePositiveInt(
     user?.feature_access?.projection_months,
     DEFAULT_FREE_PROJECTION_DISPLAY_MONTHS,
@@ -1009,6 +1011,14 @@ export default function Dashboard() {
           <div className="stat-sub">{tasaAhorro >= 20 ? 'Buen ritmo de ahorro' : tasaAhorro >= 0 ? 'Margen ajustado' : 'Gastas mas de lo que ganas'}</div>
         </div>
       </div>
+
+      {healthScoreEnabled && (
+        <SaludFinancieraCard
+          anio={selectedMonth.getFullYear()}
+          mes={selectedMonth.getMonth() + 1}
+          enabled={healthScoreEnabled}
+        />
+      )}
 
       {activeSummaryDetail && (
         <div className="dashboard-summary-detail-card">

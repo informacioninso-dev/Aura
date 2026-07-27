@@ -2010,6 +2010,37 @@ class TestGastosVariables(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['tipo_monto'], 'variable')
 
+    def test_se_puede_crear_variable_sin_estimado(self):
+        # Un rubro se crea solo con nombre y categoria: el estimado (monto=0)
+        # se aprende del historial, sin que el usuario tenga que calcularlo.
+        response = self.client.post('/api/finanzas/gastos-corrientes/', {
+            'descripcion': 'Farmacia',
+            'categoria': 'salud',
+            'monto': 0,
+            'tipo_monto': 'variable',
+            'frecuencia': 'mensual',
+            'fecha_inicio': '2026-01-01',
+            'activo': True,
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Decimal(response.data['monto']), Decimal('0.00'))
+
+    def test_un_gasto_fijo_no_se_puede_crear_sin_monto(self):
+        # Los fijos siguen exigiendo un monto mayor que 0.
+        response = self.client.post('/api/finanzas/gastos-corrientes/', {
+            'descripcion': 'Arriendo',
+            'categoria': 'servicios',
+            'monto': 0,
+            'tipo_monto': 'fijo',
+            'frecuencia': 'mensual',
+            'fecha_inicio': '2026-01-01',
+            'activo': True,
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('monto', response.data)
+
     def test_filtro_por_tipo_monto(self):
         self._crear_variable()
         GastoCorriente.objects.create(
@@ -2127,6 +2158,40 @@ class TestGastosVariables(APITestCase):
             Decimal('30.00'),
         )
 
+    def test_promedio_ponderado_da_mas_peso_a_los_ultimos_tres(self):
+        gasto = self._crear_variable(monto='0.00')
+        # 3 meses viejos en 30 y 3 meses recientes en 90.
+        for mes, monto in [(1, '30'), (2, '30'), (3, '30'),
+                           (4, '90'), (5, '90'), (6, '90')]:
+            GastoCorrienteEjecucion.objects.create(
+                gasto=gasto, anio=2026, mes=mes, monto_real=Decimal(monto),
+            )
+        ejecuciones = mapa_ejecuciones_variables(self.user)
+
+        # Julio: (30*1*3 + 90*2*3) / (3*1 + 3*2) = 630 / 9 = 70.00
+        self.assertEqual(
+            _monto_base_gasto_mes(gasto.id, gasto.monto, gasto.tipo_monto,
+                                  datetime.date(2026, 7, 1), ejecuciones),
+            Decimal('70.00'),
+        )
+
+    def test_promedio_ponderado_solo_mira_los_ultimos_seis_meses(self):
+        gasto = self._crear_variable(monto='0.00')
+        # 7 meses: enero (muy alto) queda fuera de la ventana de 6.
+        for mes, monto in [(1, '999'), (2, '60'), (3, '60'), (4, '60'),
+                           (5, '60'), (6, '60'), (7, '60')]:
+            GastoCorrienteEjecucion.objects.create(
+                gasto=gasto, anio=2026, mes=mes, monto_real=Decimal(monto),
+            )
+        ejecuciones = mapa_ejecuciones_variables(self.user)
+
+        # Agosto: ventana feb..jul, todos en 60 -> 60.00 (enero excluido).
+        self.assertEqual(
+            _monto_base_gasto_mes(gasto.id, gasto.monto, gasto.tipo_monto,
+                                  datetime.date(2026, 8, 1), ejecuciones),
+            Decimal('60.00'),
+        )
+
     def test_un_gasto_fijo_ignora_las_ejecuciones(self):
         gasto = GastoCorriente.objects.create(
             usuario=self.user, descripcion='Arriendo', monto=Decimal('500.00'),
@@ -2171,27 +2236,32 @@ class TestGastosVariables(APITestCase):
 
     # -- Endpoints -----------------------------------------------------------
 
-    def test_registrar_monto_real_por_api(self):
+    def test_registrar_consumo_por_api(self):
         gasto = self._crear_variable()
 
         response = self.client.post(
             '/api/finanzas/gastos-corrientes/{}/ejecuciones/'.format(gasto.id),
-            {'anio': 2026, 'mes': 3, 'monto_real': '77.50'}, format='json',
+            {'fecha': '2026-03-05', 'descripcion': 'Fybeca', 'monto_real': '77.50'}, format='json',
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Decimal(response.data['monto_real']), Decimal('77.50'))
+        # anio/mes se derivan de la fecha.
+        self.assertEqual(response.data['anio'], 2026)
+        self.assertEqual(response.data['mes'], 3)
 
-    def test_recargar_el_mismo_mes_reemplaza_el_valor(self):
+    def test_varios_consumos_en_el_mes_se_suman(self):
         gasto = self._crear_variable()
         url = '/api/finanzas/gastos-corrientes/{}/ejecuciones/'.format(gasto.id)
-        self.client.post(url, {'anio': 2026, 'mes': 3, 'monto_real': '77.50'}, format='json')
+        self.client.post(url, {'fecha': '2026-03-05', 'descripcion': 'Fybeca', 'monto_real': '20.00'}, format='json')
+        self.client.post(url, {'fecha': '2026-03-12', 'descripcion': 'Sana Sana', 'monto_real': '18.00'}, format='json')
 
-        response = self.client.post(url, {'anio': 2026, 'mes': 3, 'monto_real': '90.00'}, format='json')
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(gasto.ejecuciones.count(), 1)
-        self.assertEqual(gasto.ejecuciones.first().monto_real, Decimal('90.00'))
+        # Dos consumos distintos en el mes; el total del mes es la suma.
+        self.assertEqual(gasto.ejecuciones.filter(anio=2026, mes=3).count(), 2)
+        from apps.finanzas.utils import mapa_ejecuciones_variables
+        cache.clear()
+        total = mapa_ejecuciones_variables(self.user)[gasto.id][(2026, 3)]
+        self.assertEqual(total, Decimal('38.00'))
 
     def test_un_gasto_fijo_rechaza_montos_reales(self):
         gasto = GastoCorriente.objects.create(
@@ -3091,7 +3161,7 @@ class TestMontoRealCero(APITestCase):
     def test_acepta_cero(self):
         response = self.client.post(
             '/api/finanzas/gastos-corrientes/{}/ejecuciones/'.format(self.gasto.id),
-            {'anio': 2026, 'mes': 6, 'monto_real': '0'}, format='json',
+            {'fecha': '2026-06-10', 'monto_real': '0'}, format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Decimal(response.data['monto_real']), Decimal('0.00'))
@@ -3099,7 +3169,7 @@ class TestMontoRealCero(APITestCase):
     def test_rechaza_negativo(self):
         response = self.client.post(
             '/api/finanzas/gastos-corrientes/{}/ejecuciones/'.format(self.gasto.id),
-            {'anio': 2026, 'mes': 6, 'monto_real': '-5'}, format='json',
+            {'fecha': '2026-06-10', 'monto_real': '-5'}, format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
@@ -3203,10 +3273,12 @@ class TestCrearMesVariables(APITestCase):
         g = self._var('Luz', '40.00')
         self.client.post('/api/finanzas/gastos-corrientes/crear_mes_variables/',
                          {'anio': self.hoy.year, 'mes': self.hoy.month}, format='json')
-        # Editar via upsert
-        self.client.post(f'/api/finanzas/gastos-corrientes/{g.id}/ejecuciones/',
-                         {'anio': self.hoy.year, 'mes': self.hoy.month, 'monto_real': '55.00'}, format='json')
-        self.assertEqual(GastoCorrienteEjecucion.objects.get(gasto=g).monto_real, Decimal('55.00'))
+        # El consumo estimado que creo el boton es editable via PATCH.
+        consumo = GastoCorrienteEjecucion.objects.get(gasto=g)
+        self.client.patch(f'/api/finanzas/gastos-corrientes/{g.id}/ejecuciones/{consumo.id}/',
+                          {'monto_real': '55.00'}, format='json')
+        consumo.refresh_from_db()
+        self.assertEqual(consumo.monto_real, Decimal('55.00'))
 
 
 class TestNotificacionVariables(APITestCase):
@@ -3307,3 +3379,135 @@ class TestSimpleEsAritmetica(APITestCase):
         # El balance de un mes futuro incluye el variable (estimado), aritmetico.
         futuro = add_months(first_day_of_month(self.hoy), 2)
         self.assertEqual(calcular_balance_mes(self.user, futuro.year, futuro.month), Decimal('955.00'))
+
+
+class TestConsumosVariables(APITestCase):
+    """Consumos individuales por rubro: varios al mes, sumados, editables."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            email='cons@example.com', username='usuario_cons', password='clave12345',
+        )
+        self.client.force_authenticate(user=self.user)
+        self.gasto = GastoCorriente.objects.create(
+            usuario=self.user, descripcion='Farmacia', categoria='salud',
+            monto=Decimal('50.00'), tipo_monto='variable', frecuencia='mensual',
+            fecha_inicio='2026-01-01', activo=True,
+        )
+
+    def _add(self, fecha, desc, monto):
+        return self.client.post(
+            f'/api/finanzas/gastos-corrientes/{self.gasto.id}/ejecuciones/',
+            {'fecha': fecha, 'descripcion': desc, 'monto_real': monto}, format='json',
+        )
+
+    def test_lista_consumos_de_un_mes(self):
+        self._add('2026-07-05', 'Fybeca', '20.00')
+        self._add('2026-07-12', 'Sana Sana', '18.00')
+        self._add('2026-06-01', 'Otra', '10.00')  # otro mes
+
+        r = self.client.get(f'/api/finanzas/gastos-corrientes/{self.gasto.id}/ejecuciones/?anio=2026&mes=7')
+        self.assertEqual(len(r.data), 2)
+
+    def test_borrar_un_consumo(self):
+        c = self._add('2026-07-05', 'Fybeca', '20.00').data
+        r = self.client.delete(f'/api/finanzas/gastos-corrientes/{self.gasto.id}/ejecuciones/{c["id"]}/')
+        self.assertEqual(r.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(self.gasto.ejecuciones.count(), 0)
+
+    def test_resumen_muestra_acumulado_y_cantidad(self):
+        self._add('2026-07-05', 'Fybeca', '20.00')
+        self._add('2026-07-12', 'Sana Sana', '18.00')
+        self._add('2026-07-19', "Pharmacy's", '15.00')
+
+        filas = {f['descripcion']: f for f in resumen_variables_mes(self.user, 2026, 7)}
+        fila = filas['Farmacia']
+        self.assertEqual(fila['acumulado'], '53.00')
+        self.assertEqual(fila['consumos'], 3)
+        self.assertEqual(fila['situacion'], 'sobre')  # 53 > 50 estimado
+
+    def test_rechaza_consumo_futuro(self):
+        futuro = (local_today() + datetime.timedelta(days=400)).isoformat()
+        r = self._add(futuro, 'X', '10.00')
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_no_toca_consumos_de_otro_usuario(self):
+        otro = User.objects.create_user(email='x@example.com', username='x', password='clave12345')
+        g2 = GastoCorriente.objects.create(usuario=otro, descripcion='Luz', categoria='servicios',
+                                           monto=Decimal('40'), tipo_monto='variable', frecuencia='mensual',
+                                           fecha_inicio='2026-01-01', activo=True)
+        c = GastoCorrienteEjecucion.objects.create(gasto=g2, anio=2026, mes=7, fecha='2026-07-01', monto_real=Decimal('40'))
+        r = self.client.delete(f'/api/finanzas/gastos-corrientes/{g2.id}/ejecuciones/{c.id}/')
+        self.assertIn(r.status_code, (status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND))
+        self.assertTrue(GastoCorrienteEjecucion.objects.filter(pk=c.id).exists())
+
+
+class TestSaludFinanciera(APITestCase):
+    """Score de salud financiera (tipo banca), solo para plan pro."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            email='salud@example.com', username='usuario_salud', password='clave12345',
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def _hacer_pro(self):
+        plan_pro = Plan.objects.get(slug='pro')
+        assign_plan_to_user(user=self.user, plan=plan_pro, assigned_by=None, notes='Salud test')
+
+    def _ingreso(self, monto):
+        Ingreso.objects.create(
+            usuario=self.user, descripcion='Sueldo', monto=Decimal(monto),
+            frecuencia='mensual', fecha_inicio='2026-01-01', activo=True,
+        )
+
+    def test_plan_free_no_puede_ver_el_score(self):
+        r = self.client.get('/api/finanzas/salud-financiera/?anio=2026&mes=7')
+        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_plan_pro_ve_el_score(self):
+        self._hacer_pro()
+        self._ingreso('1000.00')
+        r = self.client.get('/api/finanzas/salud-financiera/?anio=2026&mes=7')
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertTrue(r.data['disponible'])
+        self.assertGreaterEqual(r.data['score'], 0)
+        self.assertLessEqual(r.data['score'], 100)
+        self.assertEqual(len(r.data['componentes']), 5)
+        self.assertIn('banda', r.data)
+
+    def test_sin_ingresos_no_hay_score(self):
+        self._hacer_pro()
+        r = self.client.get('/api/finanzas/salud-financiera/?anio=2026&mes=7')
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertFalse(r.data['disponible'])
+
+    def test_deuda_alta_baja_la_capacidad_de_pago(self):
+        from .salud import calcular_salud_financiera
+        self._hacer_pro()
+        self._ingreso('1000.00')
+        # Una cuota que se come el 50% del ingreso -> capacidad de pago en el suelo.
+        Diferido.objects.create(
+            usuario=self.user, descripcion='TV a cuotas', monto_total=Decimal('6000'),
+            num_cuotas=12, cuota_mensual=Decimal('500'),
+            fecha_inicio='2026-01-01', fecha_fin='2026-12-31', activo=True,
+        )
+        data = calcular_salud_financiera(self.user, 2026, 7)
+        cap = next(c for c in data['componentes'] if c['clave'] == 'capacidad_pago')
+        self.assertEqual(cap['puntaje'], 0)
+        self.assertTrue(any(c['clave'] == 'capacidad_pago' for c in data['consejos']))
+
+    def test_buen_perfil_da_score_alto(self):
+        from .salud import calcular_salud_financiera
+        self._hacer_pro()
+        self._ingreso('1000.00')
+        # Gasto fijo bajo, sin deudas, buen colchon acumulado.
+        GastoCorriente.objects.create(
+            usuario=self.user, descripcion='Arriendo', monto=Decimal('200'),
+            tipo_monto='fijo', frecuencia='mensual', fecha_inicio='2026-01-01', activo=True,
+        )
+        SaldoMes.objects.create(usuario=self.user, anio=2026, mes=6, monto=Decimal('5000'), activo=True)
+        data = calcular_salud_financiera(self.user, 2026, 7)
+        self.assertGreaterEqual(data['score'], 70)

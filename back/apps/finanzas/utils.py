@@ -27,6 +27,14 @@ CONSERVATIVE_PUNCTUAL_HISTORY_MONTHS = 12
 # cuando el mes consultado todavia no tiene monto real cargado.
 MESES_PROMEDIO_VARIABLE = 3
 
+# Ventana y pesos del promedio ponderado de un gasto variable: se miran los
+# ultimos 6 meses con registro y los 3 mas recientes pesan el doble, para que
+# el estimado siga el gasto reciente sin que el usuario tenga que calcular nada.
+MESES_VENTANA_VARIABLE = 6
+MESES_PESO_FUERTE = 3
+PESO_RECIENTE = 2
+PESO_ANTIGUO = 1
+
 FREQ_FACTOR = {
     'diario': 30,
     'semanal': Decimal('4.33'),
@@ -396,15 +404,18 @@ def resumen_variables_mes(usuario, anio, mes):
             usuario=usuario, tipo_monto=TIPO_MONTO_VARIABLE, activo=True,
         ).order_by('descripcion')
     )
-    ejec = {
-        e.gasto_id: e
-        for e in GastoCorrienteEjecucion.objects.filter(
+    # Acumulado del mes = suma de los consumos de ese mes, y su cantidad.
+    agregado = {
+        fila['gasto_id']: fila
+        for fila in GastoCorrienteEjecucion.objects.filter(
             gasto__usuario=usuario, anio=anio, mes=mes,
+        ).values('gasto_id').annotate(
+            total=db_models.Sum('monto_real'),
+            cantidad=db_models.Count('id'),
         )
     }
-    # Para los pendientes: el valor que el sistema ya usa (promedio 3 meses o
-    # estimado). Se muestra para que el usuario vea que el mes ya esta cubierto
-    # y solo confirme o corrija, sin arrancar de cero.
+    # Para los pendientes: el valor que el sistema ya usa (promedio / estimado),
+    # para que el usuario vea que el mes ya esta cubierto aunque no cargue nada.
     todas_ejec = mapa_ejecuciones_variables(usuario)
     month_start = datetime.date(anio, mes, 1)
 
@@ -418,17 +429,19 @@ def resumen_variables_mes(usuario, anio, mes):
             'categoria': g.categoria,
             'estimado': str(estimado),
             'sugerido': str(sugerido),
-            'real': None,
-            'fecha_registro': None,
+            'real': None,          # acumulado del mes (compat: nombre 'real')
+            'acumulado': None,
+            'consumos': 0,
             'situacion': 'pendiente',
             'delta_abs': None,
             'delta_pct': None,
         }
-        e = ejec.get(g.id)
-        if e is not None:
-            real = _money(e.monto_real)
+        ag = agregado.get(g.id)
+        if ag is not None and ag['cantidad'] > 0:
+            real = _money(ag['total'])
             fila['real'] = str(real)
-            fila['fecha_registro'] = e.actualizado_en.date().isoformat()
+            fila['acumulado'] = str(real)
+            fila['consumos'] = ag['cantidad']
             if real == 0:
                 fila['situacion'] = 'sin_gasto'
                 fila['delta_abs'] = str(-estimado)
@@ -489,16 +502,20 @@ def asegurar_notificacion_variables(usuario):
 
 
 def mapa_ejecuciones_variables(usuario):
-    """{gasto_id: {(anio, mes): monto_real}} de los gastos variables del usuario."""
+    """
+    {gasto_id: {(anio, mes): total}} de los gastos variables del usuario.
+    El total del mes es la SUMA de los consumos de ese mes (un rubro puede
+    tener varias compras al mes).
+    """
     from .models import TIPO_MONTO_VARIABLE, GastoCorrienteEjecucion
 
     mapa = {}
     filas = GastoCorrienteEjecucion.objects.filter(
         gasto__usuario=usuario,
         gasto__tipo_monto=TIPO_MONTO_VARIABLE,
-    ).values('gasto_id', 'anio', 'mes', 'monto_real')
+    ).values('gasto_id', 'anio', 'mes').annotate(total=db_models.Sum('monto_real'))
     for fila in filas:
-        mapa.setdefault(fila['gasto_id'], {})[(fila['anio'], fila['mes'])] = _money(fila['monto_real'])
+        mapa.setdefault(fila['gasto_id'], {})[(fila['anio'], fila['mes'])] = _money(fila['total'])
     return mapa
 
 
@@ -519,12 +536,32 @@ def _monto_base_gasto_mes(gasto_id, monto_estimado, tipo_monto, month_start, eje
     if clave in reales:
         return reales[clave]
 
-    previos = sorted(periodo for periodo in reales if periodo < clave)
-    if previos:
-        ultimos = [reales[periodo] for periodo in previos[-MESES_PROMEDIO_VARIABLE:]]
-        return (sum(ultimos) / Decimal(len(ultimos))).quantize(Decimal('0.01'))
+    ponderado = _promedio_ponderado_variable(reales, clave)
+    if ponderado is not None:
+        return ponderado
 
     return monto_estimado
+
+
+def _promedio_ponderado_variable(reales, clave):
+    """
+    Promedio de los ultimos MESES_VENTANA_VARIABLE meses con registro anteriores
+    a `clave`, dando doble peso a los MESES_PESO_FUERTE mas recientes.
+    Devuelve None si no hay meses previos con registro.
+    """
+    previos = sorted(periodo for periodo in reales if periodo < clave)
+    if not previos:
+        return None
+
+    ventana = previos[-MESES_VENTANA_VARIABLE:]
+    n = len(ventana)
+    total = Decimal('0')
+    pesos = 0
+    for i, periodo in enumerate(ventana):
+        peso = PESO_RECIENTE if i >= n - MESES_PESO_FUERTE else PESO_ANTIGUO
+        total += reales[periodo] * peso
+        pesos += peso
+    return (total / Decimal(pesos)).quantize(Decimal('0.01'))
 
 
 def _monto_variable_proyectado_inteligente(gasto_id, monto_estimado, reference_month, ejecuciones):
