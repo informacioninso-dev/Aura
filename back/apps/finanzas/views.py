@@ -18,6 +18,7 @@ from rest_framework.views import APIView
 from apps.usuarios.plans import (
     FEATURE_ADVANCED_PROJECTION_ENABLED,
     FEATURE_ADVANCED_PROJECTION_MONTHS,
+    FEATURE_HEALTH_SCORE_ENABLED,
     FEATURE_IMPORT_MAX_ROWS,
     FEATURE_PROJECTION_MONTHS,
     get_user_projection_mode,
@@ -203,6 +204,30 @@ class DashboardResumenView(APIView):
             ).data,
             'diferidos': DeferidoSerializer(diferidos, many=True, context={'request': request}).data,
         })
+
+class SaludFinancieraView(APIView):
+    """Score de salud financiera (tipo banca). Solo planes con la feature pro."""
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request):
+        user = request.user
+        if not get_user_feature_value(user, FEATURE_HEALTH_SCORE_ENABLED, default=False):
+            return Response(
+                {'detail': 'Tu plan no incluye el score de salud financiera.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        today = local_today()
+        try:
+            year = int(request.query_params.get('anio', today.year))
+            month = int(request.query_params.get('mes', today.month))
+            datetime.date(year, month, 1)
+        except (TypeError, ValueError):
+            return Response({'detail': 'Periodo invalido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from .salud import calcular_salud_financiera
+        return Response(calcular_salud_financiera(user, year, month))
+
 
 class IngresoViewSet(BaseFinanzasViewSet):
     queryset = Ingreso.objects.all()

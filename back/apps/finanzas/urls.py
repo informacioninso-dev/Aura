@@ -15,6 +15,7 @@ from .views import (
     ReportePDFView,
     ReporteView,
     DashboardResumenView,
+    SaludFinancieraView,
     AsistenteParseView,
     AsistenteTranscribirView,
     CatalogoView,
@@ -34,6 +35,7 @@ router.register('notificaciones',       NotificacionViewSet,    basename='notifi
 urlpatterns = [
     path('', include(router.urls)),
     path('dashboard/', DashboardResumenView.as_view(), name='dashboard-resumen'),
+    path('salud-financiera/', SaludFinancieraView.as_view(), name='salud-financiera'),
     path('importar/<str:accion>/', ImportarView.as_view(), name='importar'),
     path('proyeccion-acumulada/', ProyeccionAcumuladaView.as_view(), name='proyeccion-acumulada'),
     path('reporte/', ReporteView.as_view(), name='reporte'),

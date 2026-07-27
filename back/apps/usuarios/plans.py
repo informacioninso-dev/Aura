@@ -17,6 +17,7 @@ FEATURE_BULK_DELETE_MAX = 'bulk_delete_max'
 FEATURE_PROJECTION_MONTHS = 'projection_months'
 FEATURE_ADVANCED_PROJECTION_ENABLED = 'advanced_projection_enabled'
 FEATURE_ADVANCED_PROJECTION_MONTHS = 'advanced_projection_months'
+FEATURE_HEALTH_SCORE_ENABLED = 'health_score_enabled'
 
 FEATURE_CATALOG = {
     FEATURE_IMPORT_MAX_ROWS: {
@@ -54,6 +55,13 @@ FEATURE_CATALOG = {
         'is_highlighted': True,
         'is_active': True,
     },
+    FEATURE_HEALTH_SCORE_ENABLED: {
+        'name': 'Score de salud financiera',
+        'description': 'Habilita el score de salud financiera (tipo banca) con su detalle y consejos.',
+        'value_type': 'bool',
+        'is_highlighted': True,
+        'is_active': True,
+    },
 }
 
 FEATURE_DEFAULTS = {
@@ -62,6 +70,7 @@ FEATURE_DEFAULTS = {
     FEATURE_PROJECTION_MONTHS: 6,
     FEATURE_ADVANCED_PROJECTION_ENABLED: False,
     FEATURE_ADVANCED_PROJECTION_MONTHS: 120,
+    FEATURE_HEALTH_SCORE_ENABLED: False,
 }
 
 VALID_PROJECTION_MODES = {

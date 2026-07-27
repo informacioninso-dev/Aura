@@ -2010,6 +2010,37 @@ class TestGastosVariables(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['tipo_monto'], 'variable')
 
+    def test_se_puede_crear_variable_sin_estimado(self):
+        # Un rubro se crea solo con nombre y categoria: el estimado (monto=0)
+        # se aprende del historial, sin que el usuario tenga que calcularlo.
+        response = self.client.post('/api/finanzas/gastos-corrientes/', {
+            'descripcion': 'Farmacia',
+            'categoria': 'salud',
+            'monto': 0,
+            'tipo_monto': 'variable',
+            'frecuencia': 'mensual',
+            'fecha_inicio': '2026-01-01',
+            'activo': True,
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Decimal(response.data['monto']), Decimal('0.00'))
+
+    def test_un_gasto_fijo_no_se_puede_crear_sin_monto(self):
+        # Los fijos siguen exigiendo un monto mayor que 0.
+        response = self.client.post('/api/finanzas/gastos-corrientes/', {
+            'descripcion': 'Arriendo',
+            'categoria': 'servicios',
+            'monto': 0,
+            'tipo_monto': 'fijo',
+            'frecuencia': 'mensual',
+            'fecha_inicio': '2026-01-01',
+            'activo': True,
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('monto', response.data)
+
     def test_filtro_por_tipo_monto(self):
         self._crear_variable()
         GastoCorriente.objects.create(
@@ -2125,6 +2156,40 @@ class TestGastosVariables(APITestCase):
             _monto_base_gasto_mes(gasto.id, gasto.monto, gasto.tipo_monto,
                                   datetime.date(2026, 2, 1), ejecuciones),
             Decimal('30.00'),
+        )
+
+    def test_promedio_ponderado_da_mas_peso_a_los_ultimos_tres(self):
+        gasto = self._crear_variable(monto='0.00')
+        # 3 meses viejos en 30 y 3 meses recientes en 90.
+        for mes, monto in [(1, '30'), (2, '30'), (3, '30'),
+                           (4, '90'), (5, '90'), (6, '90')]:
+            GastoCorrienteEjecucion.objects.create(
+                gasto=gasto, anio=2026, mes=mes, monto_real=Decimal(monto),
+            )
+        ejecuciones = mapa_ejecuciones_variables(self.user)
+
+        # Julio: (30*1*3 + 90*2*3) / (3*1 + 3*2) = 630 / 9 = 70.00
+        self.assertEqual(
+            _monto_base_gasto_mes(gasto.id, gasto.monto, gasto.tipo_monto,
+                                  datetime.date(2026, 7, 1), ejecuciones),
+            Decimal('70.00'),
+        )
+
+    def test_promedio_ponderado_solo_mira_los_ultimos_seis_meses(self):
+        gasto = self._crear_variable(monto='0.00')
+        # 7 meses: enero (muy alto) queda fuera de la ventana de 6.
+        for mes, monto in [(1, '999'), (2, '60'), (3, '60'), (4, '60'),
+                           (5, '60'), (6, '60'), (7, '60')]:
+            GastoCorrienteEjecucion.objects.create(
+                gasto=gasto, anio=2026, mes=mes, monto_real=Decimal(monto),
+            )
+        ejecuciones = mapa_ejecuciones_variables(self.user)
+
+        # Agosto: ventana feb..jul, todos en 60 -> 60.00 (enero excluido).
+        self.assertEqual(
+            _monto_base_gasto_mes(gasto.id, gasto.monto, gasto.tipo_monto,
+                                  datetime.date(2026, 8, 1), ejecuciones),
+            Decimal('60.00'),
         )
 
     def test_un_gasto_fijo_ignora_las_ejecuciones(self):
@@ -3376,3 +3441,73 @@ class TestConsumosVariables(APITestCase):
         r = self.client.delete(f'/api/finanzas/gastos-corrientes/{g2.id}/ejecuciones/{c.id}/')
         self.assertIn(r.status_code, (status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND))
         self.assertTrue(GastoCorrienteEjecucion.objects.filter(pk=c.id).exists())
+
+
+class TestSaludFinanciera(APITestCase):
+    """Score de salud financiera (tipo banca), solo para plan pro."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            email='salud@example.com', username='usuario_salud', password='clave12345',
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def _hacer_pro(self):
+        plan_pro = Plan.objects.get(slug='pro')
+        assign_plan_to_user(user=self.user, plan=plan_pro, assigned_by=None, notes='Salud test')
+
+    def _ingreso(self, monto):
+        Ingreso.objects.create(
+            usuario=self.user, descripcion='Sueldo', monto=Decimal(monto),
+            frecuencia='mensual', fecha_inicio='2026-01-01', activo=True,
+        )
+
+    def test_plan_free_no_puede_ver_el_score(self):
+        r = self.client.get('/api/finanzas/salud-financiera/?anio=2026&mes=7')
+        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_plan_pro_ve_el_score(self):
+        self._hacer_pro()
+        self._ingreso('1000.00')
+        r = self.client.get('/api/finanzas/salud-financiera/?anio=2026&mes=7')
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertTrue(r.data['disponible'])
+        self.assertGreaterEqual(r.data['score'], 0)
+        self.assertLessEqual(r.data['score'], 100)
+        self.assertEqual(len(r.data['componentes']), 5)
+        self.assertIn('banda', r.data)
+
+    def test_sin_ingresos_no_hay_score(self):
+        self._hacer_pro()
+        r = self.client.get('/api/finanzas/salud-financiera/?anio=2026&mes=7')
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertFalse(r.data['disponible'])
+
+    def test_deuda_alta_baja_la_capacidad_de_pago(self):
+        from .salud import calcular_salud_financiera
+        self._hacer_pro()
+        self._ingreso('1000.00')
+        # Una cuota que se come el 50% del ingreso -> capacidad de pago en el suelo.
+        Diferido.objects.create(
+            usuario=self.user, descripcion='TV a cuotas', monto_total=Decimal('6000'),
+            num_cuotas=12, cuota_mensual=Decimal('500'),
+            fecha_inicio='2026-01-01', fecha_fin='2026-12-31', activo=True,
+        )
+        data = calcular_salud_financiera(self.user, 2026, 7)
+        cap = next(c for c in data['componentes'] if c['clave'] == 'capacidad_pago')
+        self.assertEqual(cap['puntaje'], 0)
+        self.assertTrue(any(c['clave'] == 'capacidad_pago' for c in data['consejos']))
+
+    def test_buen_perfil_da_score_alto(self):
+        from .salud import calcular_salud_financiera
+        self._hacer_pro()
+        self._ingreso('1000.00')
+        # Gasto fijo bajo, sin deudas, buen colchon acumulado.
+        GastoCorriente.objects.create(
+            usuario=self.user, descripcion='Arriendo', monto=Decimal('200'),
+            tipo_monto='fijo', frecuencia='mensual', fecha_inicio='2026-01-01', activo=True,
+        )
+        SaldoMes.objects.create(usuario=self.user, anio=2026, mes=6, monto=Decimal('5000'), activo=True)
+        data = calcular_salud_financiera(self.user, 2026, 7)
+        self.assertGreaterEqual(data['score'], 70)
