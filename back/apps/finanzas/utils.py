@@ -27,6 +27,14 @@ CONSERVATIVE_PUNCTUAL_HISTORY_MONTHS = 12
 # cuando el mes consultado todavia no tiene monto real cargado.
 MESES_PROMEDIO_VARIABLE = 3
 
+# Ventana y pesos del promedio ponderado de un gasto variable: se miran los
+# ultimos 6 meses con registro y los 3 mas recientes pesan el doble, para que
+# el estimado siga el gasto reciente sin que el usuario tenga que calcular nada.
+MESES_VENTANA_VARIABLE = 6
+MESES_PESO_FUERTE = 3
+PESO_RECIENTE = 2
+PESO_ANTIGUO = 1
+
 FREQ_FACTOR = {
     'diario': 30,
     'semanal': Decimal('4.33'),
@@ -528,12 +536,32 @@ def _monto_base_gasto_mes(gasto_id, monto_estimado, tipo_monto, month_start, eje
     if clave in reales:
         return reales[clave]
 
-    previos = sorted(periodo for periodo in reales if periodo < clave)
-    if previos:
-        ultimos = [reales[periodo] for periodo in previos[-MESES_PROMEDIO_VARIABLE:]]
-        return (sum(ultimos) / Decimal(len(ultimos))).quantize(Decimal('0.01'))
+    ponderado = _promedio_ponderado_variable(reales, clave)
+    if ponderado is not None:
+        return ponderado
 
     return monto_estimado
+
+
+def _promedio_ponderado_variable(reales, clave):
+    """
+    Promedio de los ultimos MESES_VENTANA_VARIABLE meses con registro anteriores
+    a `clave`, dando doble peso a los MESES_PESO_FUERTE mas recientes.
+    Devuelve None si no hay meses previos con registro.
+    """
+    previos = sorted(periodo for periodo in reales if periodo < clave)
+    if not previos:
+        return None
+
+    ventana = previos[-MESES_VENTANA_VARIABLE:]
+    n = len(ventana)
+    total = Decimal('0')
+    pesos = 0
+    for i, periodo in enumerate(ventana):
+        peso = PESO_RECIENTE if i >= n - MESES_PESO_FUERTE else PESO_ANTIGUO
+        total += reales[periodo] * peso
+        pesos += peso
+    return (total / Decimal(pesos)).quantize(Decimal('0.01'))
 
 
 def _monto_variable_proyectado_inteligente(gasto_id, monto_estimado, reference_month, ejecuciones):

@@ -18,6 +18,7 @@ from .models import (
     IngresoPuntual,
     Notificacion,
     SaldoMes,
+    TIPO_MONTO_VARIABLE,
 )
 
 
@@ -172,11 +173,15 @@ class IngresoPuntualSerializer(ProjectionEligibilitySerializerMixin, serializers
 class GastoCorrienteSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         monto        = attrs.get('monto',        getattr(self.instance, 'monto',        None))
+        tipo_monto   = attrs.get('tipo_monto',   getattr(self.instance, 'tipo_monto',   None))
         fecha_inicio = attrs.get('fecha_inicio', getattr(self.instance, 'fecha_inicio', None))
         fecha_fin    = attrs.get('fecha_fin',    getattr(self.instance, 'fecha_fin',    None))
 
         errors = {}
-        if monto is not None and monto <= 0:
+        # Un gasto variable (rubro) puede crearse sin estimado: el sistema lo
+        # aprende del historial. Los fijos si exigen un monto mayor que 0.
+        es_variable = tipo_monto == TIPO_MONTO_VARIABLE
+        if monto is not None and monto <= 0 and not es_variable:
             errors['monto'] = 'El monto debe ser mayor que 0.'
         validate_reasonable_date(errors, 'fecha_inicio', fecha_inicio, label='inicio')
         validate_reasonable_date(errors, 'fecha_fin', fecha_fin, label='fin')
