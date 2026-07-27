@@ -371,7 +371,7 @@ class GastoCorrienteViewSet(BaseFinanzasViewSet):
 
         nuevos = [
             GastoCorrienteEjecucion(
-                gasto=g, anio=anio, mes=mes,
+                gasto=g, anio=anio, mes=mes, fecha=month_start, descripcion='Estimado del mes',
                 monto_real=_monto_base_gasto_mes(g.id, g.monto, TIPO_MONTO_VARIABLE, month_start, ejec_map),
             )
             for g in variables if g.id not in ya_registrados
@@ -388,35 +388,50 @@ class GastoCorrienteViewSet(BaseFinanzasViewSet):
 
     @action(detail=True, methods=['get', 'post'], url_path='ejecuciones')
     def ejecuciones(self, request, pk=None):
-        """Lista o registra el monto realmente pagado de un gasto variable en un mes."""
+        """Lista o añade un consumo de un gasto variable. Varios por mes; el
+        total del mes es la suma. Filtra por ?anio=&mes= en el GET."""
         gasto = self.get_object()
 
         if request.method == 'GET':
-            return Response(
-                GastoCorrienteEjecucionSerializer(gasto.ejecuciones.all(), many=True).data
-            )
+            qs = gasto.ejecuciones.all()
+            try:
+                anio, mes = _parse_anio_mes(request.query_params.get('anio'), request.query_params.get('mes'))
+                qs = qs.filter(anio=anio, mes=mes)
+            except ValueError:
+                pass  # sin filtro: devuelve todos
+            return Response(GastoCorrienteEjecucionSerializer(qs, many=True).data)
 
         if gasto.tipo_monto != TIPO_MONTO_VARIABLE:
             return Response(
-                {'detail': 'Solo los gastos variables aceptan montos reales.'},
+                {'detail': 'Solo los gastos variables aceptan consumos.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         serializer = GastoCorrienteEjecucionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        datos = serializer.validated_data
-
-        # Upsert: recargar el mismo mes reemplaza el valor anterior.
-        ejecucion, creada = GastoCorrienteEjecucion.objects.update_or_create(
-            gasto=gasto,
-            anio=datos['anio'],
-            mes=datos['mes'],
-            defaults={'monto_real': datos['monto_real']},
-        )
+        consumo = serializer.save(gasto=gasto)
         return Response(
-            GastoCorrienteEjecucionSerializer(ejecucion).data,
-            status=status.HTTP_201_CREATED if creada else status.HTTP_200_OK,
+            GastoCorrienteEjecucionSerializer(consumo).data,
+            status=status.HTTP_201_CREATED,
         )
+
+    @action(detail=True, methods=['patch', 'delete'], url_path='ejecuciones/(?P<consumo_id>[0-9]+)')
+    def consumo(self, request, pk=None, consumo_id=None):
+        """Edita o borra un consumo individual de un gasto variable."""
+        gasto = self.get_object()
+        try:
+            consumo = gasto.ejecuciones.get(pk=consumo_id)
+        except GastoCorrienteEjecucion.DoesNotExist:
+            return Response({'detail': 'Consumo no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.method == 'DELETE':
+            consumo.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        serializer = GastoCorrienteEjecucionSerializer(consumo, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
     def convertir_a_puntual(self, request, pk=None):
@@ -525,7 +540,11 @@ class GastoNoCorrienteViewSet(BaseFinanzasViewSet):
             )
             if destino == TIPO_MONTO_VARIABLE:
                 GastoCorrienteEjecucion.objects.bulk_create([
-                    GastoCorrienteEjecucion(gasto=gasto, anio=anio, mes=mes, monto_real=monto)
+                    GastoCorrienteEjecucion(
+                        gasto=gasto, anio=anio, mes=mes,
+                        fecha=datetime.date(anio, mes, 1), descripcion='Historial',
+                        monto_real=monto,
+                    )
                     for (anio, mes), monto in por_mes.items()
                 ])
             GastoNoCorriente.objects.filter(id__in=[item.id for item in puntuales]).delete()
@@ -576,6 +595,8 @@ class GastoNoCorrienteViewSet(BaseFinanzasViewSet):
                     gasto=recurrente,
                     anio=fecha_original.year,
                     mes=fecha_original.month,
+                    fecha=fecha_original,
+                    descripcion=gasto.descripcion,
                     monto_real=monto_original,
                 )
             gasto.delete()
