@@ -5220,6 +5220,13 @@
 }
 .salud-consejo { font-size: 13px; color: var(--app-text); margin: 4px 0; line-height: 1.4; }
 
+@media (max-width: 480px) {
+  .salud-card { flex-wrap: wrap; gap: 12px 14px; padding: 14px 16px; }
+  .salud-card-detalle { width: 100%; text-align: center; }
+  .salud-detalle-head { gap: 12px; }
+  .salud-ring-num { font-size: 24px; }
+}
+
 .app-theme-root[data-theme='light'] .stat-sub,
 .app-theme-root[data-theme='light'] .dashboard-health-hint,
 .app-theme-root[data-theme='light'] .dashboard-chart-note {
