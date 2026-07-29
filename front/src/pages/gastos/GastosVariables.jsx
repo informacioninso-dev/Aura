@@ -478,14 +478,16 @@ export default function GastosVariables({ autoNew = false }) {
                   </div>
                 </div>
               )}
-              <div className="table-wrap var-table-wrap" style={{ border: 'none', borderRadius: 20 }}>
-                <table className="table">
+              <div className="table-wrap" style={{ border: 'none', borderRadius: 20 }}>
+                <table className="table table-variables">
                   <thead>
                     <tr>
                       <th style={{ width: 36, paddingRight: 0 }}>
                         <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAll} style={{ cursor: 'pointer', accentColor: 'var(--app-lila)' }} />
                       </th>
-                      {['Gasto', 'Categoria', 'Este mes', 'Accion'].map((header) => <th key={header}>{header}</th>)}
+                      {['Gasto', 'Categoria', 'Este mes', 'Accion'].map((header) => (
+                        <th key={header} className={header === 'Categoria' ? 'col-cat' : undefined}>{header}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -495,7 +497,7 @@ export default function GastosVariables({ autoNew = false }) {
                           <input type="checkbox" checked={selectedIds.has(fila.id)} onChange={() => toggleSelect(fila.id)} style={{ cursor: 'pointer', accentColor: 'var(--app-lila)' }} />
                         </td>
                         <td style={{ fontWeight: 600 }}>{fila.descripcion}</td>
-                        <td><span className="badge badge-gray" style={{ textTransform: 'capitalize' }}>{fila.categoria}</span></td>
+                        <td className="col-cat"><span className="badge badge-gray" style={{ textTransform: 'capitalize' }}>{fila.categoria}</span></td>
                         <td>
                           {fila.real != null ? (
                             <span className="table-amount negative">${formatAmount(parseFloat(fila.real))}</span>
@@ -508,11 +510,12 @@ export default function GastosVariables({ autoNew = false }) {
                         <td className="table-actions-cell">
                           <div className="table-actions-row">
                             <button
-                              className="btn-modal-convert"
-                              style={{ minWidth: 0, padding: '7px 12px', fontSize: 12 }}
+                              className="btn-modal-convert var-accion-btn"
                               onClick={() => openRubro(fila)}
+                              title={fila.consumos > 0 ? 'Ver / Añadir compra' : 'Añadir compra'}
                             >
-                              {fila.consumos > 0 ? 'Ver / Añadir' : 'Añadir'}
+                              <Plus size={16} className="var-accion-icon" />
+                              <span className="var-accion-text">{fila.consumos > 0 ? 'Ver / Añadir' : 'Añadir'}</span>
                             </button>
                             <button className="btn-icon edit" title="Editar gasto" onClick={() => openEdit(fila)}><Pencil size={15} /></button>
                             <button className="btn-icon danger" title="Eliminar" onClick={() => setConfirmDeleteId(fila.id)}><Trash2 size={15} /></button>
@@ -522,42 +525,6 @@ export default function GastosVariables({ autoNew = false }) {
                     ))}
                   </tbody>
                 </table>
-              </div>
-
-              {/* Vista de tarjetas para movil (la tabla se oculta por CSS) */}
-              <div className="var-cards">
-                {paginatedRows.map((fila) => (
-                  <div key={fila.id} className={`var-card ${selectedIds.has(fila.id) ? 'is-selected' : ''}`}>
-                    <div className="var-card-top">
-                      <input
-                        type="checkbox" checked={selectedIds.has(fila.id)}
-                        onChange={() => toggleSelect(fila.id)}
-                        style={{ cursor: 'pointer', accentColor: 'var(--app-lila)' }}
-                      />
-                      <span className="var-card-name">{fila.descripcion}</span>
-                      <span className="badge badge-gray" style={{ textTransform: 'capitalize' }}>{fila.categoria}</span>
-                    </div>
-                    <div className="var-card-bottom">
-                      <div className="var-card-monto">
-                        <span className="var-card-monto-label">Este mes</span>
-                        {fila.real != null ? (
-                          <span className="table-amount negative">${formatAmount(parseFloat(fila.real))}</span>
-                        ) : (
-                          <button type="button" className="rubro-pendiente-btn" onClick={() => openRubro(fila)}>
-                            Pendiente
-                          </button>
-                        )}
-                      </div>
-                      <div className="var-card-actions">
-                        <button className="btn-modal-convert" style={{ minWidth: 0, padding: '8px 14px', fontSize: 13 }} onClick={() => openRubro(fila)}>
-                          {fila.consumos > 0 ? 'Ver / Añadir' : 'Añadir'}
-                        </button>
-                        <button className="btn-icon edit" title="Editar gasto" onClick={() => openEdit(fila)}><Pencil size={15} /></button>
-                        <button className="btn-icon danger" title="Eliminar" onClick={() => setConfirmDeleteId(fila.id)}><Trash2 size={15} /></button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
               </div>
               </>
             )}
