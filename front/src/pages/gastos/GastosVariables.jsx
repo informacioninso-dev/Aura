@@ -478,7 +478,7 @@ export default function GastosVariables({ autoNew = false }) {
                   </div>
                 </div>
               )}
-              <div className="table-wrap" style={{ border: 'none', borderRadius: 20 }}>
+              <div className="table-wrap var-table-wrap" style={{ border: 'none', borderRadius: 20 }}>
                 <table className="table">
                   <thead>
                     <tr>
@@ -522,6 +522,42 @@ export default function GastosVariables({ autoNew = false }) {
                     ))}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Vista de tarjetas para movil (la tabla se oculta por CSS) */}
+              <div className="var-cards">
+                {paginatedRows.map((fila) => (
+                  <div key={fila.id} className={`var-card ${selectedIds.has(fila.id) ? 'is-selected' : ''}`}>
+                    <div className="var-card-top">
+                      <input
+                        type="checkbox" checked={selectedIds.has(fila.id)}
+                        onChange={() => toggleSelect(fila.id)}
+                        style={{ cursor: 'pointer', accentColor: 'var(--app-lila)' }}
+                      />
+                      <span className="var-card-name">{fila.descripcion}</span>
+                      <span className="badge badge-gray" style={{ textTransform: 'capitalize' }}>{fila.categoria}</span>
+                    </div>
+                    <div className="var-card-bottom">
+                      <div className="var-card-monto">
+                        <span className="var-card-monto-label">Este mes</span>
+                        {fila.real != null ? (
+                          <span className="table-amount negative">${formatAmount(parseFloat(fila.real))}</span>
+                        ) : (
+                          <button type="button" className="rubro-pendiente-btn" onClick={() => openRubro(fila)}>
+                            Pendiente
+                          </button>
+                        )}
+                      </div>
+                      <div className="var-card-actions">
+                        <button className="btn-modal-convert" style={{ minWidth: 0, padding: '8px 14px', fontSize: 13 }} onClick={() => openRubro(fila)}>
+                          {fila.consumos > 0 ? 'Ver / Añadir' : 'Añadir'}
+                        </button>
+                        <button className="btn-icon edit" title="Editar gasto" onClick={() => openEdit(fila)}><Pencil size={15} /></button>
+                        <button className="btn-icon danger" title="Eliminar" onClick={() => setConfirmDeleteId(fila.id)}><Trash2 size={15} /></button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
               </>
             )}

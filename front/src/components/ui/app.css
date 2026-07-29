@@ -1793,6 +1793,57 @@
 }
 .rubro-pendiente-btn:hover { background: rgba(251,191,36,0.22); }
 
+/* Gastos variables: tarjetas en movil (la tabla se oculta) */
+.var-cards { display: none; }
+@media (max-width: 640px) {
+  .var-table-wrap { display: none; }
+  .var-cards { display: flex; flex-direction: column; }
+}
+.var-card {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(var(--app-ink-rgb),0.08);
+}
+.var-card.is-selected { background: rgba(196,135,246,0.08); }
+.var-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.var-card-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--app-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.var-card-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+.var-card-monto {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.var-card-monto-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: rgba(var(--app-ink-rgb),0.45);
+}
+.var-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.var-card-actions .btn-modal-convert { flex: 1; }
+
 /* Sugerencia aprendida del historial dentro del modal del rubro */
 .rubro-sugerido {
   display: flex;
