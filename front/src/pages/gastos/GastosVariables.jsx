@@ -360,6 +360,26 @@ export default function GastosVariables({ autoNew = false }) {
     }
   }
 
+  async function handleMarcarCero() {
+    if (savingConsumo || !rubro) return
+    setSavingConsumo(true)
+    setFeedback({ type: '', message: '' })
+    try {
+      await api.post(`/finanzas/gastos-corrientes/${rubro.id}/ejecuciones/`, {
+        fecha: hoyDelMes(),
+        descripcion: 'Sin gasto este mes',
+        monto_real: 0,
+      })
+      await fetchResumen()
+      setRubro(null)
+      setFeedback({ type: 'success', message: `${rubro.descripcion}: marcado sin gasto este mes.` })
+    } catch (err) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo marcar.') })
+    } finally {
+      setSavingConsumo(false)
+    }
+  }
+
   async function handleDeleteConsumo(id) {
     try {
       await api.delete(`/finanzas/gastos-corrientes/${rubro.id}/ejecuciones/${id}/`)
@@ -619,6 +639,12 @@ export default function GastosVariables({ autoNew = false }) {
                 {savingConsumo ? 'Guardando...' : '+ Anadir compra'}
               </button>
             </form>
+
+            {consumos.length === 0 && (
+              <button type="button" className="rubro-cero-btn" onClick={handleMarcarCero} disabled={savingConsumo}>
+                Este mes no gasté nada aquí — marcar $0
+              </button>
+            )}
 
             {/* Lista de consumos del mes */}
             <p className="rubro-list-title">Compras de este mes</p>

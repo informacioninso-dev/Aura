@@ -1771,6 +1771,27 @@
   cursor: pointer;
   white-space: nowrap;
 }
+
+/* Botón rápido "no gasté nada este mes" (marca el rubro en $0) */
+.rubro-cero-btn {
+  width: 100%;
+  margin: 10px 0 4px;
+  padding: 10px;
+  border-radius: 12px;
+  background: transparent;
+  border: 1px dashed rgba(var(--app-ink-rgb),0.25);
+  color: rgba(var(--app-ink-rgb),0.6);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.rubro-cero-btn:hover {
+  background: rgba(var(--app-ink-rgb),0.04);
+  border-color: rgba(var(--app-ink-rgb),0.4);
+}
+.rubro-cero-btn:disabled { opacity: 0.5; cursor: default; }
+
 .rubro-card {
   display: flex;
   flex-direction: column;
