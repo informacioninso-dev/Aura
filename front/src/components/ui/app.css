@@ -1848,25 +1848,46 @@
   white-space: nowrap;
 }
 
-/* Botón rápido "no gasté nada este mes" (marca el rubro en $0) */
-.rubro-cero-btn {
-  width: 100%;
-  margin: 10px 0 4px;
-  padding: 10px;
-  border-radius: 12px;
-  background: transparent;
-  border: 1px dashed rgba(var(--app-ink-rgb),0.25);
-  color: rgba(var(--app-ink-rgb),0.6);
+/* Bloque de 3 opciones del rubro: repetir el promedio, marcar $0, o poner el
+   valor real (el formulario de abajo). */
+.rubro-choice { margin: -2px 0 16px; }
+.rubro-choice-title {
+  display: block;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--app-text);
+  margin-bottom: 8px;
+}
+.rubro-choice-btns { display: flex; gap: 8px; }
+.rubro-choice-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 12px;
   cursor: pointer;
+  text-align: left;
+  border: 1px solid rgba(var(--app-ink-rgb),0.14);
+  background: rgba(var(--app-ink-rgb),0.04);
   transition: background 0.15s ease, border-color 0.15s ease;
 }
-.rubro-cero-btn:hover {
-  background: rgba(var(--app-ink-rgb),0.04);
-  border-color: rgba(var(--app-ink-rgb),0.4);
+.rubro-choice-btn:hover { background: rgba(var(--app-ink-rgb),0.07); }
+.rubro-choice-btn.is-repeat {
+  border-color: rgba(196,135,246,0.4);
+  background: rgba(196,135,246,0.08);
 }
-.rubro-cero-btn:disabled { opacity: 0.5; cursor: default; }
+.rubro-choice-btn.is-repeat:hover { background: rgba(196,135,246,0.14); }
+.rubro-choice-btn:disabled { opacity: 0.5; cursor: default; }
+.rubro-choice-btn-t { font-size: 13.5px; font-weight: 700; color: var(--app-text); }
+.rubro-choice-btn-s { font-size: 12px; color: rgba(var(--app-ink-rgb),0.55); }
+.rubro-choice-hint {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(var(--app-ink-rgb),0.45);
+}
 
 .rubro-card {
   display: flex;

@@ -380,6 +380,28 @@ export default function GastosVariables({ autoNew = false }) {
     }
   }
 
+  async function handleRepetirSugerido() {
+    if (savingConsumo || !rubro) return
+    const monto = parseFloat(rubro.sugerido)
+    if (!monto || monto <= 0) return
+    setSavingConsumo(true)
+    setFeedback({ type: '', message: '' })
+    try {
+      await api.post(`/finanzas/gastos-corrientes/${rubro.id}/ejecuciones/`, {
+        fecha: hoyDelMes(),
+        descripcion: 'Igual que el promedio',
+        monto_real: monto,
+      })
+      await fetchResumen()
+      setRubro(null)
+      setFeedback({ type: 'success', message: `${rubro.descripcion}: registrado $${formatAmount(monto)} este mes.` })
+    } catch (err) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo registrar.') })
+    } finally {
+      setSavingConsumo(false)
+    }
+  }
+
   async function handleDeleteConsumo(id) {
     try {
       await api.delete(`/finanzas/gastos-corrientes/${rubro.id}/ejecuciones/${id}/`)
@@ -603,23 +625,28 @@ export default function GastosVariables({ autoNew = false }) {
               </div>
             </div>
 
-            {/* Sugerencia aprendida del historial (ultimos 6 meses, mas peso a los 3 recientes) */}
-            {parseFloat(rubro.sugerido) > 0 && (
-              <div className="rubro-sugerido">
-                <span>Sueles gastar cerca de <strong>${formatAmount(parseFloat(rubro.sugerido))}</strong> aqui.</span>
-                {consumos.length === 0 && (
-                  <button
-                    type="button"
-                    className="rubro-sugerido-btn"
-                    onClick={() => setConsumoForm((prev) => ({ ...prev, monto: String(parseFloat(rubro.sugerido)) }))}
-                  >
-                    Usar ese valor
+            {/* Resuelve el mes rapido: repetir el promedio, marcar $0, o poner el
+                valor real (el formulario de abajo). */}
+            {consumos.length === 0 && (
+              <div className="rubro-choice">
+                <span className="rubro-choice-title">¿Qué pasó este mes?</span>
+                <div className="rubro-choice-btns">
+                  {parseFloat(rubro.sugerido) > 0 && (
+                    <button type="button" className="rubro-choice-btn is-repeat" onClick={handleRepetirSugerido} disabled={savingConsumo}>
+                      <span className="rubro-choice-btn-t">Igual que siempre</span>
+                      <span className="rubro-choice-btn-s">~${formatAmount(parseFloat(rubro.sugerido))}</span>
+                    </button>
+                  )}
+                  <button type="button" className="rubro-choice-btn is-zero" onClick={handleMarcarCero} disabled={savingConsumo}>
+                    <span className="rubro-choice-btn-t">No gasté nada</span>
+                    <span className="rubro-choice-btn-s">$0</span>
                   </button>
-                )}
+                </div>
+                <span className="rubro-choice-hint">…o anota abajo el valor exacto o tus compras.</span>
               </div>
             )}
 
-            {/* Anadir una compra */}
+            {/* Anadir una compra (el valor real) */}
             <form onSubmit={handleAddConsumo} className="rubro-add-form">
               <div className="form-modal-row">
                 <div className="form-modal-group" style={{ flex: '1 1 120px' }}>
@@ -642,12 +669,6 @@ export default function GastosVariables({ autoNew = false }) {
                 {savingConsumo ? 'Guardando...' : '+ Anadir compra'}
               </button>
             </form>
-
-            {consumos.length === 0 && (
-              <button type="button" className="rubro-cero-btn" onClick={handleMarcarCero} disabled={savingConsumo}>
-                Este mes no gasté nada aquí — marcar $0
-              </button>
-            )}
 
             {/* Lista de consumos del mes */}
             <p className="rubro-list-title">Compras de este mes</p>
