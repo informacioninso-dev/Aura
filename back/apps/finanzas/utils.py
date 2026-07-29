@@ -1179,6 +1179,22 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
             )
         return total
 
+    def _gastos_variables_mes(month_start, month_end):
+        """Solo los gastos variables del mes, con el monto que usa la proyeccion
+        (ponderado en automatica/conservadora; estimado en simple)."""
+        total = Decimal('0.00')
+        for item in gastos_corrientes:
+            if item.tipo_monto != TIPO_MONTO_VARIABLE:
+                continue
+            if item.fecha_inicio > month_end or (item.fecha_fin is not None and item.fecha_fin < month_start):
+                continue
+            if projection_mode in {PROJECTION_MODE_AUTOMATICA, PROJECTION_MODE_CONSERVADORA}:
+                base_amount = intelligent_variable_amounts.get(item.id, _money(item.monto))
+            else:
+                base_amount = item.monto
+            total += _monto_efectivo_mes(base_amount, item.frecuencia, item.fecha_inicio, month_start)
+        return total
+
     def _cuotas_mes(month_start, month_end):
         return sum(
             (_money(item.cuota_mensual)
@@ -1284,10 +1300,16 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
             'is_real': False,
         })
 
+    # Estimado de gastos variables por mes (representativo: primer mes proyectado).
+    variable_monthly_estimate = _gastos_variables_mes(
+        next_month, _ultimo_dia_mes(next_month.year, next_month.month),
+    ).quantize(Decimal('0.01'))
+
     return {
         'months': months,
         'history_months_used': history_months_used,
         'starting_balance': float(_money(starting_balance)),
+        'variable_monthly_estimate': float(variable_monthly_estimate),
         'smoothed_variable_ingresos': float(smoothed_variable_ingresos),
         'smoothed_variable_gastos': float(smoothed_variable_gastos),
         'smoothed_variable_gap': float(smoothed_variable_gap),

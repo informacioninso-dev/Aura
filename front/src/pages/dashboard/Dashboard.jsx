@@ -1323,6 +1323,7 @@ export default function Dashboard() {
             const variableHistoryObservations = advancedProjection?.variable_history_observations ?? 0
             const variableHistoryCap = advancedProjection?.variable_history_cap_months ?? 18
             const punctualReserve = advancedProjection?.smoothed_variable_gastos ?? 0
+            const variableMonthlyEstimate = advancedProjection?.variable_monthly_estimate ?? 0
             const punctualTotal = advancedProjection?.conservative_punctual_total ?? 0
             const punctualHistoryMonths = advancedProjection?.conservative_punctual_history_months ?? 12
             const isSimpleMode = projectionMode === 'simple'
@@ -1362,14 +1363,18 @@ export default function Dashboard() {
                   </span>
                 </div>
                 <div className="dashboard-premium-stat">
-                  <span className="dashboard-premium-stat-label">Reserva por puntuales</span>
-                  <strong className="dashboard-premium-stat-value" style={{ color: isConservativeMode ? 'var(--app-danger)' : undefined }}>
-                    {isConservativeMode ? fmt(punctualReserve) : 'No incluida'}
+                  <span className="dashboard-premium-stat-label">
+                    {isConservativeMode ? 'Reserva por puntuales' : 'Gastos variables / mes'}
+                  </span>
+                  <strong className="dashboard-premium-stat-value" style={{ color: isConservativeMode ? 'var(--app-danger)' : 'var(--app-danger)' }}>
+                    {isConservativeMode ? fmt(punctualReserve) : fmt(variableMonthlyEstimate)}
                   </strong>
                   <span className="dashboard-chart-note">
                     {isConservativeMode
                       ? `${fmt(punctualTotal)} seleccionados / ${punctualHistoryMonths} meses`
-                      : 'Disponible al usar el modo Conservadora'}
+                      : isSimpleMode
+                        ? 'Con tus estimados registrados'
+                        : 'Estimado del historial (ponderado)'}
                   </span>
                 </div>
               </div>
