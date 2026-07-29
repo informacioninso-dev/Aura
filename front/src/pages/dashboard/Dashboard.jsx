@@ -425,7 +425,11 @@ export default function Dashboard() {
     [data.ingresosPuntuales, selectedMonth],
   )
   const fixedExpensesThisMonth = useMemo(
-    () => data.gastosCorrientes.filter((item) => overlapsMonth(item, selectedMonth)),
+    () => data.gastosCorrientes.filter((item) => (item.tipo_monto || 'fijo') !== 'variable' && overlapsMonth(item, selectedMonth)),
+    [data.gastosCorrientes, selectedMonth],
+  )
+  const variableExpensesThisMonth = useMemo(
+    () => data.gastosCorrientes.filter((item) => item.tipo_monto === 'variable' && overlapsMonth(item, selectedMonth)),
     [data.gastosCorrientes, selectedMonth],
   )
   const punctualExpensesThisMonth = useMemo(
@@ -443,8 +447,11 @@ export default function Dashboard() {
     .reduce((sum, item) => sum + Number(item.monto), 0)
   const totalIng = totalIngFijos + totalIngPuntuales
 
-  const totalGC = fixedExpensesThisMonth
+  const totalGCFijos = fixedExpensesThisMonth
     .reduce((sum, item) => sum + mensualizado(item), 0)
+  const totalGCVariables = variableExpensesThisMonth
+    .reduce((sum, item) => sum + mensualizado(item), 0)
+  const totalGC = totalGCFijos + totalGCVariables
   const totalGNC = punctualExpensesThisMonth
     .reduce((sum, item) => sum + Number(item.monto), 0)
   const totalDif = installmentsThisMonth
@@ -497,12 +504,26 @@ export default function Dashboard() {
       id: 'expense-fixed',
       title: 'Gastos fijos',
       tone: 'expense',
-      total: totalGC,
+      total: totalGCFijos,
       emptyLabel: `No tienes gastos fijos activos en ${monthReferenceText}.`,
       items: applySortDetail(fixedExpensesThisMonth.map((item) => ({
         id: `expense-fixed-${item.id}`,
         label: item.descripcion,
         meta: `${item.categoria || 'Sin categoria'} - ${getFrequencyLabel(item.frecuencia)}`,
+        amount: mensualizado(item),
+        date: item.fecha_inicio || '',
+      }))),
+    },
+    {
+      id: 'expense-variable',
+      title: 'Gastos variables',
+      tone: 'expense',
+      total: totalGCVariables,
+      emptyLabel: `No tienes gastos variables en ${monthReferenceText}.`,
+      items: applySortDetail(variableExpensesThisMonth.map((item) => ({
+        id: `expense-variable-${item.id}`,
+        label: item.descripcion,
+        meta: `${item.categoria || 'Sin categoria'} - variable`,
         amount: mensualizado(item),
         date: item.fecha_inicio || '',
       }))),
@@ -560,6 +581,18 @@ export default function Dashboard() {
       })
     })
 
+    variableExpensesThisMonth.forEach((item) => {
+      registerExpenseItem(item.categoria, {
+        id: `expense-variable-${item.id}`,
+        label: item.descripcion,
+        meta: 'Variable',
+        amount: mensualizado(item),
+        date: item.fecha_inicio || '',
+        kind: 'variable',
+        kindLabel: 'Variable',
+      })
+    })
+
     punctualExpensesThisMonth.forEach((item) => {
       registerExpenseItem(item.categoria, {
         id: `expense-punctual-${item.id}`,
@@ -590,7 +623,7 @@ export default function Dashboard() {
         items: applySortDetail(entry.items),
       }))
       .sort((a, b) => b.total - a.total)
-  }, [applySortDetail, fixedExpensesThisMonth, punctualExpensesThisMonth, installmentsThisMonth])
+  }, [applySortDetail, fixedExpensesThisMonth, variableExpensesThisMonth, punctualExpensesThisMonth, installmentsThisMonth])
 
   const activeExpenseCategory = useMemo(
     () => expenseCategoryBreakdown.find(({ cat }) => cat === selectedExpenseCategory) || null,
