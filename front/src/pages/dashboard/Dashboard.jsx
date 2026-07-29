@@ -162,6 +162,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [feedback, setFeedback] = useState({ type: '', message: '' })
+  const [ahorroInicial, setAhorroInicial] = useState('')
+  const [savingAhorro, setSavingAhorro] = useState(false)
   const [advancedProjection, setAdvancedProjection] = useState(null)
   const [projectionLoading, setProjectionLoading] = useState(false)
   const [projectionError, setProjectionError] = useState('')
@@ -387,6 +389,33 @@ export default function Dashboard() {
     maximumFractionDigits: 1,
   })
   const mensualizado = (item) => montoEfectivoMes(item.monto, item.frecuencia, item.fecha_inicio, selectedMonth.getFullYear(), selectedMonth.getMonth() + 1)
+
+  // Ahorro inicial: se guarda como un ingreso puntual "Ahorros iniciales" con
+  // fecha de hoy, para que el saldo/proyeccion/colchon arranquen con ese valor.
+  async function guardarAhorroInicial() {
+    const monto = parseFloat(ahorroInicial)
+    if (!monto || monto <= 0 || savingAhorro) return
+    setSavingAhorro(true)
+    setFeedback({ type: '', message: '' })
+    try {
+      const hoy = new Date()
+      const fecha = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
+      await api.post('/finanzas/ingresos-puntuales/', {
+        descripcion: 'Ahorros iniciales',
+        monto,
+        fecha,
+        notas: 'Saldo con el que empiezo a usar Aura',
+        incluir_en_proyeccion: true,
+      })
+      setAhorroInicial('')
+      setFeedback({ type: 'success', message: `Listo, empiezas con ${fmt(monto)} de saldo.` })
+      await loadDashboard(selectedMonth)
+    } catch (err) {
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo guardar tu ahorro inicial.') })
+    } finally {
+      setSavingAhorro(false)
+    }
+  }
   const realMonth = useMemo(() => startOfMonth(new Date()), [])
 
   useEffect(() => {
@@ -980,6 +1009,31 @@ export default function Dashboard() {
             <span className="dashboard-onboarding-point">La proyeccion ya puede darte una primera lectura</span>
             <span className="dashboard-onboarding-point">Lo demas lo completas despues, sin apuro</span>
           </div>
+
+          <div className="dashboard-onboarding-ahorro">
+            <label className="dashboard-onboarding-ahorro-label">¿Ya tienes ahorros? Empieza con tu saldo real</label>
+            <div className="dashboard-onboarding-ahorro-row">
+              <span className="dashboard-onboarding-ahorro-prefix">$</span>
+              <input
+                type="number" min="0" step="0.01" inputMode="decimal" placeholder="Ej: 500"
+                className="dashboard-onboarding-ahorro-input"
+                value={ahorroInicial}
+                onChange={(e) => setAhorroInicial(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') guardarAhorroInicial() }}
+              />
+              <button
+                type="button" className="btn-modal-save"
+                disabled={savingAhorro || !ahorroInicial}
+                onClick={guardarAhorroInicial}
+              >
+                {savingAhorro ? 'Guardando...' : 'Empezar con esto'}
+              </button>
+            </div>
+            <p className="dashboard-onboarding-ahorro-hint">
+              Suma todo lo que tengas ahorrado hoy. Lo guardamos como tu punto de partida para que tu proyeccion y tu colchon arranquen bien.
+            </p>
+          </div>
+
           <div className="dashboard-onboarding-actions">
             <Link to="/ingresos" className="btn-modal-save" style={{ textDecoration: 'none' }}>Cargar ingreso</Link>
             <Link to="/gastos-corrientes" className="btn-modal-cancel" style={{ textDecoration: 'none' }}>Cargar gasto</Link>
