@@ -171,6 +171,26 @@ class IngresoPuntualSerializer(ProjectionEligibilitySerializerMixin, serializers
 
 
 class GastoCorrienteSerializer(serializers.ModelSerializer):
+    monto_real_mes = serializers.SerializerMethodField()
+
+    def get_monto_real_mes(self, obj):
+        """
+        Consumo real del rubro variable en el mes consultado.
+
+        Solo se resuelve cuando la vista entrega `periodo` y `ejecuciones` en el
+        contexto. None significa "no hay dato real para ese mes": quien consume
+        debe caer al estimado, igual que hace _monto_base_gasto_mes en el backend.
+        """
+        if obj.tipo_monto != TIPO_MONTO_VARIABLE:
+            return None
+        periodo = self.context.get('periodo')
+        if not periodo:
+            return None
+        real = (self.context.get('ejecuciones') or {}).get(obj.id, {}).get(periodo)
+        if real is None:
+            return None
+        return str(round_money(Decimal(str(real))))
+
     def validate(self, attrs):
         monto        = attrs.get('monto',        getattr(self.instance, 'monto',        None))
         tipo_monto   = attrs.get('tipo_monto',   getattr(self.instance, 'tipo_monto',   None))

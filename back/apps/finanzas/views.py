@@ -149,6 +149,17 @@ class DashboardResumenView(APIView):
         except Exception:
             pass  # el aviso es secundario: nunca debe tumbar el dashboard.
 
+        # Los rubros variables se muestran con su consumo real del mes, no con el
+        # estimado: para un mes ya cerrado el dato real ya existe y es el que usan
+        # la proyeccion y el score. Sin consumos registrados el front cae al estimado.
+        from .utils import mapa_ejecuciones_variables
+        ejecuciones_variables = mapa_ejecuciones_variables(user)
+        gasto_context = {
+            'request': request,
+            'periodo': (year, month),
+            'ejecuciones': ejecuciones_variables,
+        }
+
         ingresos = Ingreso.objects.filter(
             usuario=user, activo=True, fecha_inicio__lte=month_end,
         ).filter(overlap)
@@ -198,7 +209,7 @@ class DashboardResumenView(APIView):
             'ingresos_puntuales': IngresoPuntualSerializer(
                 ingresos_puntuales, many=True, context={'request': request},
             ).data,
-            'gastos_corrientes': GastoCorrienteSerializer(gastos, many=True, context={'request': request}).data,
+            'gastos_corrientes': GastoCorrienteSerializer(gastos, many=True, context=gasto_context).data,
             'gastos_no_corrientes': GastoNoCorrienteSerializer(
                 gastos_puntuales, many=True, context={'request': request},
             ).data,
