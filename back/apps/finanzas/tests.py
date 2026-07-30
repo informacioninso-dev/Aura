@@ -30,7 +30,9 @@ from .utils import (
     calcular_balance_mes,
     calcular_proyeccion_acumulada,
     detectar_sugerencias,
+    invalidate_finanzas_cache,
     mapa_ejecuciones_variables,
+    recalcular_saldo_mes_para,
     resumen_variables_mes,
 )
 
@@ -893,6 +895,43 @@ class TestFinanzasAPI(APITestCase):
                 mes=previous_month.month,
             ).exists()
         )
+
+    def test_recalculo_con_mes_sucio_anterior_no_infla_el_saldo(self):
+        """Regresion: editar un movimiento viejo duplicaba los meses intermedios.
+
+        El saldo de arranque se leia del mes anterior a `desde`, pero el recorrido
+        podia empezar antes (en el mes marcado como sucio); esos meses se sumaban
+        dos veces y el acumulado quedaba inflado para siempre.
+        """
+        cache.clear()
+        primer_mes = add_months(first_day_of_month(local_today()), -6)
+        Ingreso.objects.create(
+            usuario=self.user_a,
+            descripcion='Sueldo',
+            monto=Decimal('1000.00'),
+            frecuencia='mensual',
+            fecha_inicio=primer_mes,
+            activo=True,
+        )
+        recalcular_saldo_mes_para(self.user_a, primer_mes)
+        esperados = {
+            (saldo.anio, saldo.mes): saldo.monto
+            for saldo in SaldoMes.objects.filter(usuario=self.user_a)
+        }
+        self.assertTrue(esperados)
+
+        # El usuario toca un movimiento de un mes pasado y despues se recalcula
+        # desde un mes posterior: el cursor retrocede al mes sucio, pero ese
+        # tramo ya esta incluido en el arrastre y no debe contarse otra vez.
+        mes_sucio = add_months(primer_mes, 2)
+        invalidate_finanzas_cache(self.user_a, mes_sucio)
+        recalcular_saldo_mes_para(self.user_a, add_months(mes_sucio, 2))
+
+        actuales = {
+            (saldo.anio, saldo.mes): saldo.monto
+            for saldo in SaldoMes.objects.filter(usuario=self.user_a)
+        }
+        self.assertEqual(actuales, esperados)
 
     def test_saldo_mes_arrastra_saldo_acumulado_y_expone_nombre(self):
         current_month = first_day_of_month(datetime.date.today())

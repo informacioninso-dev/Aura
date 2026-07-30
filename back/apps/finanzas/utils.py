@@ -909,21 +909,35 @@ def recalcular_saldo_mes_para(usuario, fecha_desde, fecha_hasta=None):
     hasta = min(fecha_hasta, hoy) if fecha_hasta else hoy
     desde_mes = _primer_dia_mes(fecha_desde)
     hasta_mes = _primer_dia_mes(hasta)
-    saldo_prev = SaldoMes.objects.filter(
-        usuario=usuario,
-    ).filter(
-        db_models.Q(anio__lt=desde_mes.year)
-        | db_models.Q(anio=desde_mes.year, mes__lt=desde_mes.month)
-    ).order_by('-anio', '-mes').first()
-    saldo_acumulado = _money(saldo_prev.monto if saldo_prev else Decimal('0.00'))
+    # El cursor puede arrancar antes de desde_mes: por un mes marcado como sucio
+    # o porque no hay saldo previo y hay que reconstruir desde el primer
+    # movimiento. Por eso se resuelve ANTES de leer el saldo de arranque: ese
+    # saldo tiene que ser el del mes anterior al cursor final. Tomarlo respecto a
+    # desde_mes mientras el cursor retrocede hace que los meses intermedios se
+    # sumen dos veces y el saldo acumulado quede inflado para siempre.
     cursor = desde_mes
-    if not saldo_prev:
-        primera_fecha = _primera_fecha_con_movimientos(usuario)
-        if primera_fecha:
-            cursor = min(desde_mes, _primer_dia_mes(primera_fecha))
     dirty_from = get_finanzas_dirty_from(user_id)
     if dirty_from and dirty_from <= hasta_mes:
         cursor = min(cursor, dirty_from)
+
+    def _saldo_al_cierre_anterior(mes):
+        return SaldoMes.objects.filter(
+            usuario=usuario,
+        ).filter(
+            db_models.Q(anio__lt=mes.year)
+            | db_models.Q(anio=mes.year, mes__lt=mes.month)
+        ).order_by('-anio', '-mes').first()
+
+    saldo_prev = _saldo_al_cierre_anterior(cursor)
+    if saldo_prev is None:
+        # Sin saldo anterior no hay arrastre que heredar: se reconstruye desde el
+        # primer movimiento del usuario, partiendo de cero.
+        primera_fecha = _primera_fecha_con_movimientos(usuario)
+        if primera_fecha:
+            cursor = min(cursor, _primer_dia_mes(primera_fecha))
+        saldo_acumulado = Decimal('0.00')
+    else:
+        saldo_acumulado = _money(saldo_prev.monto)
 
     monthly_net = _calcular_neto_mensual_en_rango(usuario, cursor, hasta_mes)
     existing_saldos = {
