@@ -1,14 +1,15 @@
 export const FRECUENCIAS = ['diario', 'semanal', 'quincenal', 'mensual', 'bimestral', 'trimestral', 'semestral', 'anual']
 
+// Cuantas veces cae en un mes promedio cada frecuencia (365.25 dias / 12 meses).
+// Debe quedar identico a FREQ_FACTOR en back/apps/finanzas/utils.py.
+//
+// bimestral/trimestral/semestral/anual NO van aqui: cobran el monto completo en
+// su mes de recurrencia y los resuelve PERIODO_MESES antes de llegar a esta tabla.
 export const FREQ_FACTOR = {
-  diario: 30,
-  semanal: 4.33,
+  diario: 30.44,
+  semanal: 4.348,
   quincenal: 2,
   mensual: 1,
-  bimestral: 0.5,
-  trimestral: 0.333,
-  semestral: 0.167,
-  anual: 0.083,
 }
 
 // Frecuencias que ocurren cada N meses con el monto completo (no prorrateado),

@@ -24,7 +24,10 @@ from .models import (
     SaldoMes,
 )
 from .utils import (
+    FREQ_FACTOR,
+    PERIODO_MESES,
     _monto_base_gasto_mes,
+    _monto_efectivo_mes,
     _monto_variable_proyectado_inteligente,
     parece_gasto_variable,
     calcular_balance_mes,
@@ -896,6 +899,37 @@ class TestFinanzasAPI(APITestCase):
                 mes=previous_month.month,
             ).exists()
         )
+
+    def test_semanal_y_diario_usan_el_promedio_exacto_de_un_mes(self):
+        inicio = datetime.date(2026, 1, 1)
+        # 365.25 dias / 7 / 12 = 4.348 semanas por mes
+        self.assertEqual(
+            _monto_efectivo_mes(Decimal('100.00'), 'semanal', inicio, inicio),
+            Decimal('434.800'),
+        )
+        # 365.25 / 12 = 30.44 dias por mes
+        self.assertEqual(
+            _monto_efectivo_mes(Decimal('10.00'), 'diario', inicio, inicio),
+            Decimal('304.400'),
+        )
+
+    def test_frecuencias_de_periodo_no_se_prorratean(self):
+        """bimestral/trimestral/semestral/anual cobran el monto completo en su mes
+        de recurrencia, asi que no deben estar en FREQ_FACTOR."""
+        inicio = datetime.date(2026, 1, 1)
+        for frecuencia in PERIODO_MESES:
+            with self.subTest(frecuencia=frecuencia):
+                self.assertNotIn(frecuencia, FREQ_FACTOR)
+                self.assertEqual(
+                    _monto_efectivo_mes(Decimal('120.00'), frecuencia, inicio, inicio),
+                    Decimal('120.00'),
+                )
+                self.assertEqual(
+                    _monto_efectivo_mes(
+                        Decimal('120.00'), frecuencia, inicio, add_months(inicio, 1),
+                    ),
+                    Decimal('0.00'),
+                )
 
     def test_las_cuotas_de_un_diferido_suman_el_monto_total(self):
         """La ultima cuota absorbe el residuo: 100 en 3 no puede dar 99.99."""

@@ -35,15 +35,19 @@ MESES_PESO_FUERTE = 3
 PESO_RECIENTE = 2
 PESO_ANTIGUO = 1
 
+# Cuantas veces cae en un mes promedio cada frecuencia. Se usan los promedios
+# exactos (365.25 dias / 12 meses) en vez de valores truncados: 'diario' con 30
+# perdia medio dia por mes y 'semanal' con 4.33 subestimaba un 0.4%.
+# Debe quedar identico a FREQ_FACTOR en front/src/utils/frecuencias.js.
+#
+# bimestral/trimestral/semestral/anual NO van aqui: esas frecuencias cobran el
+# monto completo en su mes de recurrencia y las resuelve PERIODO_MESES antes de
+# llegar a esta tabla.
 FREQ_FACTOR = {
-    'diario': 30,
-    'semanal': Decimal('4.33'),
+    'diario': Decimal('30.44'),
+    'semanal': Decimal('4.348'),
     'quincenal': 2,
     'mensual': 1,
-    'bimestral': Decimal('0.5'),
-    'trimestral': Decimal('0.333'),
-    'semestral': Decimal('0.167'),
-    'anual': Decimal('0.083'),
 }
 
 # Frecuencias que ocurren cada N meses con el monto completo (no prorrateado),
