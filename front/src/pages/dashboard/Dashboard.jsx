@@ -8,7 +8,7 @@ import FeedbackAlert from '../../components/ui/FeedbackAlert'
 import Modal from '../../components/ui/Modal'
 import SaludFinancieraCard from './SaludFinancieraCard'
 import { useAuth } from '../../context/useAuth'
-import { formatMoney } from '../../utils/formatters'
+import { formatMoney, formatNumber } from '../../utils/formatters'
 import { montoEfectivoMes } from '../../utils/frecuencias'
 import '../../components/ui/app.css'
 
@@ -120,7 +120,7 @@ function formatDetailShare(amount, total) {
   if (!Number.isFinite(safeAmount) || !Number.isFinite(safeTotal) || safeTotal <= 0) return null
 
   const percentage = (safeAmount / safeTotal) * 100
-  return `${new Intl.NumberFormat('es-EC', { maximumFractionDigits: 1 }).format(percentage)}%`
+  return `${formatNumber(percentage, { maximumFractionDigits: 1 })}%`
 }
 
 function clampProjectionWindow(startIndex, totalPoints, windowSize) {
@@ -488,7 +488,7 @@ export default function Dashboard() {
   const totalGNC = punctualExpensesThisMonth
     .reduce((sum, item) => sum + Number(item.monto), 0)
   const totalDif = installmentsThisMonth
-    .reduce((sum, item) => sum + Number(item.cuota_mensual), 0)
+    .reduce((sum, item) => sum + Number(item.cuota_mes ?? item.cuota_mensual), 0)
   const totalGastos = totalGC + totalGNC + totalDif
   const balance = totalIng - totalGastos
 
@@ -571,7 +571,7 @@ export default function Dashboard() {
         id: `expense-installment-${item.id}`,
         label: item.descripcion,
         meta: `${item.categoria || 'Sin categoria'} - cuota mensual`,
-        amount: Number(item.cuota_mensual),
+        amount: Number(item.cuota_mes ?? item.cuota_mensual),
         date: item.fecha_inicio || '',
       }))),
     },
@@ -643,7 +643,7 @@ export default function Dashboard() {
         id: `expense-installment-${item.id}`,
         label: item.descripcion,
         meta: 'Cuota mensual',
-        amount: Number(item.cuota_mensual),
+        amount: Number(item.cuota_mes ?? item.cuota_mensual),
         date: item.fecha_inicio || '',
         kind: 'installment',
         kindLabel: 'Cuota',

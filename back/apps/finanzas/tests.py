@@ -1,5 +1,5 @@
 import datetime
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -29,6 +29,7 @@ from .utils import (
     parece_gasto_variable,
     calcular_balance_mes,
     calcular_proyeccion_acumulada,
+    cuota_efectiva_mes,
     detectar_sugerencias,
     invalidate_finanzas_cache,
     mapa_ejecuciones_variables,
@@ -895,6 +896,38 @@ class TestFinanzasAPI(APITestCase):
                 mes=previous_month.month,
             ).exists()
         )
+
+    def test_las_cuotas_de_un_diferido_suman_el_monto_total(self):
+        """La ultima cuota absorbe el residuo: 100 en 3 no puede dar 99.99."""
+        casos = [
+            (Decimal('100.00'), 3),    # 33.33 x3 = 99.99 -> falta 1 centavo
+            (Decimal('1000.00'), 7),   # 142.86 x7 = 1000.02 -> sobran 2
+            (Decimal('50.00'), 4),     # exacto, no debe cambiar nada
+            (Decimal('0.05'), 3),      # residuo mayor que la cuota base
+        ]
+        for monto_total, num_cuotas in casos:
+            with self.subTest(monto_total=monto_total, num_cuotas=num_cuotas):
+                inicio = datetime.date(2026, 1, 1)
+                cuota_base = (monto_total / num_cuotas).quantize(
+                    Decimal('0.01'), rounding=ROUND_HALF_UP,
+                )
+                total = sum(
+                    (cuota_efectiva_mes(
+                        monto_total, cuota_base, num_cuotas, inicio,
+                        add_months(inicio, i),
+                     )
+                     for i in range(num_cuotas)),
+                    Decimal('0.00'),
+                )
+                self.assertEqual(total, monto_total)
+
+    def test_cuota_efectiva_solo_cambia_en_la_ultima(self):
+        inicio = datetime.date(2026, 1, 1)
+        cuotas = [
+            cuota_efectiva_mes(Decimal('100.00'), Decimal('33.33'), 3, inicio, add_months(inicio, i))
+            for i in range(3)
+        ]
+        self.assertEqual(cuotas, [Decimal('33.33'), Decimal('33.33'), Decimal('33.34')])
 
     def test_recalculo_con_mes_sucio_anterior_no_infla_el_saldo(self):
         """Regresion: editar un movimiento viejo duplicaba los meses intermedios.

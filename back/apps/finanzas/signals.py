@@ -19,7 +19,12 @@ from .models import (
     IngresoPuntual,
     Notificacion,
 )
-from .utils import _monto_efectivo_mes, invalidate_finanzas_cache, recalcular_saldo_mes_para
+from .utils import (
+    _monto_efectivo_mes,
+    cuota_efectiva_mes,
+    invalidate_finanzas_cache,
+    recalcular_saldo_mes_para,
+)
 
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
@@ -60,7 +65,13 @@ def _gasto_mensual_categoria(usuario, categoria, anio, mes):
         fecha_inicio__lte=ultimo_dia,
         fecha_fin__gte=primer_dia,
     )
-    total += sum(Decimal(str(d.cuota_mensual)) for d in diferidos)
+    total += sum(
+        (cuota_efectiva_mes(
+            d.monto_total, d.cuota_mensual, d.num_cuotas, d.fecha_inicio, primer_dia,
+         )
+         for d in diferidos),
+        Decimal('0.00'),
+    )
     return total
 
 

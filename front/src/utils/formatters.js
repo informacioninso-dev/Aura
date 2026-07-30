@@ -1,9 +1,11 @@
-const DEFAULT_LOCALE = 'es-419'
+// Formato fijo para toda la app: 1,146.42 (coma de miles, punto decimal).
+// Antes se usaba navigator.language, asi que el mismo dato se veia "1.234,50" o
+// "1,234.50" segun el equipo y dos personas mirando la misma cuenta veian
+// puntuaciones distintas. El formato de la plata no debe depender del navegador.
+const DEFAULT_LOCALE = 'en-US'
 
 function resolveLocale(locale) {
-  if (locale) return locale
-  if (typeof navigator !== 'undefined' && navigator.language) return navigator.language
-  return DEFAULT_LOCALE
+  return locale || DEFAULT_LOCALE
 }
 
 function toFiniteNumber(value) {

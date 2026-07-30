@@ -282,7 +282,26 @@ class GastoNoCorrienteSerializer(ProjectionEligibilitySerializerMixin, serialize
 
 class DeferidoSerializer(serializers.ModelSerializer):
     cuota_mensual = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    cuota_mes = serializers.SerializerMethodField()
     confirmar_duplicado = serializers.BooleanField(write_only=True, required=False, default=False)
+
+    def get_cuota_mes(self, obj):
+        """
+        Cuota que corresponde en el mes consultado.
+
+        Coincide con `cuota_mensual` salvo en la ultima cuota, que absorbe el
+        residuo del redondeo para que la suma cuadre con monto_total. La vista
+        entrega `periodo` en el contexto; sin el se devuelve la cuota normal.
+        """
+        periodo = self.context.get('periodo')
+        if not periodo:
+            return None
+        from .utils import cuota_efectiva_mes
+        cuota = cuota_efectiva_mes(
+            obj.monto_total, obj.cuota_mensual, obj.num_cuotas,
+            obj.fecha_inicio, date(periodo[0], periodo[1], 1),
+        )
+        return str(cuota)
 
     def _get_value(self, attrs, field):
         if field in attrs:

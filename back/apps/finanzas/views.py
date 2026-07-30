@@ -44,6 +44,7 @@ from .models import (
 )
 from .utils import (
     calcular_proyeccion_acumulada,
+    cuota_efectiva_mes,
     asegurar_saldo_mes,
     asegurar_saldos_historicos,
     detectar_sugerencias,
@@ -149,12 +150,13 @@ class DashboardResumenView(APIView):
         except Exception:
             pass  # el aviso es secundario: nunca debe tumbar el dashboard.
 
-        # Los rubros variables se muestran con su consumo real del mes, no con el
-        # estimado: para un mes ya cerrado el dato real ya existe y es el que usan
-        # la proyeccion y el score. Sin consumos registrados el front cae al estimado.
+        # Contexto del mes consultado, para que los serializers puedan resolver
+        # los montos que dependen del periodo: el consumo real de un rubro
+        # variable (en vez del estimado) y la cuota que toca de un diferido (la
+        # ultima lleva el residuo del redondeo).
         from .utils import mapa_ejecuciones_variables
         ejecuciones_variables = mapa_ejecuciones_variables(user)
-        gasto_context = {
+        periodo_context = {
             'request': request,
             'periodo': (year, month),
             'ejecuciones': ejecuciones_variables,
@@ -209,11 +211,11 @@ class DashboardResumenView(APIView):
             'ingresos_puntuales': IngresoPuntualSerializer(
                 ingresos_puntuales, many=True, context={'request': request},
             ).data,
-            'gastos_corrientes': GastoCorrienteSerializer(gastos, many=True, context=gasto_context).data,
+            'gastos_corrientes': GastoCorrienteSerializer(gastos, many=True, context=periodo_context).data,
             'gastos_no_corrientes': GastoNoCorrienteSerializer(
                 gastos_puntuales, many=True, context={'request': request},
             ).data,
-            'diferidos': DeferidoSerializer(diferidos, many=True, context={'request': request}).data,
+            'diferidos': DeferidoSerializer(diferidos, many=True, context=periodo_context).data,
         })
 
 class SaludFinancieraView(APIView):
@@ -651,11 +653,21 @@ class DeferidoViewSet(BaseFinanzasViewSet):
 
     def get_list_summary(self, queryset):
         today = local_today()
+        month_start = today.replace(day=1)
         current = queryset.filter(activo=True, fecha_inicio__lte=today, fecha_fin__gte=today)
         committed = queryset.filter(activo=True, fecha_fin__gte=today)
         aggregates = committed.aggregate(total_committed=models.Sum('monto_total'))
         return {
-            'monthly_total': current.aggregate(value=models.Sum('cuota_mensual'))['value'] or Decimal('0.00'),
+            # No se puede agregar en SQL: la ultima cuota lleva el residuo del
+            # redondeo y solo se conoce mes a mes.
+            'monthly_total': sum(
+                (cuota_efectiva_mes(
+                    item.monto_total, item.cuota_mensual, item.num_cuotas,
+                    item.fecha_inicio, month_start,
+                 )
+                 for item in current),
+                Decimal('0.00'),
+            ),
             'total_committed': aggregates['total_committed'] or Decimal('0.00'),
             'current': current.count(),
             'upcoming': queryset.filter(activo=True, fecha_inicio__gt=today).count(),
@@ -1132,7 +1144,13 @@ def _build_reporte_data(usuario, anio, mes):
         fecha_inicio__lte=ultimo_dia,
         fecha_fin__gte=primer_dia,
     )
-    total_dif = sum(Decimal(str(d.cuota_mensual)) for d in dif_qs)
+    total_dif = sum(
+        (cuota_efectiva_mes(
+            d.monto_total, d.cuota_mensual, d.num_cuotas, d.fecha_inicio, primer_dia,
+         )
+         for d in dif_qs),
+        Decimal('0.00'),
+    )
 
     gnc_qs = GastoNoCorriente.objects.filter(usuario=usuario, fecha__gte=primer_dia, fecha__lte=ultimo_dia)
     total_gnc = sum(Decimal(str(g.monto)) for g in gnc_qs)
@@ -1153,7 +1171,11 @@ def _build_reporte_data(usuario, anio, mes):
 
     for diferido in dif_qs:
         cat_totales[diferido.categoria] = (
-            cat_totales.get(diferido.categoria, Decimal('0')) + Decimal(str(diferido.cuota_mensual))
+            cat_totales.get(diferido.categoria, Decimal('0'))
+            + cuota_efectiva_mes(
+                diferido.monto_total, diferido.cuota_mensual, diferido.num_cuotas,
+                diferido.fecha_inicio, primer_dia,
+            )
         )
 
     categorias = {c.nombre: c for c in Categoria.objects.filter(usuario=usuario)}

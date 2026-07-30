@@ -76,6 +76,26 @@ def _monto_efectivo_mes(monto, frecuencia, fecha_inicio, month_start):
     return _money(monto)
 
 
+def cuota_efectiva_mes(monto_total, cuota_mensual, num_cuotas, fecha_inicio, month_start):
+    """
+    Cuota de un diferido en un mes dado.
+
+    `cuota_mensual` es monto_total/num_cuotas redondeado a 2 decimales, asi que
+    sumarla N veces no reconstruye el total: 100 en 3 cuotas da 33.33 x 3 = 99.99
+    y 1000 en 7 da 1000.02. La ultima cuota absorbe el residuo (33.33, 33.33,
+    33.34) para que lo cobrado cuadre exactamente con monto_total, como en
+    cualquier tabla de pagos. El resto de los meses paga la cuota normal.
+    """
+    cuota = _money(cuota_mensual)
+    if not num_cuotas or monto_total is None or fecha_inicio is None:
+        return cuota
+    inicio = _primer_dia_mes(_coerce_date(fecha_inicio))
+    indice = (month_start.year - inicio.year) * 12 + (month_start.month - inicio.month)
+    if indice != num_cuotas - 1:
+        return cuota
+    return (_money(monto_total) - cuota * (num_cuotas - 1)).quantize(Decimal('0.01'))
+
+
 def _primer_dia_mes(fecha):
     return datetime.date(fecha.year, fecha.month, 1)
 
@@ -796,7 +816,13 @@ def calcular_balance_mes(usuario, anio, mes):
         fecha_inicio__lte=ultimo_dia,
         fecha_fin__gte=primer_dia,
     )
-    total_dif = sum(Decimal(str(d.cuota_mensual)) for d in diferidos)
+    total_dif = sum(
+        (cuota_efectiva_mes(
+            d.monto_total, d.cuota_mensual, d.num_cuotas, d.fecha_inicio, primer_dia,
+         )
+         for d in diferidos),
+        Decimal('0.00'),
+    )
 
     gnc = GastoNoCorriente.objects.filter(
         usuario=usuario,
@@ -876,10 +902,13 @@ def _calcular_neto_mensual_en_rango(usuario, desde_mes, hasta_mes):
         activo=True,
         fecha_inicio__lte=hasta_dia,
         fecha_fin__gte=desde_mes,
-    ).values('cuota_mensual', 'fecha_inicio', 'fecha_fin')
+    ).values('cuota_mensual', 'monto_total', 'num_cuotas', 'fecha_inicio', 'fecha_fin')
     add_recurrente(
         diferidos,
-        amount_fn=lambda item, month_date: -Decimal(str(item['cuota_mensual'])),
+        amount_fn=lambda item, month_date: -cuota_efectiva_mes(
+            item['monto_total'], item['cuota_mensual'], item['num_cuotas'],
+            item['fecha_inicio'], month_date,
+        ),
     )
 
     gastos_no_corrientes = GastoNoCorriente.objects.filter(
@@ -1211,7 +1240,10 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
 
     def _cuotas_mes(month_start, month_end):
         return sum(
-            (_money(item.cuota_mensual)
+            (cuota_efectiva_mes(
+                item.monto_total, item.cuota_mensual, item.num_cuotas,
+                item.fecha_inicio, month_start,
+             )
              for item in diferidos
              if item.fecha_inicio <= month_end and item.fecha_fin >= month_start),
             Decimal('0.00'),

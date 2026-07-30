@@ -23,6 +23,7 @@ from .utils import (
     _monto_base_gasto_mes,
     _monto_efectivo_mes,
     calcular_balance_mes,
+    cuota_efectiva_mes,
     mapa_ejecuciones_variables,
 )
 
@@ -107,7 +108,13 @@ def _montos_mensuales(usuario, anio, mes):
     diferidos = Diferido.objects.filter(
         usuario=usuario, activo=True, fecha_inicio__lte=ultimo_dia, fecha_fin__gte=primer_dia,
     )
-    cuotas = sum((_money(d.cuota_mensual) for d in diferidos), Decimal('0.00'))
+    cuotas = sum(
+        (cuota_efectiva_mes(
+            d.monto_total, d.cuota_mensual, d.num_cuotas, d.fecha_inicio, primer_dia,
+         )
+         for d in diferidos),
+        Decimal('0.00'),
+    )
 
     return _money(ingreso), _money(gasto_fijo), _money(gasto_variable), _money(cuotas)
 

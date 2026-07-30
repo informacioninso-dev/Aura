@@ -178,6 +178,9 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
     setSummary(data.summary || {})
   }
 
+  // Vista previa mientras se llena el formulario: el backend recalcula la cuota
+  // al guardar y es la fuente de verdad. Es la cuota base; la ultima puede
+  // diferir en centavos porque absorbe el residuo de la division.
   function calcularCuota(monto, cuotas) {
     if (monto && cuotas && parseFloat(cuotas) > 0) {
       return (parseFloat(monto) / parseFloat(cuotas)).toFixed(2)
@@ -271,7 +274,7 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
     return {
       ...item,
       totalValue: Number(item.monto_total || 0),
-      monthlyValue: Number(item.cuota_mensual || 0),
+      monthlyValue: Number(item.cuota_mes ?? item.cuota_mensual ?? 0),
       progress: getProgress(item, todayDate),
       remainingInstallments: getRemainingInstallments(item, todayDate, status.key),
       status,
