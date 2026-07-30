@@ -14,7 +14,7 @@ import Modal from '../../components/ui/Modal'
 import MonthNavigator from '../../components/ui/MonthNavigator'
 import { useCategorias } from '../../hooks/useCategorias'
 import { formatAmount } from '../../utils/formatters'
-import { startOfMonth } from '../../utils/months'
+import { MESES_FULL, startOfMonth } from '../../utils/months'
 import '../../components/ui/app.css'
 
 const SITUACION = {
@@ -119,12 +119,17 @@ export default function GastosVariables({ autoNew = false }) {
       .then(({ data }) => setCatalogo(data.gasto_variable || []))
       .catch(() => {})
   }, [])
-  // Total del mes: lo que ya registraste; si un rubro sigue pendiente, usa su
-  // sugerencia (o el estimado guardado). Sin jergas de "estimado" a la vista.
-  const totalMes = filas.reduce((sum, fila) => {
-    const valor = fila.real != null ? fila.real : (fila.sugerido ?? fila.estimado ?? 0)
-    return sum + parseFloat(valor || 0)
-  }, 0)
+  // El numero grande es solo plata registrada, para que cuadre exactamente con
+  // la columna de la tabla. Lo que falta por registrar se informa aparte, con su
+  // propio rotulo: antes se sumaba en silencio y el total no daba con la lista.
+  const totalReal = filas.reduce(
+    (sum, fila) => (fila.real != null ? sum + parseFloat(fila.real || 0) : sum),
+    0,
+  )
+  const totalPendiente = filas.reduce(
+    (sum, fila) => (fila.real != null ? sum : sum + parseFloat(fila.sugerido ?? fila.estimado ?? 0)),
+    0,
+  )
 
   const suggestionItems = esMesActual && pendientes > 0 && filas.length > 0
   ? [{
@@ -420,9 +425,14 @@ export default function GastosVariables({ autoNew = false }) {
         <div>
           <h2 className="finance-panel-kicker">Gastos variables</h2>
           <p className="finance-panel-kpi">
-            Este mes:&nbsp;
-            <span style={{ color: 'var(--app-danger)', fontWeight: 700 }}>${formatAmount(totalMes)}</span>
+            {MESES_FULL[selectedMonth.getMonth()]} {selectedMonth.getFullYear()}:&nbsp;
+            <span style={{ color: 'var(--app-danger)', fontWeight: 700 }}>${formatAmount(totalReal)}</span>
           </p>
+          {pendientes > 0 && (
+            <p className="finance-panel-subtitle">
+              Faltan {pendientes} rubro{pendientes !== 1 ? 's' : ''} por registrar (~${formatAmount(totalPendiente)})
+            </p>
+          )}
         </div>
         <button className="btn-add page-primary-action" onClick={openNew}><Plus size={16} /> Agregar</button>
       </div>
