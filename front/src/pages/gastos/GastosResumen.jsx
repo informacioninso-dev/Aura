@@ -33,12 +33,20 @@ export default function GastosResumen({ onOpenTipo, onAgregar }) {
       const fijosTotal = fijos.reduce((s, g) => s + montoEfectivoMes(g.monto, g.frecuencia, g.fecha_inicio, anio, mes), 0)
 
       const variables = gc.filter((g) => g.tipo_monto === 'variable' && g.activo)
-      // Total del mes por rubro: lo registrado o, si sigue pendiente, su sugerencia.
-      const varTotal = (vars.data || []).reduce((s, f) => {
-        const valor = f.real != null ? f.real : (f.sugerido ?? f.estimado ?? 0)
-        return s + parseFloat(valor || 0)
-      }, 0)
-      const varPend = (vars.data || []).filter((f) => f.situacion === 'pendiente').length
+      // La card de variables muestra solo lo registrado, para que cuadre con el
+      // detalle de Gastos variables. Lo que falta por registrar va aparte en el
+      // subtitulo; se suma unicamente en la proyeccion del mes, que si estima lo
+      // que todavia no se gasta.
+      const filasVar = vars.data || []
+      const varReal = filasVar.reduce(
+        (s, f) => (f.real != null ? s + parseFloat(f.real || 0) : s),
+        0,
+      )
+      const varPendMonto = filasVar.reduce(
+        (s, f) => (f.real != null ? s : s + parseFloat(f.sugerido ?? f.estimado ?? 0)),
+        0,
+      )
+      const varPend = filasVar.filter((f) => f.situacion === 'pendiente').length
 
       const dif = (d.diferidos || []).filter((x) => x.activo && overlapsMes(x, anio, mes))
       const cuotasTotal = dif.reduce((s, x) => s + parseFloat(x.cuota_mensual || 0), 0)
@@ -47,13 +55,13 @@ export default function GastosResumen({ onOpenTipo, onAgregar }) {
 
       setT({
         fijosTotal, fijosCount: fijos.length,
-        varTotal, varCount: variables.length, varPend,
+        varReal, varPendMonto, varCount: variables.length, varPend,
         cuotasTotal, cuotasCount: dif.length,
         puntuales,
-        proyeccion: fijosTotal + varTotal + cuotasTotal,
+        proyeccion: fijosTotal + varReal + varPendMonto + cuotasTotal,
       })
     } catch {
-      setT({ fijosTotal: 0, fijosCount: 0, varTotal: 0, varCount: 0, varPend: 0, cuotasTotal: 0, cuotasCount: 0, puntuales: 0, proyeccion: 0 })
+      setT({ fijosTotal: 0, fijosCount: 0, varReal: 0, varPendMonto: 0, varCount: 0, varPend: 0, cuotasTotal: 0, cuotasCount: 0, puntuales: 0, proyeccion: 0 })
     }
   }, [])
 
@@ -61,7 +69,7 @@ export default function GastosResumen({ onOpenTipo, onAgregar }) {
 
   const cards = t && [
     { id: 'fijos', icon: Home, tint: '#4ADE80', title: 'Gastos fijos', valor: `$${formatAmount(t.fijosTotal)}`, unidad: '/ mes', sub: `${t.fijosCount} gasto${t.fijosCount !== 1 ? 's' : ''}` },
-    { id: 'variables', icon: Activity, tint: '#C487F6', title: 'Gastos variables', valor: `$${formatAmount(t.varTotal)}`, unidad: '/ este mes', sub: t.varPend > 0 ? `${t.varPend} por registrar` : `${t.varCount} gasto${t.varCount !== 1 ? 's' : ''}` },
+    { id: 'variables', icon: Activity, tint: '#C487F6', title: 'Gastos variables', valor: `$${formatAmount(t.varReal)}`, unidad: '/ este mes', sub: t.varPend > 0 ? `${t.varPend} por registrar (~$${formatAmount(t.varPendMonto)})` : `${t.varCount} gasto${t.varCount !== 1 ? 's' : ''}` },
     { id: 'cuotas', icon: CreditCard, tint: '#C487F6', title: 'Gastos a cuotas', valor: `$${formatAmount(t.cuotasTotal)}`, unidad: '/ cuota del mes', sub: `${t.cuotasCount} cuota${t.cuotasCount !== 1 ? 's' : ''} activa${t.cuotasCount !== 1 ? 's' : ''}` },
     { id: 'puntuales', icon: Calendar, tint: '#4ADE80', title: 'Gastos puntuales', valor: `${t.puntuales} registrado${t.puntuales !== 1 ? 's' : ''}`, unidad: '', sub: 'No afectan tu proyeccion' },
   ]
