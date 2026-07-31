@@ -152,6 +152,15 @@ class GastoCorrienteEjecucion(models.Model):
             models.Index(fields=['gasto', 'anio', 'mes'], name='gce_gasto_periodo_idx'),
         ]
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Si el consumo es anterior al inicio del rubro, bajar el inicio para que
+        # cuente en los calculos por mes. (bulk_create no pasa por aqui: esos
+        # sitios llaman a sincronizar_inicio_rubro a mano.)
+        if self.fecha and self.gasto_id:
+            from .utils import sincronizar_inicio_rubro
+            sincronizar_inicio_rubro(self.gasto_id)
+
     def __str__(self):
         return f"{self.gasto.descripcion} {self.mes}/{self.anio}: ${self.monto_real}"
 

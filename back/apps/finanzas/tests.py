@@ -2369,6 +2369,19 @@ class TestGastosVariables(APITestCase):
         total = mapa_ejecuciones_variables(self.user)[gasto.id][(2026, 3)]
         self.assertEqual(total, Decimal('38.00'))
 
+    def test_consumo_previo_baja_el_inicio_del_rubro(self):
+        # Un consumo con fecha anterior al inicio del rubro baja la fecha_inicio,
+        # para que ese consumo cuente en los calculos por mes (dashboard/balance).
+        gasto = self._crear_variable()  # fecha_inicio 2026-01-01
+        import datetime as _dt
+        self.client.post(
+            '/api/finanzas/gastos-corrientes/{}/ejecuciones/'.format(gasto.id),
+            {'fecha': '2025-11-15', 'descripcion': 'Historico', 'monto_real': '30.00'},
+            format='json',
+        )
+        gasto.refresh_from_db()
+        self.assertEqual(gasto.fecha_inicio, _dt.date(2025, 11, 15))
+
     def test_un_gasto_fijo_rechaza_montos_reales(self):
         gasto = GastoCorriente.objects.create(
             usuario=self.user, descripcion='Arriendo', monto=Decimal('500.00'),

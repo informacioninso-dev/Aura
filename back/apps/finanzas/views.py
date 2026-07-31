@@ -54,6 +54,7 @@ from .utils import (
     _restar_meses,
     invalidate_finanzas_cache,
     recalcular_saldo_mes_para,
+    sincronizar_inicio_rubro,
     obtener_o_sembrar_saldo_mes,
     build_projection_cache_key,
     _monto_efectivo_mes,
@@ -418,7 +419,11 @@ class GastoCorrienteViewSet(BaseFinanzasViewSet):
         if nuevos:
             with transaction.atomic():
                 GastoCorrienteEjecucion.objects.bulk_create(nuevos)
-                # bulk_create no dispara señales: recalcular e invalidar a mano.
+                # bulk_create no dispara señales/save: sincronizar el inicio de
+                # los rubros (por si el mes creado es anterior a su fecha_inicio),
+                # recalcular e invalidar a mano.
+                for gid in {e.gasto_id for e in nuevos}:
+                    sincronizar_inicio_rubro(gid)
                 recalcular_saldo_mes_para(request.user, month_start)
                 invalidate_finanzas_cache(request.user.pk, month_start)
 
@@ -585,6 +590,8 @@ class GastoNoCorrienteViewSet(BaseFinanzasViewSet):
                     )
                     for (anio, mes), monto in por_mes.items()
                 ])
+                # El historial puede ser anterior al inicio del rubro: sincronizar.
+                sincronizar_inicio_rubro(gasto.id)
             GastoNoCorriente.objects.filter(id__in=[item.id for item in puntuales]).delete()
 
         return Response(

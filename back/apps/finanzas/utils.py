@@ -538,6 +538,29 @@ def asegurar_notificacion_variables(usuario):
     noti.save()
 
 
+def sincronizar_inicio_rubro(gasto_id):
+    """
+    Baja la fecha_inicio de un rubro variable a la de su primer consumo si este
+    es anterior. Un rubro puede recibir consumos con fecha previa a su inicio
+    (datos historicos/importados); como los calculos por mes (dashboard,
+    balance, saldo, proyeccion) filtran por fecha_inicio, esos consumos se
+    caerian y subestimarian el gasto. Devuelve True si ajusto algo.
+    """
+    from .models import GastoCorriente, GastoCorrienteEjecucion
+
+    primer = (
+        GastoCorrienteEjecucion.objects.filter(gasto_id=gasto_id)
+        .exclude(fecha__isnull=True)
+        .aggregate(m=db_models.Min('fecha'))['m']
+    )
+    if not primer:
+        return False
+    return bool(
+        GastoCorriente.objects.filter(pk=gasto_id, fecha_inicio__gt=primer)
+        .update(fecha_inicio=primer)
+    )
+
+
 def mapa_ejecuciones_variables(usuario):
     """
     {gasto_id: {(anio, mes): total}} de los gastos variables del usuario.
