@@ -388,10 +388,16 @@ export default function Dashboard() {
     notation: 'compact',
     maximumFractionDigits: 1,
   })
-  // Un rubro variable con consumos registrados en el mes vale su gasto real; el
-  // estimado solo aplica mientras no haya consumos (mes en curso o sin registrar).
-  // El backend entrega monto_real_mes solo para el mes consultado.
-  const montoDelMes = (item) => (item.monto_real_mes ?? item.monto)
+  // Un rubro variable vale su gasto REAL del mes; si sigue pendiente (sin
+  // registrar) cuenta como 0, igual que en la lista de Gastos variables, para
+  // que el total del dashboard cuadre con esa vista (lo que falta por registrar
+  // se estima solo en la proyeccion, no en el mes en curso). Los fijos siempre
+  // valen su monto. El backend entrega monto_real_mes solo para el mes consultado.
+  const montoDelMes = (item) => (
+    item.tipo_monto === 'variable'
+      ? (item.monto_real_mes ?? 0)
+      : (item.monto_real_mes ?? item.monto)
+  )
   const mensualizado = (item) => montoEfectivoMes(montoDelMes(item), item.frecuencia, item.fecha_inicio, selectedMonth.getFullYear(), selectedMonth.getMonth() + 1)
 
   // Ahorro inicial: se guarda como un ingreso puntual "Ahorros iniciales" con
