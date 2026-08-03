@@ -14,6 +14,7 @@ from apps.usuarios.models import Plan
 from apps.usuarios.plans import assign_plan_to_user
 from .dates import local_today
 from .models import (
+    Categoria,
     CuentaPorCobrar,
     Diferido,
     GastoCorriente,
@@ -3656,3 +3657,73 @@ class TestSaludFinanciera(APITestCase):
         SaldoMes.objects.create(usuario=self.user, anio=2026, mes=6, monto=Decimal('5000'), activo=True)
         data = calcular_salud_financiera(self.user, 2026, 7)
         self.assertGreaterEqual(data['score'], 70)
+
+
+class TestRespaldoCuentaAsesor(APITestCase):
+    """Respaldo XLSX completo: gating a asesor + round-trip export->import."""
+
+    def setUp(self):
+        cache.clear()
+        self.asesor = User.objects.create_user(email='asesor@example.com', username='asesor', password='clave12345')
+        self.normal = User.objects.create_user(email='normal@example.com', username='normal', password='clave12345')
+        self.destino = User.objects.create_user(email='destino@example.com', username='destino', password='clave12345')
+        plan_pro = Plan.objects.get(slug='pro')
+        assign_plan_to_user(user=self.asesor, plan=plan_pro, assigned_by=None, tipo='asesor')
+        assign_plan_to_user(user=self.destino, plan=plan_pro, assigned_by=None, tipo='asesor')
+
+    def _poblar(self, user):
+        Categoria.objects.create(usuario=user, nombre='mascotas', icono='🐶', limite_mensual=Decimal('50'))
+        Ingreso.objects.create(usuario=user, descripcion='Sueldo', monto=Decimal('1500'), frecuencia='mensual', fecha_inicio=datetime.date(2026, 1, 1))
+        IngresoPuntual.objects.create(usuario=user, descripcion='Bono', monto=Decimal('300'), fecha=datetime.date(2026, 3, 5))
+        GastoCorriente.objects.create(usuario=user, descripcion='Arriendo', categoria='vivienda', monto=Decimal('600'), tipo_monto='fijo', frecuencia='mensual', fecha_inicio=datetime.date(2026, 1, 1))
+        rubro = GastoCorriente.objects.create(usuario=user, descripcion='Super', categoria='alimentacion', monto=Decimal('0'), tipo_monto='variable', frecuencia='mensual', fecha_inicio=datetime.date(2026, 4, 1))
+        GastoCorrienteEjecucion.objects.create(gasto=rubro, anio=2026, mes=4, fecha=datetime.date(2026, 4, 10), descripcion='Supermaxi', monto_real=Decimal('120'))
+        GastoNoCorriente.objects.create(usuario=user, descripcion='TV', categoria='tecnologia', monto=Decimal('400'), fecha=datetime.date(2026, 2, 20))
+        Diferido.objects.create(usuario=user, descripcion='Laptop', categoria='tecnologia', monto_total=Decimal('1200'), num_cuotas=12, cuota_mensual=Decimal('100'), fecha_inicio=datetime.date(2026, 1, 1), fecha_fin=datetime.date(2026, 12, 31))
+        CuentaPorCobrar.objects.create(usuario=user, direccion='me_deben', persona='Ana', concepto='Prestamo', monto_total=Decimal('200'), monto_cobrado=Decimal('50'), fecha_prestamo=datetime.date(2026, 3, 1))
+
+    def test_no_asesor_no_puede_exportar_ni_importar(self):
+        self.client.force_authenticate(user=self.normal)
+        self.assertEqual(self.client.get('/api/finanzas/respaldo/exportar/').status_code, status.HTTP_403_FORBIDDEN)
+        archivo = SimpleUploadedFile('x.xlsx', b'x', content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        r = self.client.post('/api/finanzas/respaldo/importar/', {'archivo': archivo}, format='multipart')
+        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_asesor_roundtrip_exporta_e_importa_todo(self):
+        self._poblar(self.asesor)
+        self.client.force_authenticate(user=self.asesor)
+        exp = self.client.get('/api/finanzas/respaldo/exportar/')
+        self.assertEqual(exp.status_code, status.HTTP_200_OK)
+        self.assertTrue(exp['Content-Disposition'].endswith('.xlsx"'))
+        contenido = exp.content
+        self.assertGreater(len(contenido), 0)
+
+        self.client.force_authenticate(user=self.destino)
+        archivo = SimpleUploadedFile('respaldo.xlsx', contenido, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        imp = self.client.post('/api/finanzas/respaldo/importar/', {'archivo': archivo}, format='multipart')
+        self.assertEqual(imp.status_code, status.HTTP_200_OK, imp.data)
+
+        # El usuario nuevo ya trae categorias por defecto; el import deduplica esas
+        # y agrega solo la propia ('mascotas'), sin duplicar.
+        cat = Categoria.objects.get(usuario=self.destino, nombre='mascotas')
+        self.assertEqual(cat.limite_mensual, Decimal('50.00'))
+        self.assertEqual(Ingreso.objects.filter(usuario=self.destino).count(), 1)
+        self.assertEqual(IngresoPuntual.objects.filter(usuario=self.destino).count(), 1)
+        self.assertEqual(GastoCorriente.objects.filter(usuario=self.destino).count(), 2)
+        self.assertEqual(GastoCorriente.objects.filter(usuario=self.destino, tipo_monto='variable').count(), 1)
+        self.assertEqual(GastoNoCorriente.objects.filter(usuario=self.destino).count(), 1)
+        self.assertEqual(Diferido.objects.filter(usuario=self.destino).count(), 1)
+        self.assertEqual(CuentaPorCobrar.objects.filter(usuario=self.destino).count(), 1)
+
+        rubro = GastoCorriente.objects.get(usuario=self.destino, tipo_monto='variable')
+        ejec = GastoCorrienteEjecucion.objects.filter(gasto=rubro)
+        self.assertEqual(ejec.count(), 1)
+        self.assertEqual(ejec.first().monto_real, Decimal('120.00'))
+        # el consumo del 2026-04-10 no baja el inicio (rubro ya empieza 2026-04-01)
+        self.assertEqual(rubro.fecha_inicio, datetime.date(2026, 4, 1))
+
+    def test_import_respaldo_rechaza_no_xlsx(self):
+        self.client.force_authenticate(user=self.asesor)
+        archivo = SimpleUploadedFile('x.csv', b'fecha,monto\n2026-01-01,10', content_type='text/csv')
+        r = self.client.post('/api/finanzas/respaldo/importar/', {'archivo': archivo}, format='multipart')
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)

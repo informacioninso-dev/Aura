@@ -21,9 +21,11 @@ from apps.usuarios.plans import (
     FEATURE_HEALTH_SCORE_ENABLED,
     FEATURE_IMPORT_MAX_ROWS,
     FEATURE_PROJECTION_MONTHS,
+    get_active_plan_assignment,
     get_user_projection_mode,
     get_user_feature_value,
 )
+from apps.usuarios.models import UserPlanAssignment
 logger = logging.getLogger(__name__)
 
 from .dates import local_today
@@ -1100,6 +1102,66 @@ class ImportarView(APIView):
             return Response(resultado)
 
         return Response({'error': 'Accion desconocida.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def _es_asesor(user):
+    """El respaldo completo (mover la cuenta) es solo para cuentas de asesor."""
+    assignment = get_active_plan_assignment(user)
+    return bool(assignment and assignment.tipo == UserPlanAssignment.TIPO_ASESOR)
+
+
+class IsAsesor(permissions.BasePermission):
+    message = 'El respaldo de cuenta esta disponible solo para cuentas de asesor.'
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and _es_asesor(request.user))
+
+
+class ExportarCuentaView(APIView):
+    """Descarga toda la cuenta como XLSX multi-hoja (re-importable). Solo asesor."""
+    permission_classes = (permissions.IsAuthenticated, IsAsesor)
+    throttle_classes = (throttling.ScopedRateThrottle,)
+    throttle_scope = 'historical_import'
+
+    def get(self, request):
+        from .respaldo import exportar_cuenta_xlsx
+        data = exportar_cuenta_xlsx(request.user)
+        resp = HttpResponse(
+            data,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        resp['Content-Disposition'] = f'attachment; filename="respaldo_aura_{local_today().isoformat()}.xlsx"'
+        return resp
+
+
+class ImportarRespaldoView(APIView):
+    """Restaura (de forma aditiva) un respaldo XLSX completo. Solo asesor."""
+    permission_classes = (permissions.IsAuthenticated, IsAsesor)
+    parser_classes = (MultiPartParser,)
+    throttle_classes = (throttling.ScopedRateThrottle,)
+    throttle_scope = 'historical_import'
+    MAX_MB = 10
+
+    def post(self, request):
+        from .respaldo import importar_cuenta_xlsx
+        archivo = request.FILES.get('archivo')
+        if not archivo:
+            return Response({'error': 'No se recibio ningun archivo.'}, status=status.HTTP_400_BAD_REQUEST)
+        if archivo.size > self.MAX_MB * 1024 * 1024:
+            return Response({'error': f'El archivo supera los {self.MAX_MB} MB.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not archivo.name.lower().endswith('.xlsx'):
+            return Response({'error': 'El respaldo debe ser un archivo .xlsx exportado desde Aura.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            resultado = importar_cuenta_xlsx(request.user, archivo.read())
+            return Response(resultado)
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            logger.exception('Error importando respaldo de cuenta')
+            return Response(
+                {'error': 'No se pudo procesar el respaldo. Verifica que sea un .xlsx exportado desde Aura.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 class NotificacionViewSet(BaseFinanzasViewSet):

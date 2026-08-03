@@ -18,6 +18,8 @@ const PREVIEW_PAGE_SIZE = 100
 export default function Importar() {
   const { user, fetchPerfil } = useAuth()
   const inputRef = useRef(null)
+  const respaldoInputRef = useRef(null)
+  const esAsesor = user?.plan?.assignment_tipo === 'asesor'
 
   const [fase, setFase] = useState('upload')
   const [drag, setDrag] = useState(false)
@@ -27,6 +29,9 @@ export default function Importar() {
   const [seleccion, setSeleccion] = useState([])
   const [resultado, setResultado] = useState(null)
   const [previewPage, setPreviewPage] = useState(1)
+  const [respaldoCargando, setRespaldoCargando] = useState(false)
+  const [respaldoResultado, setRespaldoResultado] = useState(null)
+  const [respaldoError, setRespaldoError] = useState('')
 
   const maxFilasPlan = user?.feature_access?.import_max_rows ?? 2000
   const maxFilasDetectadas = preview?.max_filas_permitidas ?? maxFilasPlan
@@ -148,6 +153,50 @@ export default function Importar() {
     setResultado(null)
     setError('')
     setPreviewPage(1)
+  }
+
+  // Respaldo completo (solo asesor): mover la cuenta entera en un XLSX.
+  async function exportarCuenta() {
+    setRespaldoError('')
+    setRespaldoCargando(true)
+    try {
+      const { data } = await api.get('/finanzas/respaldo/exportar/', { responseType: 'blob' })
+      const url = URL.createObjectURL(data)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `respaldo_aura_${new Date().toISOString().slice(0, 10)}.xlsx`
+      anchor.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setRespaldoError('No se pudo exportar la cuenta.')
+    } finally {
+      setRespaldoCargando(false)
+    }
+  }
+
+  async function importarRespaldo(file) {
+    if (!file) return
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      setRespaldoError('El respaldo debe ser un archivo .xlsx exportado desde Aura.')
+      return
+    }
+    setRespaldoError('')
+    setRespaldoResultado(null)
+    setRespaldoCargando(true)
+    try {
+      const formData = new FormData()
+      formData.append('archivo', file)
+      const { data } = await api.post('/finanzas/respaldo/importar/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      setRespaldoResultado(data)
+      void fetchPerfil()
+    } catch (err) {
+      setRespaldoError(err.response?.data?.error || 'No se pudo importar el respaldo.')
+    } finally {
+      setRespaldoCargando(false)
+      if (respaldoInputRef.current) respaldoInputRef.current.value = ''
+    }
   }
 
   if (fase === 'confirmado' && resultado) {
@@ -532,6 +581,78 @@ export default function Importar() {
           </button>
         </div>
       </div>
+
+      {esAsesor && (
+        <div className="card" style={{ padding: 20, marginTop: 16, border: '1px solid rgba(196,135,246,0.25)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
+            <span className="badge badge-gray" style={{ color: 'var(--app-lila)' }}>Asesor</span>
+            <span style={{ fontWeight: 800, fontSize: 15 }}>Respaldo de cuenta completa</span>
+          </div>
+          <p style={{ fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.5)', marginBottom: 14 }}>
+            Exporta TODO en un Excel (ingresos, gastos fijos/variables y sus consumos, diferidos, cuentas con personas y
+            categorias) y vuelve a importarlo en otra cuenta. Disponible solo para cuentas de asesor.
+          </p>
+
+          <div className="inline-actions-wrap" style={{ flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn-modal-save"
+              onClick={exportarCuenta}
+              disabled={respaldoCargando}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px' }}
+            >
+              <Download size={15} />
+              {respaldoCargando ? 'Procesando...' : 'Exportar cuenta (Excel)'}
+            </button>
+            <button
+              type="button"
+              className="btn-modal-cancel"
+              onClick={() => respaldoInputRef.current?.click()}
+              disabled={respaldoCargando}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px' }}
+            >
+              <Upload size={15} />
+              Importar respaldo (.xlsx)
+            </button>
+            <input
+              ref={respaldoInputRef}
+              type="file"
+              accept=".xlsx"
+              style={{ display: 'none' }}
+              onChange={(event) => importarRespaldo(event.target.files?.[0])}
+            />
+          </div>
+
+          {respaldoError && <div style={{ marginTop: 12, color: 'var(--app-danger)', fontSize: 13 }}>{respaldoError}</div>}
+
+          {respaldoResultado && (
+            <div
+              style={{
+                marginTop: 12,
+                padding: '12px 16px',
+                background: 'rgba(74,222,128,0.08)',
+                border: '1px solid rgba(74,222,128,0.20)',
+                borderRadius: 10,
+                fontSize: 13,
+              }}
+            >
+              <p style={{ fontWeight: 700, marginBottom: 6, color: 'var(--app-green)' }}>
+                Respaldo importado ({respaldoResultado.total} registros)
+              </p>
+              <p style={{ color: 'rgba(var(--app-ink-rgb),0.55)' }}>
+                {respaldoResultado.conteo?.ingresos ?? 0} ingresos · {respaldoResultado.conteo?.gastos ?? 0} gastos ·{' '}
+                {respaldoResultado.conteo?.consumos ?? 0} consumos · {respaldoResultado.conteo?.diferidos ?? 0} diferidos ·{' '}
+                {respaldoResultado.conteo?.cuentas ?? 0} cuentas · {respaldoResultado.conteo?.categorias ?? 0} categorias
+              </p>
+              {respaldoResultado.avisos?.length > 0 && (
+                <p style={{ marginTop: 6, color: 'rgba(var(--app-ink-rgb),0.40)', fontSize: 12 }}>
+                  {respaldoResultado.avisos.length} fila(s) omitida(s) por datos incompletos.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
