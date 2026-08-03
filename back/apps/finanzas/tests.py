@@ -3727,3 +3727,34 @@ class TestRespaldoCuentaAsesor(APITestCase):
         archivo = SimpleUploadedFile('x.csv', b'fecha,monto\n2026-01-01,10', content_type='text/csv')
         r = self.client.post('/api/finanzas/respaldo/importar/', {'archivo': archivo}, format='multipart')
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class TestDiferidosOrdenPorDefecto(APITestCase):
+    """El orden por defecto: activos por fecha_fin (primero el que termina antes),
+    luego por comenzar, luego finalizados e inactivos."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(email='dif@example.com', username='dif', password='clave12345')
+        hoy = local_today()
+
+        def crear(desc, ini, fin, activo=True):
+            Diferido.objects.create(
+                usuario=self.user, descripcion=desc, categoria='deudas',
+                monto_total=Decimal('1200'), num_cuotas=12, cuota_mensual=Decimal('100'),
+                fecha_inicio=ini, fecha_fin=fin, activo=activo,
+            )
+
+        crear('activoB', hoy - datetime.timedelta(days=30), hoy + datetime.timedelta(days=30))   # termina antes
+        crear('activoA', hoy - datetime.timedelta(days=30), hoy + datetime.timedelta(days=60))   # termina despues
+        crear('porComenzar', hoy + datetime.timedelta(days=10), hoy + datetime.timedelta(days=100))
+        crear('finalizado', hoy - datetime.timedelta(days=200), hoy - datetime.timedelta(days=10))
+        crear('inactivo', hoy - datetime.timedelta(days=30), hoy + datetime.timedelta(days=30), activo=False)
+
+    def test_orden_por_defecto(self):
+        self.client.force_authenticate(user=self.user)
+        r = self.client.get('/api/finanzas/diferidos/')
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        filas = r.data['results'] if isinstance(r.data, dict) else r.data
+        orden = [d['descripcion'] for d in filas]
+        self.assertEqual(orden, ['activoB', 'activoA', 'porComenzar', 'finalizado', 'inactivo'])

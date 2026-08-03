@@ -660,6 +660,26 @@ class DeferidoViewSet(BaseFinanzasViewSet):
     search_fields = ('descripcion', 'categoria', 'cuota_mensual', 'monto_total')
     ordering_fields = ('descripcion', 'cuota_mensual', 'monto_total', 'fecha_fin')
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        ordering = self.request.query_params.get('ordering', '').strip()
+        # Orden por defecto ("estado"): primero los activos ordenados por fecha_fin
+        # (el que termina de pagarse antes va primero), luego los por comenzar y al
+        # final los finalizados e inactivos. Los demas ordering (fecha_fin, monto...)
+        # ya los aplica la clase base.
+        if ordering.lstrip('-') in ('', 'estado'):
+            hoy = local_today()
+            queryset = queryset.annotate(
+                _estado_bucket=models.Case(
+                    models.When(activo=False, then=models.Value(3)),
+                    models.When(fecha_fin__lt=hoy, then=models.Value(2)),
+                    models.When(fecha_inicio__gt=hoy, then=models.Value(1)),
+                    default=models.Value(0),
+                    output_field=models.IntegerField(),
+                ),
+            ).order_by('_estado_bucket', 'fecha_fin')
+        return queryset
+
     def get_list_summary(self, queryset):
         today = local_today()
         month_start = today.replace(day=1)

@@ -148,7 +148,7 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const [sortField, setSortField] = useState('fecha_fin')
+  const [sortField, setSortField] = useState('estado')
   const [sortDir, setSortDir] = useState('asc')
   const [totalItems, setTotalItems] = useState(0)
   const [summary, setSummary] = useState({})
@@ -362,6 +362,7 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
               showPagination={false}
               onSortChange={(field, dir) => { setSortField(field); setSortDir(dir); setPage(1) }}
               sortOptions={[
+                { value: 'estado', label: 'Estado' },
                 { value: 'descripcion', label: 'Nombre' },
                 { value: 'monto_total', label: 'Valor' },
                 { value: 'cuota_mensual', label: 'Cuota' },
