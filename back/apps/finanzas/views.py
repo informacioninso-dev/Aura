@@ -59,6 +59,7 @@ from .utils import (
     sincronizar_inicio_rubro,
     obtener_o_sembrar_saldo_mes,
     build_projection_cache_key,
+    build_salud_cache_key,
     _monto_efectivo_mes,
 )
 from .pagination import OptInPageNumberPagination
@@ -241,8 +242,13 @@ class SaludFinancieraView(APIView):
         except (TypeError, ValueError):
             return Response({'detail': 'Periodo invalido.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        from .salud import calcular_salud_financiera
-        return Response(calcular_salud_financiera(user, year, month))
+        cache_key = build_salud_cache_key(user.id, anio=year, mes=month)
+        data = cache.get(cache_key)
+        if data is None:
+            from .salud import calcular_salud_financiera
+            data = calcular_salud_financiera(user, year, month)
+            cache.set(cache_key, data, getattr(settings, 'FINANZAS_PROJECTION_CACHE_TTL', 300))
+        return Response(data)
 
 
 class IngresoViewSet(BaseFinanzasViewSet):

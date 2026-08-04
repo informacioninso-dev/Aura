@@ -19,10 +19,10 @@ from decimal import Decimal
 from django.db import models as db_models
 
 from .utils import (
+    _calcular_neto_mensual_en_rango,
     _money,
     _monto_base_gasto_mes,
     _monto_efectivo_mes,
-    calcular_balance_mes,
     cuota_efectiva_mes,
     mapa_ejecuciones_variables,
 )
@@ -121,15 +121,24 @@ def _montos_mensuales(usuario, anio, mes):
 
 def _consistencia(usuario, anio, mes):
     """Fraccion de los ultimos meses (previos al pedido) que cerraron en positivo."""
+    # Rango de los MESES_CONSISTENCIA meses previos al pedido.
+    hasta = datetime.date(*_prev_month(anio, mes), 1)
+    desde = hasta
+    for _ in range(MESES_CONSISTENCIA - 1):
+        desde = datetime.date(*_prev_month(desde.year, desde.month), 1)
+
+    # Un solo set de queries para todos los meses (antes: calcular_balance_mes por
+    # mes = ~7 queries x mes). El neto por mes es equivalente al balance del mes.
+    nets = _calcular_neto_mensual_en_rango(usuario, desde, hasta)
+
     positivos = 0
     total = 0
-    cur_anio, cur_mes = _prev_month(anio, mes)
+    cur = hasta
     for _ in range(MESES_CONSISTENCIA):
-        balance = calcular_balance_mes(usuario, cur_anio, cur_mes)
         total += 1
-        if balance >= 0:
+        if nets.get((cur.year, cur.month), Decimal('0.00')) >= 0:
             positivos += 1
-        cur_anio, cur_mes = _prev_month(cur_anio, cur_mes)
+        cur = datetime.date(*_prev_month(cur.year, cur.month), 1)
     return positivos, total
 
 

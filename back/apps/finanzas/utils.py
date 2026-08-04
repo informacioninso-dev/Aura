@@ -180,6 +180,13 @@ def build_projection_cache_key(user_id, *, months, past_months, projection_mode=
     )
 
 
+def build_salud_cache_key(user_id, *, anio, mes):
+    # Incluye la version de cache de finanzas: al cambiar cualquier movimiento se
+    # bumpea la version y el score cacheado se invalida solo.
+    version = get_finanzas_cache_version(user_id)
+    return f'finanzas:salud:{user_id}:v{version}:{anio}-{mes:02d}'
+
+
 def get_finanzas_dirty_from(user_id):
     raw_value = cache.get(_dirty_from_key(user_id))
     if not raw_value:

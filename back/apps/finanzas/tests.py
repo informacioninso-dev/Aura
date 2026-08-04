@@ -3658,6 +3658,24 @@ class TestSaludFinanciera(APITestCase):
         data = calcular_salud_financiera(self.user, 2026, 7)
         self.assertGreaterEqual(data['score'], 70)
 
+    def test_score_se_cachea_y_se_invalida_al_cambiar_datos(self):
+        self._hacer_pro()
+        self._ingreso('1000.00')
+        url = '/api/finanzas/salud-financiera/?anio=2026&mes=7'
+        score1 = self.client.get(url).data['score']
+
+        # Cambio los datos por ORM (no invalida) -> debe devolver el score CACHEADO.
+        Diferido.objects.create(
+            usuario=self.user, descripcion='TV a cuotas', monto_total=Decimal('6000'),
+            num_cuotas=12, cuota_mensual=Decimal('500'),
+            fecha_inicio='2026-01-01', fecha_fin='2026-12-31', activo=True,
+        )
+        self.assertEqual(self.client.get(url).data['score'], score1)
+
+        # Al invalidar (lo que hace el flujo de escritura real) se recalcula y baja.
+        invalidate_finanzas_cache(self.user, datetime.date(2026, 1, 1))
+        self.assertLess(self.client.get(url).data['score'], score1)
+
 
 class TestRespaldoCuentaAsesor(APITestCase):
     """Respaldo XLSX completo: gating a asesor + round-trip export->import."""
