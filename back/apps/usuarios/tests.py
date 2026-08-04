@@ -173,7 +173,16 @@ class TestUsuarioAPI(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(mail.outbox), 1)
-        self.assertIn('https://app.aura.test/reset-password?uid=', mail.outbox[0].body)
+        correo = mail.outbox[0]
+        # Texto plano (fallback) sigue trayendo el enlace.
+        self.assertIn('https://app.aura.test/reset-password?uid=', correo.body)
+        # Y ahora hay una alternativa HTML con marca Aura y el mismo enlace.
+        self.assertEqual(len(correo.alternatives), 1)
+        html, mime = correo.alternatives[0]
+        self.assertEqual(mime, 'text/html')
+        self.assertIn('https://app.aura.test/reset-password?uid=', html)
+        self.assertIn('Aura', html)
+        self.assertIn('Cambiar mi contrase', html)
 
     def test_password_forgot_no_filtra_usuarios_inexistentes(self):
         response = self.client.post('/api/usuarios/password/forgot/', {'email': 'nadie@example.com'}, format='json')

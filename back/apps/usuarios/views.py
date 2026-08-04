@@ -6,7 +6,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
-from django.core.mail import EmailMessage, get_connection
+from django.core.mail import EmailMessage, EmailMultiAlternatives, get_connection
 from django.db import connections, transaction
 from django.db.models import Count, DecimalField, Q, Sum
 from django.db.models.functions import TruncDate, TruncMonth
@@ -209,17 +209,52 @@ def _resolve_mail_transport(use_custom=True):
     return connection, from_email, 'default'
 
 
-def _send_email_message(*, to_email, subject, message, from_email=None, use_custom=True):
+def _send_email_message(*, to_email, subject, message, from_email=None, use_custom=True, html_message=None):
     connection, default_from, source = _resolve_mail_transport(use_custom=use_custom)
-    email = EmailMessage(
+    # EmailMultiAlternatives manda el texto plano como cuerpo (fallback y mejor
+    # entregabilidad) y adjunta el HTML como alternativa cuando existe.
+    email = EmailMultiAlternatives(
         subject=subject,
         body=message,
         from_email=from_email or default_from,
         to=[to_email],
         connection=connection,
     )
+    if html_message:
+        email.attach_alternative(html_message, 'text/html')
     email.send(fail_silently=False)
     return source
+
+
+def _html_password_reset(reset_url):
+    """Correo de recuperacion con la marca Aura (light, seguro para clientes de correo)."""
+    return f"""\
+<div style="background:#f4f4f7;padding:32px 16px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" align="center" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+    <tr><td style="background:#8B5CF6;padding:20px 32px;">
+      <div style="font-size:22px;font-weight:800;color:#ffffff;letter-spacing:1px;">Aura</div>
+    </td></tr>
+    <tr><td style="padding:28px 32px 8px;">
+      <h1 style="margin:0 0 12px;font-size:20px;color:#1a1a2e;font-weight:700;">Restablece tu contrase&ntilde;a</h1>
+      <p style="margin:0 0 22px;font-size:14px;line-height:22px;color:#555555;">
+        Recibimos una solicitud para restablecer la contrase&ntilde;a de tu cuenta. Toca el bot&oacute;n para elegir una nueva.
+      </p>
+    </td></tr>
+    <tr><td align="center" style="padding:0 32px 8px;">
+      <a href="{reset_url}" style="display:inline-block;background:#8B5CF6;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 34px;border-radius:12px;">Cambiar mi contrase&ntilde;a</a>
+    </td></tr>
+    <tr><td style="padding:18px 32px 0;">
+      <p style="margin:0 0 6px;font-size:12px;color:#888888;">O copia y pega este enlace en tu navegador:</p>
+      <p style="margin:0;font-size:12px;color:#8B5CF6;word-break:break-all;">{reset_url}</p>
+    </td></tr>
+    <tr><td style="padding:24px 32px 28px;">
+      <p style="margin:18px 0 0;padding-top:16px;border-top:1px solid #eeeeee;font-size:12px;color:#999999;line-height:18px;">
+        Si no solicitaste este cambio, ignora este mensaje: tu contrase&ntilde;a seguir&aacute; igual.
+      </p>
+    </td></tr>
+  </table>
+  <p style="text-align:center;margin:16px 0 0;font-size:11px;color:#aaaaaa;">Aura &middot; aura.binnso.com</p>
+</div>"""
 
 
 class IsSuperAdmin(permissions.BasePermission):
@@ -339,11 +374,11 @@ class PasswordForgotView(APIView):
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             token = default_token_generator.make_token(user)
             reset_url = f"{settings.FRONTEND_URL}/reset-password?uid={uid}&token={token}"
-            subject = 'Aura: Restablece tu contrasena'
+            subject = 'Aura: Restablece tu contraseña'
             message = (
-                'Recibimos una solicitud para restablecer tu contrasena.\n\n'
-                f'Abre este enlace para continuar:\n{reset_url}\n\n'
-                'Si no solicitaste este cambio, puedes ignorar este mensaje.'
+                'Recibimos una solicitud para restablecer la contraseña de tu cuenta.\n\n'
+                f'Abre este enlace para elegir una nueva:\n{reset_url}\n\n'
+                'Si no solicitaste este cambio, puedes ignorar este mensaje; tu contraseña seguirá igual.'
             )
             try:
                 _send_email_message(
@@ -351,6 +386,7 @@ class PasswordForgotView(APIView):
                     subject=subject,
                     message=message,
                     use_custom=True,
+                    html_message=_html_password_reset(reset_url),
                 )
             except Exception:
                 logger.exception('No se pudo enviar correo de recuperacion para %s', user.email)
