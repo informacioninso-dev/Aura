@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Pencil, Trash2, ChevronRight } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronRight, Wallet } from 'lucide-react'
 
 import api from '../../api/client'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
@@ -84,6 +84,10 @@ function getItemStatus(item, todayDate, todayString) {
   const startDate = parseLocalDate(item.fecha_inicio)
   const endDate = parseLocalDate(item.fecha_fin)
 
+  if (item.pagada_en) {
+    return { key: 'pagada', label: 'Pagada', badgeClass: 'badge badge-green', sortBucket: 2 }
+  }
+
   if (!item.activo) {
     return {
       key: 'inactive',
@@ -120,6 +124,7 @@ function getItemStatus(item, todayDate, todayString) {
 }
 
 function getProgress(item, todayDate) {
+  if (item.pagada_en) return 100
   const startDate = parseLocalDate(item.fecha_inicio)
   const endDate = parseLocalDate(item.fecha_fin)
   const totalMonths = Math.max(1, diffMonths(startDate, endDate) + 1)
@@ -132,7 +137,7 @@ function getProgress(item, todayDate) {
 }
 
 function getRemainingInstallments(item, todayDate, statusKey) {
-  if (statusKey === 'finished' || statusKey === 'inactive') return 0
+  if (statusKey === 'pagada' || statusKey === 'finished' || statusKey === 'inactive') return 0
   if (statusKey === 'upcoming') return Number(item.num_cuotas || 0)
   return Math.max(0, diffMonths(todayDate, parseLocalDate(item.fecha_fin)) + 1)
 }
@@ -152,6 +157,10 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
   const [sortDir, setSortDir] = useState('asc')
   const [totalItems, setTotalItems] = useState(0)
   const [summary, setSummary] = useState({})
+  const [payTarget, setPayTarget] = useState(null)
+  const [payAmount, setPayAmount] = useState('')
+  const [paying, setPaying] = useState(false)
+  const [payError, setPayError] = useState('')
   const { categorias } = useCategorias()
 
   useEffect(() => {
@@ -176,6 +185,27 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
     setItems(data.results || [])
     setTotalItems(data.count || 0)
     setSummary(data.summary || {})
+  }
+
+  function openPay(item) {
+    setPayTarget(item)
+    setPayAmount(String(item.saldo_pendiente ?? item.monthlyValue ?? ''))
+    setPayError('')
+  }
+
+  async function confirmPay() {
+    if (!payTarget) return
+    setPaying(true)
+    setPayError('')
+    try {
+      await api.post(`/finanzas/diferidos/${payTarget.id}/pagar-el-resto/`, { monto: payAmount })
+      setPayTarget(null)
+      await fetchItems()
+    } catch (err) {
+      setPayError(err.response?.data?.error || 'No se pudo registrar el pago.')
+    } finally {
+      setPaying(false)
+    }
   }
 
   // Vista previa mientras se llena el formulario: el backend recalcula la cuota
@@ -415,6 +445,7 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
                             {item.status.key === 'upcoming' && 'Pendiente de iniciar'}
                             {item.status.key === 'finished' && 'Ya termino'}
                             {item.status.key === 'inactive' && 'Fuera del flujo'}
+                            {item.status.key === 'pagada' && 'Pagada de una vez'}
                           </div>
                         </td>
                         <td className="table-amount">${formatAmount(item.totalValue)}</td>
@@ -430,6 +461,16 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
                         </td>
                         <td className="table-actions-cell">
                           <div className="table-actions-row">
+                            {(item.status.key === 'current' || item.status.key === 'upcoming') && (
+                              <button
+                                className="btn-icon"
+                                title="Pagar el resto"
+                                style={{ color: 'var(--app-lila)' }}
+                                onClick={() => openPay(item)}
+                              >
+                                <Wallet size={15} />
+                              </button>
+                            )}
                             <button className="btn-icon edit" onClick={() => openEdit(item)}><Pencil size={15} /></button>
                             <button className="btn-icon danger" disabled={deletingId === item.id} onClick={() => openDeleteConfirm(item.id)}>
                               <Trash2 size={15} />
@@ -596,6 +637,63 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
         onConfirm={handleDelete}
         onClose={() => setConfirmDeleteId(null)}
       />
+
+      <Modal
+        open={Boolean(payTarget)}
+        onClose={() => setPayTarget(null)}
+        title={payTarget ? `Pagar el resto de "${payTarget.descripcion}"` : ''}
+      >
+        {payTarget && (
+          <div>
+            <p style={{ fontSize: 14, color: 'rgba(var(--app-ink-rgb),0.7)', marginBottom: 14 }}>
+              Vas a pagar de una vez{' '}
+              {payTarget.remainingInstallments > 0
+                ? <b>las {payTarget.remainingInstallments} {payTarget.remainingInstallments === 1 ? 'cuota que te falta' : 'cuotas que te faltan'}</b>
+                : <b>el saldo restante</b>}.
+            </p>
+
+            <div
+              style={{
+                background: 'rgba(251,146,60,0.08)',
+                border: '1px solid rgba(251,146,60,0.22)',
+                borderRadius: 12,
+                padding: '12px 14px',
+                fontSize: 13,
+                lineHeight: 1.5,
+                color: 'rgba(var(--app-ink-rgb),0.65)',
+                marginBottom: 16,
+              }}
+            >
+              💸 Se registra como un <b>gasto de este mes</b>, así que tu <b>saldo disponible baja</b> ahora (sale de tu liquidez).<br />
+              ✅ A cambio, <b>dejas de pagar la cuota mensual</b> de aquí en adelante.
+            </div>
+
+            <div className="form-modal-group">
+              <label className="form-modal-label">Monto a pagar</label>
+              <input
+                className="form-modal-input"
+                type="number"
+                min="0"
+                step="0.01"
+                value={payAmount}
+                onChange={(event) => setPayAmount(event.target.value)}
+              />
+              <p style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.4)', marginTop: 6 }}>
+                Edítalo si te dieron descuento por pagar todo de una vez.
+              </p>
+            </div>
+
+            {payError && <div style={{ color: 'var(--app-danger)', fontSize: 13, marginBottom: 10 }}>{payError}</div>}
+
+            <div className="inline-actions-wrap" style={{ justifyContent: 'flex-end', marginTop: 8 }}>
+              <button type="button" className="btn-modal-cancel" onClick={() => setPayTarget(null)}>Cancelar</button>
+              <button type="button" className="btn-modal-save" onClick={confirmPay} disabled={paying}>
+                {paying ? 'Registrando...' : 'Pagar el resto'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

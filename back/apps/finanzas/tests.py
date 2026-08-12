@@ -3776,3 +3776,59 @@ class TestDiferidosOrdenPorDefecto(APITestCase):
         filas = r.data['results'] if isinstance(r.data, dict) else r.data
         orden = [d['descripcion'] for d in filas]
         self.assertEqual(orden, ['activoB', 'activoA', 'porComenzar', 'finalizado', 'inactivo'])
+
+
+class TestPagarElResto(APITestCase):
+    """Pagar el resto: registra gasto puntual, cierra la cuota desde este mes y
+    deja los meses pasados intactos."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(email='pagar@example.com', username='pagar', password='clave12345')
+        self.client.force_authenticate(user=self.user)
+        self.hoy = local_today()
+        inicio = add_months(self.hoy, -5)   # empezo hace 5 meses -> va en la cuota 6
+        fin = add_months(self.hoy, 6)       # 12 cuotas de 100
+        self.dif = Diferido.objects.create(
+            usuario=self.user, descripcion='Laptop', categoria='tecnologia',
+            monto_total=Decimal('1200'), num_cuotas=12, cuota_mensual=Decimal('100'),
+            fecha_inicio=inicio, fecha_fin=fin, activo=True,
+        )
+        self.url = f'/api/finanzas/diferidos/{self.dif.id}/pagar-el-resto/'
+
+    def _mes(self, delta):
+        d = add_months(self.hoy, delta)
+        return d.year, d.month
+
+    def test_saldo_pendiente_sugerido(self):
+        r = self.client.get('/api/finanzas/diferidos/')
+        filas = r.data['results'] if isinstance(r.data, dict) else r.data
+        self.assertEqual(filas[0]['saldo_pendiente'], '700.00')  # 12*100 - 5 cobradas
+
+    def test_pagar_el_resto_registra_gasto_y_cierra_cuota(self):
+        r = self.client.post(self.url, {'monto': '700'}, format='json')
+        self.assertEqual(r.status_code, status.HTTP_200_OK, r.data)
+
+        gnc = GastoNoCorriente.objects.filter(usuario=self.user, monto=Decimal('700.00'))
+        self.assertEqual(gnc.count(), 1)
+        self.assertEqual(gnc.first().fecha, self.hoy)
+
+        self.dif.refresh_from_db()
+        self.assertEqual(self.dif.pagada_en, self.hoy)
+        self.assertLess(self.dif.fecha_fin, self.hoy.replace(day=1))
+        self.assertEqual(r.data['saldo_pendiente'], '0.00')
+
+        # Mes pasado: la cuota SIGUE contando (pasado intacto).
+        ay, am = self._mes(-2)
+        self.assertEqual(calcular_balance_mes(self.user, ay, am), Decimal('-100.00'))
+        # Mes actual: la cuota YA no cuenta, pero el pago si -> balance = -700.
+        self.assertEqual(calcular_balance_mes(self.user, self.hoy.year, self.hoy.month), Decimal('-700.00'))
+
+    def test_no_se_puede_pagar_dos_veces(self):
+        self.client.post(self.url, {'monto': '700'}, format='json')
+        r2 = self.client.post(self.url, {'monto': '100'}, format='json')
+        self.assertEqual(r2.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_monto_invalido(self):
+        self.assertEqual(self.client.post(self.url, {'monto': '0'}, format='json').status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.client.post(self.url, {'monto': 'abc'}, format='json').status_code, status.HTTP_400_BAD_REQUEST)

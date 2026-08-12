@@ -686,6 +686,53 @@ class DeferidoViewSet(BaseFinanzasViewSet):
             ).order_by('_estado_bucket', 'fecha_fin')
         return queryset
 
+    @action(detail=True, methods=['post'], url_path='pagar-el-resto')
+    def pagar_el_resto(self, request, pk=None):
+        """Paga de una vez el saldo restante: registra un gasto puntual del mes
+        (sale de la liquidez) y cierra la cuota para que deje de contar desde este
+        mes. Los meses pasados quedan intactos."""
+        from .utils import recalcular_saldo_mes_para
+
+        diferido = self.get_object()
+        if diferido.pagada_en:
+            return Response({'error': 'Este gasto a cuotas ya esta pagado.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not diferido.activo:
+            return Response({'error': 'Este gasto a cuotas esta inactivo.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            monto = Decimal(str(request.data.get('monto'))).quantize(Decimal('0.01'))
+        except (TypeError, ValueError, ArithmeticError):
+            return Response({'error': 'Monto invalido.'}, status=status.HTTP_400_BAD_REQUEST)
+        if monto <= 0:
+            return Response({'error': 'El monto debe ser mayor que 0.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        hoy = local_today()
+        mes_actual = hoy.replace(day=1)
+        # fecha_fin se corta al ultimo dia del mes anterior: la cuota de este mes
+        # ya va incluida en el pago, asi la cuota deja de contar desde ahora.
+        if hoy.month == 1:
+            fin_corte = datetime.date(hoy.year - 1, 12, 31)
+        else:
+            ultimo = calendar.monthrange(hoy.year, hoy.month - 1)[1]
+            fin_corte = datetime.date(hoy.year, hoy.month - 1, ultimo)
+
+        with transaction.atomic():
+            GastoNoCorriente.objects.create(
+                usuario=request.user,
+                descripcion=f'Pagar el resto: {diferido.descripcion}'[:200],
+                categoria=diferido.categoria,
+                monto=monto,
+                fecha=hoy,
+                notas='Pago total anticipado de un gasto a cuotas.',
+            )
+            diferido.pagada_en = hoy
+            diferido.fecha_fin = fin_corte
+            diferido.save(update_fields=['pagada_en', 'fecha_fin'])
+            recalcular_saldo_mes_para(request.user, mes_actual)
+            invalidate_finanzas_cache(request.user, mes_actual)
+
+        return Response(self.get_serializer(diferido).data)
+
     def get_list_summary(self, queryset):
         today = local_today()
         month_start = today.replace(day=1)

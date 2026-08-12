@@ -283,7 +283,20 @@ class GastoNoCorrienteSerializer(ProjectionEligibilitySerializerMixin, serialize
 class DeferidoSerializer(serializers.ModelSerializer):
     cuota_mensual = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     cuota_mes = serializers.SerializerMethodField()
+    saldo_pendiente = serializers.SerializerMethodField()
     confirmar_duplicado = serializers.BooleanField(write_only=True, required=False, default=False)
+
+    def get_saldo_pendiente(self, obj):
+        """Lo que falta por pagar hoy = monto_total menos las cuotas ya cobradas
+        (las de meses anteriores al actual). Sirve para sugerir el 'pagar el resto'."""
+        if obj.pagada_en:
+            return '0.00'
+        from .dates import local_today
+        hoy = local_today()
+        cobradas = (hoy.year - obj.fecha_inicio.year) * 12 + (hoy.month - obj.fecha_inicio.month)
+        cobradas = max(0, min(cobradas, obj.num_cuotas))
+        saldo = Decimal(obj.monto_total) - (Decimal(obj.cuota_mensual) * cobradas)
+        return str(round_money(saldo if saldo > 0 else Decimal('0.00')))
 
     def get_cuota_mes(self, obj):
         """
@@ -390,7 +403,7 @@ class DeferidoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Diferido
         fields = '__all__'
-        read_only_fields = ('usuario', 'creado_en', 'cuota_mensual')
+        read_only_fields = ('usuario', 'creado_en', 'cuota_mensual', 'pagada_en')
 
 
 class CuentaPorCobrarSerializer(serializers.ModelSerializer):

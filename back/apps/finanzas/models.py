@@ -258,6 +258,10 @@ class Diferido(models.Model):
     fecha_inicio  = models.DateField()
     fecha_fin     = models.DateField()
     activo        = models.BooleanField(default=True)
+    # Si se paga todo de una vez ("pagar el resto"), la fecha en que se saldo.
+    # Al setearla, fecha_fin se corta al mes anterior para que la cuota deje de
+    # contar desde ese mes (el saldo va como gasto puntual del mes del pago).
+    pagada_en     = models.DateField(null=True, blank=True)
     creado_en     = models.DateTimeField(auto_now_add=True)
 
     class Meta:
