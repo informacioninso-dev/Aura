@@ -93,6 +93,34 @@ function overlapsMonth(item, monthDate) {
   return ini <= monthEnd && (!fin || fin >= monthStart)
 }
 
+// Avance de un diferido al mes de referencia: en que cuota va (X de N), cuantas
+// faltan y el % pagado. Sirve para ver el progreso desde "Mi dinero" sin entrar
+// a la pestana de gastos.
+function cuotaProgreso(item, monthDate) {
+  const total = Number(item.num_cuotas) || 0
+  if (!total) return null
+  const inicio = startOfMonth(parseLocalDate(item.fecha_inicio))
+  const ref = startOfMonth(monthDate)
+  const transcurridas =
+    (ref.getFullYear() - inicio.getFullYear()) * 12 + (ref.getMonth() - inicio.getMonth()) + 1
+  const actual = Math.max(0, Math.min(transcurridas, total))
+  return {
+    actual,
+    total,
+    faltan: Math.max(0, total - actual),
+    pct: Math.round((actual / total) * 100),
+  }
+}
+
+const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+
+// "2028-08-31" -> "ago 2028"
+function mesAnioCorto(value) {
+  if (!value) return ''
+  const [y, m] = String(value).split('-').map(Number)
+  return `${MESES_CORTOS[m - 1]} ${y}`
+}
+
 function occursInMonth(item, monthDate, dateField = 'fecha') {
   const dateValue = item?.[dateField]
   if (!dateValue) return false
@@ -573,13 +601,20 @@ export default function Dashboard() {
       tone: 'expense',
       total: totalDif,
       emptyLabel: `No tienes cuotas activas en ${monthReferenceText}.`,
-      items: applySortDetail(installmentsThisMonth.map((item) => ({
-        id: `expense-installment-${item.id}`,
-        label: item.descripcion,
-        meta: `${item.categoria || 'Sin categoria'} - cuota mensual`,
-        amount: Number(item.cuota_mes ?? item.cuota_mensual),
-        date: item.fecha_inicio || '',
-      }))),
+      items: applySortDetail(installmentsThisMonth.map((item) => {
+        const prog = cuotaProgreso(item, selectedMonth)
+        return {
+          id: `expense-installment-${item.id}`,
+          label: item.descripcion,
+          meta: prog
+            ? `${item.categoria || 'Sin categoria'} · ${prog.actual}/${prog.total}`
+              + (item.fecha_fin ? ` · termina ${mesAnioCorto(item.fecha_fin)}` : '')
+            : `${item.categoria || 'Sin categoria'} - cuota mensual`,
+          amount: Number(item.cuota_mes ?? item.cuota_mensual),
+          date: item.fecha_inicio || '',
+          progress: prog ? prog.pct : null,
+        }
+      })),
     },
     {
       id: 'expense-punctual',
@@ -1230,6 +1265,20 @@ export default function Dashboard() {
                             <div className="dashboard-summary-detail-item-copy">
                               <span className="dashboard-summary-detail-item-label">{item.label}</span>
                               <span className="dashboard-summary-detail-item-meta">{item.meta}</span>
+                              {item.progress != null && (
+                                <div
+                                  className="dashboard-installment-progress"
+                                  role="progressbar"
+                                  aria-valuenow={item.progress}
+                                  aria-valuemin={0}
+                                  aria-valuemax={100}
+                                >
+                                  <div
+                                    className="dashboard-installment-progress-fill"
+                                    style={{ width: `${item.progress}%` }}
+                                  />
+                                </div>
+                              )}
                             </div>
                             <div className="dashboard-summary-detail-item-trailing">
                               <span className={`dashboard-summary-detail-item-amount ${section.tone}`}>
