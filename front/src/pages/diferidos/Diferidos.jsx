@@ -332,7 +332,7 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
       ) : (
         <div className="page-header page-header-actions">
           <div className="page-header-main">
-            <h1 className="page-title">Gastos a cuotas</h1>
+            <h1 className="page-title">🧩 Gastos a cuotas</h1>
             <p className="page-subtitle">Vista compacta para manejar muchas deudas sin perder de vista lo que vence primero.</p>
           </div>
           <button className="btn-add page-primary-action" onClick={openNew}>

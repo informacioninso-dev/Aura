@@ -429,7 +429,7 @@ export default function Importar() {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Importar historial</h1>
+        <h1 className="page-title">📥 Importar historial</h1>
         <p className="page-subtitle">Sube tu estado de cuenta o tu planilla de movimientos en Excel o CSV.</p>
       </div>
 

@@ -463,7 +463,7 @@ export default function Simulador() {
     <div className="simulator-page">
       <div className="page-header simulator-page-header">
         <div>
-          <h1 className="page-title">Simula una decision de gasto</h1>
+          <h1 className="page-title">🔮 Simula una decision de gasto</h1>
           <p className="page-subtitle">Prueba una compra grande o un cambio de vida antes de comprometer tu dinero.</p>
         </div>
         <div className="simulator-projection-badge">

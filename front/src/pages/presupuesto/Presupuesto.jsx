@@ -273,7 +273,7 @@ export default function Presupuesto() {
     <div>
       <div className="page-header page-header-actions">
         <div className="page-header-main">
-          <h1 className="page-title">Categorias y presupuesto</h1>
+          <h1 className="page-title">🏷️ Categorias y presupuesto</h1>
           <p className="page-subtitle">Organiza tus categorias, mira en que se te va el mes y define limites solo donde de verdad te ayuden.</p>
         </div>
         <button className="btn-add page-primary-action" onClick={openNew}>

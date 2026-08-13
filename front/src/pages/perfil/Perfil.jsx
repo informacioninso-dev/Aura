@@ -134,7 +134,7 @@ export default function Perfil() {
     <div style={{ maxWidth: 640 }}>
       <div className="page-header">
         <div className="page-title-row">
-          <h1 className="page-title">Tu perfil</h1>
+          <h1 className="page-title">👤 Tu perfil</h1>
           <span className={`subtle-plan-badge ${currentPlanBadgeClass}`}>Plan {currentPlanLabel}</span>
         </div>
         <p className="page-subtitle">Personaliza tu cuenta y seguridad</p>

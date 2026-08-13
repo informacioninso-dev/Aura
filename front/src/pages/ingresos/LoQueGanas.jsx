@@ -32,7 +32,7 @@ export default function LoQueGanas() {
   return (
     <div className="finance-shell">
       <div className="page-header">
-        <h1 className="page-title">Lo que ganas</h1>
+        <h1 className="page-title">💰 Lo que ganas</h1>
         <p className="page-subtitle">Todo lo que te entra, fijo o puntual.</p>
       </div>
 

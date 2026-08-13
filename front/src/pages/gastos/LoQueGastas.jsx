@@ -96,7 +96,7 @@ export default function LoQueGastas() {
   return (
     <div className="finance-shell">
       <div className="page-header">
-        <h1 className="page-title">Lo que gastas</h1>
+        <h1 className="page-title">💸 Lo que gastas</h1>
         <p className="page-subtitle">Organiza tus gastos sin complicarte.</p>
       </div>
 

@@ -31,7 +31,7 @@ export default function CuentasPersonas() {
   return (
     <div className="finance-shell">
       <div className="page-header">
-        <h1 className="page-title">Cuentas con personas</h1>
+        <h1 className="page-title">🐭 Cuentas con personas</h1>
         <p className="page-subtitle">Pequenas deudas, vueltas y prestamos informales con conocidos.</p>
       </div>
 
