@@ -1009,6 +1009,14 @@ export default function Dashboard() {
           <div className="page-title-row">
             <h1 className="page-title">{saludo}{nombre}</h1>
             <span className={`subtle-plan-badge ${currentPlanBadgeClass}`}>Plan {currentPlanLabel}</span>
+            {healthScoreEnabled && (
+              <SaludFinancieraCard
+                variant="chip"
+                anio={selectedMonth.getFullYear()}
+                mes={selectedMonth.getMonth() + 1}
+                enabled={healthScoreEnabled}
+              />
+            )}
           </div>
           <p className="page-subtitle">Tu mes, claro y sin vueltas.</p>
         </div>
@@ -1143,14 +1151,6 @@ export default function Dashboard() {
           <div className="stat-sub">{tasaAhorro >= 20 ? 'Buen ritmo de ahorro' : tasaAhorro >= 0 ? 'Margen ajustado' : 'Gastas mas de lo que ganas'}</div>
         </div>
       </div>
-
-      {healthScoreEnabled && (
-        <SaludFinancieraCard
-          anio={selectedMonth.getFullYear()}
-          mes={selectedMonth.getMonth() + 1}
-          enabled={healthScoreEnabled}
-        />
-      )}
 
       {activeSummaryDetail && (
         <div className="dashboard-summary-detail-card">

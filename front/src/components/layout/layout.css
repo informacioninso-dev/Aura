@@ -89,6 +89,10 @@
   align-items: center;
   justify-content: center;
 }
+.nav-item-emoji {
+  font-size: 15px;
+  line-height: 1;
+}
 .nav-item:hover {
   background: rgba(var(--app-ink-rgb),0.06);
   color: rgba(var(--app-ink-rgb),0.85);

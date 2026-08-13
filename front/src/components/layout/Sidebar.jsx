@@ -1,42 +1,32 @@
-import {
-  ArrowDownCircle,
-  ArrowUpCircle,
-  Calculator,
-  CreditCard,
-  LogOut,
-  Moon,
-  Rat,
-  Sun,
-  Tags,
-  Upload,
-  UserRound,
-  Wallet,
-} from 'lucide-react'
+import { Moon, Sun } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router'
 
 import BrandMark from '../brand/BrandMark'
 import { useAuth } from '../../context/useAuth'
 import './layout.css'
 
+// Emojis para hablar igual de cercano que la app movil (misma identidad).
 const FINANCE_NAV_ITEMS = [
-  { to: '/dashboard', icon: Wallet, label: 'Mi dinero' },
-  { to: '/ingresos', icon: ArrowDownCircle, label: 'Lo que ganas' },
-  { to: '/gastos', icon: ArrowUpCircle, label: 'Lo que gastas' },
-  { to: '/cuentas-personas', icon: Rat, label: 'Cuentas con personas' },
+  { to: '/dashboard', icon: '📈', label: 'Mi dinero' },
+  { to: '/ingresos', icon: '💰', label: 'Lo que ganas' },
+  { to: '/gastos', icon: '💸', label: 'Lo que gastas' },
+  { to: '/cuentas-personas', icon: '🐭', label: 'Cuentas con personas' },
+]
+
+const TOOL_NAV_ITEMS = [
+  { to: '/presupuesto', icon: '🏷️', label: 'Categorias' },
+  { to: '/simulador', icon: '🔮', label: 'Simulador' },
+  { to: '/importar', icon: '📥', label: 'Importar historial' },
 ]
 
 function NavItem({ to, icon, label, onClick }) {
-  const IconComponent = icon
-
   return (
     <NavLink
       to={to}
       className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
       onClick={onClick}
     >
-      <span className="nav-item-icon" aria-hidden="true">
-        <IconComponent size={17} strokeWidth={2.1} />
-      </span>
+      <span className="nav-item-icon nav-item-emoji" aria-hidden="true">{icon}</span>
       {label}
     </NavLink>
   )
@@ -82,11 +72,9 @@ export default function Sidebar({ isOpen, onClose, theme, onThemeToggle }) {
         ))}
 
         <div className="nav-section-label" style={{ marginTop: 8 }}>Herramientas</div>
-        <NavItem to="/presupuesto" icon={Tags} label="Categorias" onClick={handleNavClick} />
-        <NavItem to="/simulador" icon={Calculator} label="Simulador" onClick={handleNavClick} />
-        <NavItem to="/importar" icon={Upload} label="Importar historial" onClick={handleNavClick} />
-
-
+        {TOOL_NAV_ITEMS.map(({ to, icon, label }) => (
+          <NavItem key={to} to={to} icon={icon} label={label} onClick={handleNavClick} />
+        ))}
       </nav>
 
       <div className="sidebar-footer">
@@ -109,14 +97,12 @@ export default function Sidebar({ isOpen, onClose, theme, onThemeToggle }) {
             <span />
           </span>
         </button>
-        <NavItem to="/perfil" icon={UserRound} label={user?.username || 'Mi perfil'} onClick={handleNavClick} />
+        <NavItem to="/perfil" icon="👤" label={user?.username || 'Mi perfil'} onClick={handleNavClick} />
         <button
           onClick={handleLogout}
           className="nav-item nav-item-danger"
         >
-          <span className="nav-item-icon" aria-hidden="true">
-            <LogOut size={17} strokeWidth={2.1} />
-          </span>
+          <span className="nav-item-icon nav-item-emoji" aria-hidden="true">🚪</span>
           Cerrar sesion
         </button>
       </div>

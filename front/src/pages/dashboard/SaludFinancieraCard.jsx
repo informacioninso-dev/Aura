@@ -38,7 +38,7 @@ function valorTexto(comp) {
   return comp.valor_texto || ''
 }
 
-export default function SaludFinancieraCard({ anio, mes, enabled }) {
+export default function SaludFinancieraCard({ anio, mes, enabled, variant = 'card' }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(false)
   const [detail, setDetail] = useState(false)
@@ -59,7 +59,10 @@ export default function SaludFinancieraCard({ anio, mes, enabled }) {
 
   if (!enabled || error || !data) return null
 
+  const chip = variant === 'chip'
+
   if (!data.disponible) {
+    if (chip) return null   // en el header no mostramos la version vacia
     return (
       <div className="salud-card salud-card-empty">
         <ShieldCheck size={18} />
@@ -72,17 +75,25 @@ export default function SaludFinancieraCard({ anio, mes, enabled }) {
 
   return (
     <>
-      <div className="salud-card">
-        <ScoreRing score={score} color={banda.color} />
-        <div className="salud-card-body">
-          <span className="salud-card-kicker">Salud financiera</span>
-          <span className="salud-card-banda" style={{ color: banda.color }}>{banda.label}</span>
-          <span className="salud-card-sub">Como la mide un banco: ingresos, gastos, cuotas y ahorro.</span>
-        </div>
-        <button type="button" className="salud-card-detalle" onClick={() => setDetail(true)}>
-          Ver detalle
+      {chip ? (
+        <button type="button" className="salud-chip" onClick={() => setDetail(true)} title="Ver tu salud financiera">
+          <span className="salud-chip-dot" style={{ background: banda.color }} />
+          <span className="salud-chip-score">{score}</span>
+          <span className="salud-chip-banda" style={{ color: banda.color }}>{banda.label}</span>
         </button>
-      </div>
+      ) : (
+        <div className="salud-card">
+          <ScoreRing score={score} color={banda.color} />
+          <div className="salud-card-body">
+            <span className="salud-card-kicker">Salud financiera</span>
+            <span className="salud-card-banda" style={{ color: banda.color }}>{banda.label}</span>
+            <span className="salud-card-sub">Como la mide un banco: ingresos, gastos, cuotas y ahorro.</span>
+          </div>
+          <button type="button" className="salud-card-detalle" onClick={() => setDetail(true)}>
+            Ver detalle
+          </button>
+        </div>
+      )}
 
       <Modal open={detail} onClose={() => setDetail(false)} title="Tu salud financiera">
         <div className="salud-detalle">
