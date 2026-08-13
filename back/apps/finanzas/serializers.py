@@ -172,6 +172,9 @@ class IngresoPuntualSerializer(ProjectionEligibilitySerializerMixin, serializers
 
 class GastoCorrienteSerializer(serializers.ModelSerializer):
     monto_real_mes = serializers.SerializerMethodField()
+    # El simulador puede sembrar un gasto planificado a futuro; la entrada manual
+    # sigue prohibiendo fechas futuras.
+    permitir_futuro = serializers.BooleanField(write_only=True, required=False, default=False)
 
     def get_monto_real_mes(self, obj):
         """
@@ -192,6 +195,7 @@ class GastoCorrienteSerializer(serializers.ModelSerializer):
         return str(round_money(Decimal(str(real))))
 
     def validate(self, attrs):
+        permitir_futuro = attrs.pop('permitir_futuro', False)
         monto        = attrs.get('monto',        getattr(self.instance, 'monto',        None))
         tipo_monto   = attrs.get('tipo_monto',   getattr(self.instance, 'tipo_monto',   None))
         fecha_inicio = attrs.get('fecha_inicio', getattr(self.instance, 'fecha_inicio', None))
@@ -205,7 +209,8 @@ class GastoCorrienteSerializer(serializers.ModelSerializer):
             errors['monto'] = 'El monto debe ser mayor que 0.'
         validate_reasonable_date(errors, 'fecha_inicio', fecha_inicio, label='inicio')
         validate_reasonable_date(errors, 'fecha_fin', fecha_fin, label='fin')
-        validate_not_future_expense_date(errors, 'fecha_inicio', fecha_inicio, label='inicio')
+        if not permitir_futuro:
+            validate_not_future_expense_date(errors, 'fecha_inicio', fecha_inicio, label='inicio')
         if fecha_inicio and fecha_fin and fecha_fin < fecha_inicio:
             errors['fecha_fin'] = 'La fecha fin no puede ser menor que la fecha de inicio.'
         if errors:
@@ -257,18 +262,23 @@ class GastoNoCorrienteSerializer(ProjectionEligibilitySerializerMixin, serialize
     # Marca los que por su nombre suelen ser variables (luz, agua, super), para
     # que la UI pueda sugerir el cambio sin esperar a que se repitan 3 meses.
     parece_variable = serializers.SerializerMethodField()
+    # El simulador puede sembrar un gasto puntual a futuro; la entrada manual
+    # sigue prohibiendo fechas futuras.
+    permitir_futuro = serializers.BooleanField(write_only=True, required=False, default=False)
 
     def get_parece_variable(self, obj):
         return parece_gasto_variable(obj.descripcion, obj.categoria)
 
     def validate(self, attrs):
+        permitir_futuro = attrs.pop('permitir_futuro', False)
         monto = attrs.get('monto', getattr(self.instance, 'monto', None))
         fecha = attrs.get('fecha', getattr(self.instance, 'fecha', None))
         errors = {}
         if monto is not None and monto <= 0:
             errors['monto'] = 'El monto debe ser mayor que 0.'
         validate_reasonable_date(errors, 'fecha', fecha)
-        validate_not_future_expense_date(errors, 'fecha', fecha)
+        if not permitir_futuro:
+            validate_not_future_expense_date(errors, 'fecha', fecha)
         if errors:
             raise serializers.ValidationError(errors)
         self.enforce_projection_eligibility(attrs)

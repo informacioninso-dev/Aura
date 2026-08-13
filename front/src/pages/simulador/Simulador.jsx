@@ -42,6 +42,21 @@ const SCENARIO_TYPE_LABELS = {
   cuotas: 'Prestamo',
   recurrente: 'Gasto mensual',
 }
+const ADD_SUCCESS_MESSAGES = {
+  contado: 'Listo. Este pago quedo agregado como gasto puntual en tu plan.',
+  recurrente: 'Listo. Este gasto mensual quedo agregado a tu plan.',
+  cuotas: 'La decision quedo agregada a tus gastos a cuotas.',
+}
+const ADD_BUTTON_LABELS = {
+  contado: 'Agregar a mis gastos',
+  recurrente: 'Agregar a mis gastos',
+  cuotas: 'Agregar a mi plan',
+}
+const ADD_DONE_LABELS = {
+  contado: 'Agregado a tus gastos futuros',
+  recurrente: 'Agregado a gastos mensuales',
+  cuotas: 'Agregado a gastos a cuotas',
+}
 const SCENARIO_TYPES = [
   {
     value: 'contado',
@@ -318,7 +333,8 @@ export default function Simulador() {
   }
 
   async function agregarComoDiferido({ confirmarDuplicado = false } = {}) {
-    if (!resultado || form.tipo !== 'cuotas' || agregando || !ensureFutureSimulationDate()) return
+    const tipo = form.tipo
+    if (!resultado || agregando || !ensureFutureSimulationDate()) return
     if (confirmarDuplicado) setDuplicateDiferidoWarning(null)
     setConfirmAddDiferidoOpen(false)
     setAgregando(true)
@@ -326,30 +342,60 @@ export default function Simulador() {
 
     try {
       const inicio = parseLocalDate(form.fecha_inicio)
-      const fin = shiftMonths(inicio, Number(form.plazo_meses) - 1)
-      await api.post('/finanzas/diferidos/', {
-        descripcion: form.nombre.trim(),
-        categoria: 'otro',
-        monto_total: resultado.total_a_pagar,
-        num_cuotas: form.plazo_meses,
-        cuota_mensual: resultado.cuota_mensual,
-        fecha_inicio: form.fecha_inicio,
-        fecha_fin: formatDateLocal(fin),
-        activo: true,
-        confirmar_duplicado: confirmarDuplicado,
-      })
+      if (tipo === 'contado') {
+        // Pago unico -> gasto puntual a futuro (Gasto No Corriente)
+        await api.post('/finanzas/gastos-no-corrientes/', {
+          descripcion: form.nombre.trim(),
+          categoria: 'otro',
+          monto: resultado.total_a_pagar,
+          fecha: form.fecha_inicio,
+          incluir_en_proyeccion: true,
+          permitir_futuro: true,
+        })
+      } else if (tipo === 'recurrente') {
+        // Gasto mensual -> gasto corriente fijo, acotado al plazo simulado
+        const fin = shiftMonths(inicio, Number(form.plazo_meses) - 1)
+        await api.post('/finanzas/gastos-corrientes/', {
+          descripcion: form.nombre.trim(),
+          categoria: 'otro',
+          monto: resultado.cuota_mensual,
+          tipo_monto: 'fijo',
+          frecuencia: 'mensual',
+          fecha_inicio: form.fecha_inicio,
+          fecha_fin: formatDateLocal(endOfMonth(fin)),
+          activo: true,
+          permitir_futuro: true,
+        })
+      } else {
+        // Prestamo -> gasto a cuotas (Diferido)
+        const fin = shiftMonths(inicio, Number(form.plazo_meses) - 1)
+        await api.post('/finanzas/diferidos/', {
+          descripcion: form.nombre.trim(),
+          categoria: 'otro',
+          monto_total: resultado.total_a_pagar,
+          num_cuotas: form.plazo_meses,
+          cuota_mensual: resultado.cuota_mensual,
+          fecha_inicio: form.fecha_inicio,
+          fecha_fin: formatDateLocal(fin),
+          activo: true,
+          confirmar_duplicado: confirmarDuplicado,
+        })
+      }
       setDiferidoOk(true)
       setDuplicateDiferidoWarning(null)
-      setFeedback({ type: 'success', message: 'La decision quedo agregada a tus gastos a cuotas.' })
+      setFeedback({ type: 'success', message: ADD_SUCCESS_MESSAGES[tipo] || ADD_SUCCESS_MESSAGES.cuotas })
       setTimeout(() => setDiferidoOk(false), 3500)
     } catch (error) {
-      const duplicateMessage = normalizeApiMessage(error?.response?.data?.duplicado).trim()
-      const detectedDuplicates = normalizeDetectedDuplicates(error?.response?.data?.duplicados_detectados)
-      if (!confirmarDuplicado && duplicateMessage && detectedDuplicates.length > 0) {
-        setDuplicateDiferidoWarning({ message: duplicateMessage, duplicates: detectedDuplicates })
-        return
+      // La deteccion de duplicados solo existe para gastos a cuotas.
+      if (tipo === 'cuotas') {
+        const duplicateMessage = normalizeApiMessage(error?.response?.data?.duplicado).trim()
+        const detectedDuplicates = normalizeDetectedDuplicates(error?.response?.data?.duplicados_detectados)
+        if (!confirmarDuplicado && duplicateMessage && detectedDuplicates.length > 0) {
+          setDuplicateDiferidoWarning({ message: duplicateMessage, duplicates: detectedDuplicates })
+          return
+        }
       }
-      setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo agregar el gasto a cuotas.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo agregar a tus gastos.') })
     } finally {
       setAgregando(false)
     }
@@ -710,12 +756,12 @@ export default function Simulador() {
                       <button type="button" onClick={guardarSimulacion} disabled={guardando} className="btn-modal-cancel">
                         <Save size={16} /> {guardando ? 'Guardando...' : 'Guardar escenario'}
                       </button>
-                      {form.tipo === 'cuotas' && resultado.factible && (
+                      {resultado.factible && (
                         diferidoOk ? (
-                          <div className="simulator-added-state"><CheckCircle size={16} /> Agregado a gastos a cuotas</div>
+                          <div className="simulator-added-state"><CheckCircle size={16} /> {ADD_DONE_LABELS[form.tipo]}</div>
                         ) : (
                           <button type="button" onClick={() => setConfirmAddDiferidoOpen(true)} disabled={agregando} className="btn-modal-save">
-                            <CreditCard size={16} /> Agregar a mi plan
+                            <CreditCard size={16} /> {ADD_BUTTON_LABELS[form.tipo]}
                           </button>
                         )
                       )}
@@ -890,9 +936,13 @@ export default function Simulador() {
 
       <ConfirmDialog
         open={confirmAddDiferidoOpen}
-        title="Agregar esta decision a tu plan"
-        message={`Se agregara una cuota mensual de ${fmt(resultado?.cuota_mensual || 0)} desde ${startDateLabel}.`}
-        confirmText="Agregar cuota"
+        title={form.tipo === 'cuotas' ? 'Agregar esta decision a tu plan' : 'Agregar este gasto a tu plan'}
+        message={form.tipo === 'contado'
+          ? `Se agregara un gasto puntual de ${fmt(resultado?.total_a_pagar || 0)} en ${startDateLabel}. Podras eliminarlo cuando quieras desde "Lo que gastas".`
+          : form.tipo === 'recurrente'
+            ? `Se agregara un gasto mensual de ${fmt(resultado?.cuota_mensual || 0)} desde ${startDateLabel} durante ${form.plazo_meses} meses. Podras eliminarlo cuando quieras.`
+            : `Se agregara una cuota mensual de ${fmt(resultado?.cuota_mensual || 0)} desde ${startDateLabel}.`}
+        confirmText={form.tipo === 'cuotas' ? 'Agregar cuota' : 'Agregar gasto'}
         cancelText="Cancelar"
         loading={agregando}
         onConfirm={agregarComoDiferido}

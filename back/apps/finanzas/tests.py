@@ -3527,6 +3527,77 @@ class TestSimpleEsAritmetica(APITestCase):
         self.assertEqual(calcular_balance_mes(self.user, futuro.year, futuro.month), Decimal('955.00'))
 
 
+class TestGastosPlanificadosDesdeSimulador(APITestCase):
+    """El simulador puede sembrar gastos a futuro en su tabla correspondiente:
+    pago unico -> Gasto No Corriente, gasto mensual -> Gasto Corriente. Deben
+    aceptar fecha futura con permitir_futuro y salir en la proyeccion."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            email='plan@example.com', username='usuario_plan', password='clave12345',
+        )
+        self.client.force_authenticate(user=self.user)
+        self.hoy = local_today()
+        self.base = first_day_of_month(self.hoy)
+
+    def test_puntual_futuro_se_proyecta_en_su_mes(self):
+        objetivo = add_months(self.base, 2)
+        GastoNoCorriente.objects.create(
+            usuario=self.user, descripcion='Viaje', categoria='otro',
+            monto=Decimal('300.00'), fecha=objetivo + datetime.timedelta(days=5),
+            incluir_en_proyeccion=True,
+        )
+        cache.clear()
+        data = calcular_proyeccion_acumulada(self.user, months=6)
+        por_mes = {p['month']: p for p in data['series']}
+        clave = f'{objetivo.year}-{objetivo.month:02d}'
+        otro = add_months(self.base, 3)
+        clave_otro = f'{otro.year}-{otro.month:02d}'
+        self.assertEqual(Decimal(str(por_mes[clave]['monthly_gastos'])), Decimal('300.0'))
+        self.assertEqual(Decimal(str(por_mes[clave_otro]['monthly_gastos'])), Decimal('0.0'))
+
+    def test_puntual_futuro_excluido_no_se_proyecta(self):
+        objetivo = add_months(self.base, 2)
+        GastoNoCorriente.objects.create(
+            usuario=self.user, descripcion='Viaje', categoria='otro',
+            monto=Decimal('300.00'), fecha=objetivo + datetime.timedelta(days=5),
+            incluir_en_proyeccion=False,
+        )
+        cache.clear()
+        data = calcular_proyeccion_acumulada(self.user, months=6)
+        por_mes = {p['month']: p for p in data['series']}
+        clave = f'{objetivo.year}-{objetivo.month:02d}'
+        self.assertEqual(Decimal(str(por_mes[clave]['monthly_gastos'])), Decimal('0.0'))
+
+    def test_api_puntual_futuro_requiere_permitir_futuro(self):
+        futura = (add_months(self.base, 1) + datetime.timedelta(days=5)).isoformat()
+        payload = {
+            'descripcion': 'Compra planificada', 'categoria': 'otro',
+            'monto': '300.00', 'fecha': futura,
+        }
+        r1 = self.client.post('/api/finanzas/gastos-no-corrientes/', payload, format='json')
+        self.assertEqual(r1.status_code, status.HTTP_400_BAD_REQUEST)
+        r2 = self.client.post(
+            '/api/finanzas/gastos-no-corrientes/', {**payload, 'permitir_futuro': True}, format='json',
+        )
+        self.assertEqual(r2.status_code, status.HTTP_201_CREATED)
+        self.assertFalse('permitir_futuro' in r2.data)
+
+    def test_api_gasto_mensual_futuro_requiere_permitir_futuro(self):
+        futura = (add_months(self.base, 1) + datetime.timedelta(days=5)).isoformat()
+        payload = {
+            'descripcion': 'Gimnasio', 'categoria': 'otro', 'monto': '45.00',
+            'tipo_monto': 'fijo', 'frecuencia': 'mensual', 'fecha_inicio': futura, 'activo': True,
+        }
+        r1 = self.client.post('/api/finanzas/gastos-corrientes/', payload, format='json')
+        self.assertEqual(r1.status_code, status.HTTP_400_BAD_REQUEST)
+        r2 = self.client.post(
+            '/api/finanzas/gastos-corrientes/', {**payload, 'permitir_futuro': True}, format='json',
+        )
+        self.assertEqual(r2.status_code, status.HTTP_201_CREATED)
+
+
 class TestConsumosVariables(APITestCase):
     """Consumos individuales por rubro: varios al mes, sumados, editables."""
 

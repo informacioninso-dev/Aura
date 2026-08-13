@@ -1171,6 +1171,23 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
             ingresos_puntuales_futuros_por_mes.get(key, Decimal('0.00')) + _money(item.monto)
         )
 
+    # Gastos puntuales con fecha futura conocida (ej. un pago unico planificado
+    # desde el simulador). Se proyectan solo en su mes, igual que los ingresos.
+    gastos_puntuales_futuros = list(
+        GastoNoCorriente.objects.filter(
+            usuario=usuario,
+            fecha__gt=current_month_end,
+            fecha__lte=projection_end,
+            incluir_en_proyeccion=True,
+        )
+    )
+    gastos_puntuales_futuros_por_mes = {}
+    for item in gastos_puntuales_futuros:
+        key = (item.fecha.year, item.fecha.month)
+        gastos_puntuales_futuros_por_mes[key] = (
+            gastos_puntuales_futuros_por_mes.get(key, Decimal('0.00')) + _money(item.monto)
+        )
+
     # Un puntual que ya existe como variable declarado no puede alimentar el
     # colchon: ese gasto ya se proyecta por su propia via.
     claves_variables = claves_gastos_variables(gastos_corrientes)
@@ -1351,9 +1368,10 @@ def calcular_proyeccion_acumulada(usuario, *, months=120, history_months=12, rea
         total_cuotas = _cuotas_mes(month_start, month_end)
         key = (month_start.year, month_start.month)
         ing_puntual_futuro = ingresos_puntuales_futuros_por_mes.get(key, Decimal('0.00'))
+        gasto_puntual_futuro = gastos_puntuales_futuros_por_mes.get(key, Decimal('0.00'))
 
         projected_ingresos = (total_ing_fijos + smoothed_variable_ingresos + ing_puntual_futuro).quantize(Decimal('0.01'))
-        projected_gastos = (total_gastos_fijos + total_cuotas + smoothed_variable_gastos).quantize(Decimal('0.01'))
+        projected_gastos = (total_gastos_fijos + total_cuotas + smoothed_variable_gastos + gasto_puntual_futuro).quantize(Decimal('0.01'))
         projected_gap = (projected_ingresos - projected_gastos).quantize(Decimal('0.01'))
         opening_balance = latest_closing_balance
         closing_balance = (opening_balance + projected_gap).quantize(Decimal('0.01'))
