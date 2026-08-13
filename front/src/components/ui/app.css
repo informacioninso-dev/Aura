@@ -2691,6 +2691,87 @@
   color: var(--app-text);
 }
 
+/* Card "Si sigues asi": conteos alineados a la derecha de cada fila
+   (verde "en positivo" junto al label; rojo "en rojo" junto al valor). */
+.dashboard-outlook-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.dashboard-outlook-pill {
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.dashboard-outlook-pill.pos { color: var(--app-green); }
+.dashboard-outlook-pill.neg { color: var(--app-danger); }
+.dashboard-outlook-pill.zero { color: rgba(var(--app-ink-rgb),0.38); font-weight: 700; }
+
+/* Detalle mes a mes (detras de "ver mas"), embebido en la card. */
+.dashboard-outlook {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.dashboard-outlook-summary {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px;
+  color: rgba(var(--app-ink-rgb),0.62);
+}
+.dashboard-outlook-summary .pos { color: var(--app-green); font-weight: 800; }
+.dashboard-outlook-summary .neg { color: var(--app-danger); font-weight: 800; }
+.dashboard-outlook-summary .zero { color: rgba(var(--app-ink-rgb),0.38); font-weight: 700; }
+.dashboard-outlook-sep { color: rgba(var(--app-ink-rgb),0.30); }
+.dashboard-outlook-since { color: rgba(var(--app-ink-rgb),0.50); font-weight: 600; }
+.dashboard-outlook-toggle {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--app-danger);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.dashboard-outlook-toggle:hover { opacity: 0.82; }
+.dashboard-outlook-list {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dashboard-outlook-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: rgba(var(--app-ink-rgb),0.03);
+}
+.dashboard-outlook-list .neg {
+  font-weight: 800;
+  color: var(--app-danger);
+  font-variant-numeric: tabular-nums;
+}
+.dashboard-outlook-more {
+  justify-content: center !important;
+  background: none !important;
+  color: rgba(var(--app-ink-rgb),0.40);
+  font-size: 12px;
+}
+.dashboard-outlook-standalone { margin-bottom: 12px; }
+
 .dashboard-premium-locked {
   background: linear-gradient(135deg, rgba(196,135,246,0.08), rgba(16,185,129,0.05));
 }

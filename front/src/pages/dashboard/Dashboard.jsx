@@ -202,6 +202,7 @@ export default function Dashboard() {
   const [showProjectionPeriod, setShowProjectionPeriod] = useState(false)
   const [seriesFocus, setSeriesFocus] = useState('all')
   const [activeSummaryDetail, setActiveSummaryDetail] = useState(null)
+  const [showNegDetail, setShowNegDetail] = useState(false)
   const [detailSort, setDetailSort] = useState('amount-desc')
   const [showCategoryView, setShowCategoryView] = useState(false)
   const [selectedExpenseCategory, setSelectedExpenseCategory] = useState(null)
@@ -787,6 +788,66 @@ export default function Dashboard() {
   }, [chartSeries.length, currentMonthIndex, projectionWindowSize])
 
   const latestProjectedPoint = chartSeries.filter((point) => !point.is_real).at(-1) || null
+
+  // Conteo del horizonte proyectado (acotado por el plan: free = proximos
+  // meses; pro = hasta 10 anos): cuantos meses cierran en positivo y cuantos en
+  // rojo. Los conteos se pintan alineados a la derecha de cada fila de la card
+  // "Si sigues asi" (verde arriba junto al label, rojo abajo junto al valor).
+  function computeOutlook() {
+    const proyectados = chartSeries.filter((point) => !point.is_real)
+    const enRojo = proyectados.filter((point) => Number(point.gapAcumulado) < 0)
+    return { total: proyectados.length, enRojo, enPositivo: proyectados.length - enRojo.length }
+  }
+
+  // Toggle + detalle mes a mes de los meses en rojo (detras de "ver mas").
+  function renderOutlookDetail(enRojo) {
+    if (!enRojo.length) return null
+    const visibles = enRojo.slice(0, 4)
+    const resto = enRojo.length - visibles.length
+    return (
+      <span className="dashboard-outlook">
+        <button
+          type="button"
+          className="dashboard-outlook-toggle"
+          onClick={() => setShowNegDetail((prev) => !prev)}
+        >
+          {showNegDetail
+            ? 'Ocultar el detalle'
+            : `Ver ${enRojo.length === 1 ? 'el mes en rojo' : `los ${enRojo.length} meses en rojo`}`}
+        </button>
+        {showNegDetail && (
+          <ul className="dashboard-outlook-list">
+            {visibles.map((m) => (
+              <li key={m.month}>
+                <span>{m.label}</span>
+                <span className="neg">{fmt(m.gapAcumulado)}</span>
+              </li>
+            ))}
+            {resto > 0 && (
+              <li className="dashboard-outlook-more">y {resto} {resto === 1 ? 'mes mas' : 'meses mas'} en rojo</li>
+            )}
+          </ul>
+        )}
+      </span>
+    )
+  }
+
+  // Version suelta para la card Free (que no tiene la tile "Si sigues asi").
+  function renderOutlookFree() {
+    const { total, enRojo, enPositivo } = computeOutlook()
+    if (!total) return null
+    return (
+      <div className="dashboard-outlook-standalone">
+        <span className="dashboard-outlook-summary">
+          <strong className="pos">{enPositivo} en positivo</strong>
+          <span className="dashboard-outlook-sep">·</span>
+          <strong className={enRojo.length ? 'neg' : 'zero'}>{enRojo.length} en rojo</strong>
+        </span>
+        {renderOutlookDetail(enRojo)}
+      </div>
+    )
+  }
+
   const visibleProjectionSeries = chartSeries.slice(projectionWindow.startIndex, projectionWindow.endIndex + 1)
   const visibleCurrentMonthLabel = visibleProjectionSeries.find((point) => point.month === currentMonthKey)?.label || null
   const isCurrentMonthVisible = visibleProjectionSeries.some((p) => p.month === currentMonthKey)
@@ -1389,13 +1450,29 @@ export default function Dashboard() {
             const isConservativeMode = projectionMode === 'conservadora'
             return (
               <div className="dashboard-premium-meta">
-                <div className="dashboard-premium-stat">
-                  <span className="dashboard-premium-stat-label">Si sigues asi, terminarias con</span>
-                  <strong className="dashboard-premium-stat-value" style={{ color: projectedGap >= 0 ? 'var(--app-lila)' : 'var(--app-danger)' }}>
-                    {fmt(projectedGap)}
-                  </strong>
-                  <span className="dashboard-chart-note">Saldo estimado al cierre de {projectedGapLabel}</span>
-                </div>
+                {(() => {
+                  const outlook = computeOutlook()
+                  return (
+                    <div className="dashboard-premium-stat dashboard-premium-stat-outlook">
+                      <div className="dashboard-outlook-row">
+                        <span className="dashboard-premium-stat-label">Si sigues asi, terminarias con</span>
+                        {outlook.total > 0 && (
+                          <span className="dashboard-outlook-pill pos">{outlook.enPositivo} en positivo</span>
+                        )}
+                      </div>
+                      <div className="dashboard-outlook-row">
+                        <strong className="dashboard-premium-stat-value" style={{ color: projectedGap >= 0 ? 'var(--app-lila)' : 'var(--app-danger)' }}>
+                          {fmt(projectedGap)}
+                        </strong>
+                        {outlook.total > 0 && (
+                          <span className={`dashboard-outlook-pill ${outlook.enRojo.length ? 'neg' : 'zero'}`}>{outlook.enRojo.length} en rojo</span>
+                        )}
+                      </div>
+                      <span className="dashboard-chart-note">Saldo estimado al cierre de {projectedGapLabel}</span>
+                      {renderOutlookDetail(outlook.enRojo)}
+                    </div>
+                  )
+                })()}
                 <div className="dashboard-premium-stat">
                   <span className="dashboard-premium-stat-label">Hoy partes con</span>
                   <strong className="dashboard-premium-stat-value">{fmt(advancedProjection?.starting_balance ?? 0)}</strong>
@@ -1439,6 +1516,7 @@ export default function Dashboard() {
               </div>
             )
           })()}
+
           {/* ── 2. Controles ── */}
           <div className="dashboard-chart-toolbar">
             <div className="dashboard-chart-toolbar-primary">
@@ -1609,6 +1687,8 @@ export default function Dashboard() {
             <span className="dashboard-premium-chip">{freeProjectionPastMonths} meses reales</span>
             <span className="dashboard-premium-chip">{freeProjectionFutureMonths} proyectados</span>
           </div>
+
+          {!projectionLoading && !projectionError && !advancedChartEmpty && renderOutlookFree()}
 
           {projectionLoading ? (
             <div className="loading-screen" style={{ minHeight: '220px' }}>
