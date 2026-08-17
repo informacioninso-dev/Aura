@@ -333,12 +333,37 @@ class GastoCorrienteViewSet(BaseFinanzasViewSet):
     search_fields = ('descripcion', 'categoria', 'frecuencia', 'monto', 'fecha_inicio')
     ordering_fields = ('descripcion', 'monto', 'categoria', 'fecha_inicio')
 
+    def _mes_seleccionado(self):
+        """(primer_dia, primer_dia_mes_siguiente) del anio/mes en query, o None
+        si no se pidio o es invalido. Sirve para filtrar 'activos en ese mes'."""
+        anio_raw = self.request.query_params.get('anio')
+        mes_raw = self.request.query_params.get('mes')
+        if anio_raw is None or mes_raw is None:
+            return None
+        try:
+            anio = int(anio_raw)
+            mes = int(mes_raw)
+        except (TypeError, ValueError):
+            return None
+        if not (2000 <= anio <= 2100 and 1 <= mes <= 12):
+            return None
+        month_start = datetime.date(anio, mes, 1)
+        next_month = datetime.date(anio + 1, 1, 1) if mes == 12 else datetime.date(anio, mes + 1, 1)
+        return month_start, next_month
+
     def get_list_summary(self, queryset):
-        today = local_today()
-        month_start = today.replace(day=1)
-        active = queryset.filter(
-            activo=True, fecha_inicio__lte=today,
-        ).filter(models.Q(fecha_fin__isnull=True) | models.Q(fecha_fin__gte=today))
+        periodo = self._mes_seleccionado()
+        if periodo:
+            month_start, next_month = periodo
+            active = queryset.filter(
+                activo=True, fecha_inicio__lt=next_month,
+            ).filter(models.Q(fecha_fin__isnull=True) | models.Q(fecha_fin__gte=month_start))
+        else:
+            today = local_today()
+            month_start = today.replace(day=1)
+            active = queryset.filter(
+                activo=True, fecha_inicio__lte=today,
+            ).filter(models.Q(fecha_fin__isnull=True) | models.Q(fecha_fin__gte=today))
         monthly_total = sum(
             (_monto_efectivo_mes(item.monto, item.frecuencia, item.fecha_inicio, month_start) for item in active.iterator()),
             Decimal('0.00'),
@@ -349,6 +374,15 @@ class GastoCorrienteViewSet(BaseFinanzasViewSet):
         tipo_monto = self.request.query_params.get('tipo_monto')
         if tipo_monto in {TIPO_MONTO_FIJO, TIPO_MONTO_VARIABLE}:
             qs = qs.filter(tipo_monto=tipo_monto)
+        # El navegador de mes lista los gastos activos en ese mes. Solo en 'list'
+        # para no afectar retrieve/update/delete/acciones (que no mandan anio/mes).
+        if self.action == 'list':
+            periodo = self._mes_seleccionado()
+            if periodo:
+                month_start, next_month = periodo
+                qs = qs.filter(fecha_inicio__lt=next_month).filter(
+                    models.Q(fecha_fin__isnull=True) | models.Q(fecha_fin__gte=month_start)
+                )
         return qs
 
     @action(detail=True, methods=['post'])

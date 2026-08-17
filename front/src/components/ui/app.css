@@ -2113,6 +2113,10 @@
   padding: 10px 0 18px;
 }
 
+/* Navegador de mes suelto arriba de la lista de gastos fijos. */
+.gastos-month-nav-row { display: flex; justify-content: center; }
+.gastos-month-nav-row .month-nav { padding: 2px 0 12px; }
+
 .month-nav-label {
   font-size: 17px;
   font-weight: 700;

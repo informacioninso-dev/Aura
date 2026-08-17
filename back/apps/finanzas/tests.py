@@ -3527,6 +3527,65 @@ class TestSimpleEsAritmetica(APITestCase):
         self.assertEqual(calcular_balance_mes(self.user, futuro.year, futuro.month), Decimal('955.00'))
 
 
+class TestGastosCorrientesNavegadorMes(APITestCase):
+    """El navegador de mes lista los gastos fijos activos en el mes elegido
+    (segun fecha_inicio/fecha_fin) y el total refleja ese mes; editar/borrar de
+    otros meses no se bloquea."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            email='navmes@example.com', username='usuario_navmes', password='clave12345',
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def _crear(self, desc, inicio, fin=None, monto='100'):
+        return GastoCorriente.objects.create(
+            usuario=self.user, descripcion=desc, categoria='otro',
+            monto=Decimal(monto), tipo_monto='fijo', frecuencia='mensual',
+            fecha_inicio=inicio, fecha_fin=fin, activo=True,
+        )
+
+    def _list(self, anio, mes):
+        return self.client.get(
+            f'/api/finanzas/gastos-corrientes/?tipo_monto=fijo&anio={anio}&mes={mes}&page=1&page_size=50'
+        )
+
+    def test_lista_solo_activos_en_el_mes(self):
+        self._crear('Cerrado en julio', datetime.date(2026, 6, 1), datetime.date(2026, 7, 31))
+        self._crear('Vigente', datetime.date(2026, 6, 1))
+        self._crear('Futuro sept', datetime.date(2026, 9, 1))
+
+        nombres_ago = {row['descripcion'] for row in self._list(2026, 8).data['results']}
+        self.assertEqual(nombres_ago, {'Vigente'})
+        nombres_jul = {row['descripcion'] for row in self._list(2026, 7).data['results']}
+        self.assertEqual(nombres_jul, {'Cerrado en julio', 'Vigente'})
+        nombres_sep = {row['descripcion'] for row in self._list(2026, 9).data['results']}
+        self.assertEqual(nombres_sep, {'Vigente', 'Futuro sept'})
+
+    def test_summary_refleja_el_mes(self):
+        self._crear('Cerrado en julio', datetime.date(2026, 6, 1), datetime.date(2026, 7, 31), monto='40')
+        self._crear('Vigente', datetime.date(2026, 6, 1), monto='100')
+        self.assertEqual(Decimal(str(self._list(2026, 8).data['summary']['monthly_total'])), Decimal('100.00'))
+        self.assertEqual(Decimal(str(self._list(2026, 7).data['summary']['monthly_total'])), Decimal('140.00'))
+
+    def test_editar_gasto_de_otro_mes_no_se_bloquea(self):
+        # Un fijo cerrado en julio: "viendo agosto" igual debe poder editarse
+        # (el PATCH no manda anio/mes, y el filtro de mes solo aplica en list).
+        g = self._crear('Cerrado en julio', datetime.date(2026, 6, 1), datetime.date(2026, 7, 31))
+        r = self.client.patch(f'/api/finanzas/gastos-corrientes/{g.id}/', {'monto': '55'}, format='json')
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        g.refresh_from_db()
+        self.assertEqual(g.monto, Decimal('55'))
+
+    def test_sin_anio_mes_lista_todos(self):
+        # Compatibilidad: sin navegador (sin anio/mes) siguen viniendo todos.
+        self._crear('Cerrado en julio', datetime.date(2026, 6, 1), datetime.date(2026, 7, 31))
+        self._crear('Vigente', datetime.date(2026, 6, 1))
+        r = self.client.get('/api/finanzas/gastos-corrientes/?tipo_monto=fijo&page=1&page_size=50')
+        self.assertEqual(r.data['count'], 2)
+
+
 class TestGastosPlanificadosDesdeSimulador(APITestCase):
     """El simulador puede sembrar gastos a futuro en su tabla correspondiente:
     pago unico -> Gasto No Corriente, gasto mensual -> Gasto Corriente. Deben

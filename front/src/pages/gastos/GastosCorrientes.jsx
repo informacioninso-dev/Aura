@@ -10,8 +10,10 @@ import ListPager from '../../components/ui/ListPager'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import DateQuickActions from '../../components/ui/DateQuickActions'
 import Modal from '../../components/ui/Modal'
+import MonthNavigator from '../../components/ui/MonthNavigator'
 import { useCategorias } from '../../hooks/useCategorias'
 import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../../utils/dateBounds'
+import { startOfMonth } from '../../utils/months'
 import { formatAmount } from '../../utils/formatters'
 import { FRECUENCIAS } from '../../utils/frecuencias'
 import '../../components/ui/app.css'
@@ -94,6 +96,11 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
   const [totalItems, setTotalItems] = useState(0)
   const [total, setTotal] = useState(0)
 
+  // — navegador de mes: muestra los gastos activos en el mes elegido —
+  const [selectedMonth, setSelectedMonth] = useState(() => startOfMonth(new Date()))
+  const anio = selectedMonth.getFullYear()
+  const mes = selectedMonth.getMonth() + 1
+
   // — modal crear/editar —
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState(buildEmptyForm(tipoMonto))
@@ -131,7 +138,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
   useEffect(() => {
     const timer = setTimeout(() => { void fetchItems() }, 250)
     return () => clearTimeout(timer)
-  }, [tipoMonto, page, pageSize, query, sortField, sortDir])
+  }, [tipoMonto, page, pageSize, query, sortField, sortDir, anio, mes])
   useEffect(() => {
     api.get('/finanzas/catalogo/')
       .then(({ data }) => setCatalogo(data[`gasto_${tipoMonto}`] || []))
@@ -162,6 +169,8 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
       const { data } = await api.get('/finanzas/gastos-corrientes/', {
         params: {
           tipo_monto: tipoMonto,
+          anio,
+          mes,
           page,
           page_size: pageSize,
           search: query.trim() || undefined,
@@ -458,6 +467,17 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
           <button className="btn-add page-primary-action" onClick={openNew}><Plus size={16} /> Agregar</button>
         </div>
       )}
+
+      <div className="gastos-month-nav-row">
+        <MonthNavigator
+          value={selectedMonth}
+          onChange={(nextMonth) => {
+            setSelectedMonth(nextMonth)
+            setPage(1)
+            setSelectedIds(new Set())
+          }}
+        />
+      </div>
 
       <FeedbackAlert type={feedback.type || 'error'} message={feedback.message} />
 
