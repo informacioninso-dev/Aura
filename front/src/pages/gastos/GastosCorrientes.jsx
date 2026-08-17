@@ -58,10 +58,17 @@ function getTodayDate() {
   return `${y}-${m}-${d}`
 }
 
-function dayBefore(dateStr) {
+// Ultimo dia del mes ANTERIOR al de la fecha dada. Al versionar cerramos la
+// version vieja aqui, para que el mes en que arranca la nueva version cuente
+// solo la nueva (un gasto mensual cuenta el mes completo, sin prorrateo por
+// dia; si compartieran mes se contaria doble).
+function endOfMonthBefore(dateStr) {
   const d = new Date(dateStr + 'T00:00:00')
-  d.setDate(d.getDate() - 1)
-  return d.toISOString().slice(0, 10)
+  const prev = new Date(d.getFullYear(), d.getMonth(), 0)
+  const y = prev.getFullYear()
+  const m = String(prev.getMonth() + 1).padStart(2, '0')
+  const day = String(prev.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 function buildEmptyForm(tipoMonto = 'fijo') {
@@ -340,7 +347,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
     setVersionLoading(true)
     setFeedback({ type: '', message: '' })
     try {
-      await api.patch(`/finanzas/gastos-corrientes/${versioningItem.id}/`, { fecha_fin: dayBefore(versionForm.nuevaFecha) })
+      await api.patch(`/finanzas/gastos-corrientes/${versioningItem.id}/`, { fecha_fin: endOfMonthBefore(versionForm.nuevaFecha) })
       await api.post('/finanzas/gastos-corrientes/', {
         descripcion: versionForm.descripcion,
         categoria: versionForm.categoria,
@@ -544,7 +551,14 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
                       <td style={{ width: 36, paddingRight: 0 }}>
                         <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} style={{ cursor: 'pointer', accentColor: 'var(--app-lila)' }} />
                       </td>
-                      <td style={{ fontWeight: 600 }}>{item.descripcion}</td>
+                      <td style={{ fontWeight: 600 }}>
+                        {item.descripcion}
+                        {item.version_info && (
+                          <span className="gasto-version-chip" title={`Version ${item.version_info.numero} de ${item.version_info.total}`}>
+                            v{item.version_info.numero}
+                          </span>
+                        )}
+                      </td>
                       <td><span className="badge badge-gray" style={{ textTransform: 'capitalize' }}>{item.categoria}</span></td>
                       <td className="table-amount negative">${formatAmount(parseFloat(item.monto))}</td>
                       <td><span className="badge badge-gray" style={{ textTransform: 'capitalize' }}>{item.frecuencia}</span></td>
@@ -721,7 +735,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
         {versioningItem && (
           <form onSubmit={handleVersion}>
             <p style={{ marginTop: -8, marginBottom: 16, fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.5)', lineHeight: 1.5 }}>
-              Cerramos el registro actual un dia antes de la nueva fecha. El historial queda guardado.
+              La version nueva cuenta desde el mes que elijas; la anterior se cierra al fin del mes previo, para que ese mes no se cuente dos veces. El historial queda guardado.
             </p>
 
             <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(var(--app-ink-rgb),0.04)', borderRadius: 10, fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.45)' }}>

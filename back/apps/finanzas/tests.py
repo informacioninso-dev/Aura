@@ -3585,6 +3585,79 @@ class TestGastosCorrientesNavegadorMes(APITestCase):
         r = self.client.get('/api/finanzas/gastos-corrientes/?tipo_monto=fijo&page=1&page_size=50')
         self.assertEqual(r.data['count'], 2)
 
+    def test_versiones_cortadas_por_mes_no_duplican(self):
+        # Vieja cerrada a fin de julio; nueva desde mediados de agosto. Agosto
+        # cuenta solo la nueva (350), no old+new; julio cuenta solo la vieja.
+        self._crear('Arriendo', datetime.date(2026, 1, 1), datetime.date(2026, 7, 31), monto='300')
+        self._crear('Arriendo', datetime.date(2026, 8, 18), monto='350')
+        self.assertEqual(calcular_balance_mes(self.user, 2026, 8), Decimal('-350.00'))
+        self.assertEqual(calcular_balance_mes(self.user, 2026, 7), Decimal('-300.00'))
+
+    def test_chip_version_en_lista(self):
+        self._crear('Arriendo', datetime.date(2026, 1, 1), datetime.date(2026, 7, 31), monto='300')
+        self._crear('Arriendo', datetime.date(2026, 8, 1), monto='350')
+        self._crear('Luz', datetime.date(2026, 1, 1), monto='50')  # sin versiones
+        r = self.client.get('/api/finanzas/gastos-corrientes/?tipo_monto=fijo&page=1&page_size=50')
+        por_nombre = {}
+        for row in r.data['results']:
+            por_nombre.setdefault(row['descripcion'], []).append(row['version_info'])
+        self.assertEqual(sorted(v['numero'] for v in por_nombre['Arriendo']), [1, 2])
+        self.assertTrue(all(v['total'] == 2 for v in por_nombre['Arriendo']))
+        self.assertIsNone(por_nombre['Luz'][0])  # una sola version -> sin chip
+
+
+class TestCleanupSolapesVersiones(APITestCase):
+    """El command arreglar_solapes_versiones cierra la version vieja al fin del
+    mes anterior cuando comparte mes con la nueva (evita doble conteo)."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            email='cleanup@example.com', username='u_cleanup', password='clave12345',
+        )
+
+    def _crear(self, inicio, fin=None, monto='100', desc='Arriendo'):
+        return GastoCorriente.objects.create(
+            usuario=self.user, descripcion=desc, categoria='otro',
+            monto=Decimal(monto), tipo_monto='fijo', frecuencia='mensual',
+            fecha_inicio=inicio, fecha_fin=fin, activo=True,
+        )
+
+    def test_snap_corrige_solape_y_es_idempotente(self):
+        from io import StringIO
+        from django.core.management import call_command
+
+        vieja = self._crear(datetime.date(2026, 1, 1), datetime.date(2026, 8, 14), monto='300')
+        self._crear(datetime.date(2026, 8, 15), monto='350')
+        # Bug documentado: agosto cuenta 300 + 350 = 650.
+        cache.clear()
+        self.assertEqual(calcular_balance_mes(self.user, 2026, 8), Decimal('-650.00'))
+
+        call_command('arreglar_solapes_versiones', '--apply', stdout=StringIO())
+        vieja.refresh_from_db()
+        self.assertEqual(vieja.fecha_fin, datetime.date(2026, 7, 31))
+        cache.clear()
+        self.assertEqual(calcular_balance_mes(self.user, 2026, 8), Decimal('-350.00'))
+
+        # Idempotente: segunda corrida no cambia nada.
+        out2 = StringIO()
+        call_command('arreglar_solapes_versiones', '--apply', stdout=out2)
+        vieja.refresh_from_db()
+        self.assertEqual(vieja.fecha_fin, datetime.date(2026, 7, 31))
+        self.assertIn('0 correccion', out2.getvalue())
+
+    def test_dry_run_no_escribe(self):
+        from io import StringIO
+        from django.core.management import call_command
+
+        vieja = self._crear(datetime.date(2026, 1, 1), datetime.date(2026, 8, 14), monto='300')
+        self._crear(datetime.date(2026, 8, 15), monto='350')
+        out = StringIO()
+        call_command('arreglar_solapes_versiones', stdout=out)
+        vieja.refresh_from_db()
+        self.assertEqual(vieja.fecha_fin, datetime.date(2026, 8, 14))
+        self.assertIn('DRY-RUN', out.getvalue())
+
 
 class TestGastosPlanificadosDesdeSimulador(APITestCase):
     """El simulador puede sembrar gastos a futuro en su tabla correspondiente:

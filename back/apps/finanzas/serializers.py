@@ -172,9 +172,21 @@ class IngresoPuntualSerializer(ProjectionEligibilitySerializerMixin, serializers
 
 class GastoCorrienteSerializer(serializers.ModelSerializer):
     monto_real_mes = serializers.SerializerMethodField()
+    # Chip "vN" cuando el gasto tiene varias versiones (mismo nombre, rangos de
+    # fecha encadenados). El linaje llega por contexto desde la vista de lista.
+    version_info = serializers.SerializerMethodField()
     # El simulador puede sembrar un gasto planificado a futuro; la entrada manual
     # sigue prohibiendo fechas futuras.
     permitir_futuro = serializers.BooleanField(write_only=True, required=False, default=False)
+
+    def get_version_info(self, obj):
+        lineage = self.context.get('lineage')
+        if not lineage:
+            return None
+        ids = lineage.get((obj.descripcion or '').strip().lower()) or []
+        if len(ids) < 2 or obj.id not in ids:
+            return None
+        return {'numero': ids.index(obj.id) + 1, 'total': len(ids)}
 
     def get_monto_real_mes(self, obj):
         """

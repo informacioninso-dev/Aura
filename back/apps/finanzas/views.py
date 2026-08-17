@@ -333,6 +333,21 @@ class GastoCorrienteViewSet(BaseFinanzasViewSet):
     search_fields = ('descripcion', 'categoria', 'frecuencia', 'monto', 'fecha_inicio')
     ordering_fields = ('descripcion', 'monto', 'categoria', 'fecha_inicio')
 
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        # Al listar, arma el linaje de versiones (mismo nombre) en UNA query para
+        # que el serializer pueda numerar "vN" sin N+1.
+        if self.action == 'list':
+            qs = GastoCorriente.objects.filter(usuario=self.request.user)
+            tipo_monto = self.request.query_params.get('tipo_monto')
+            if tipo_monto in {TIPO_MONTO_FIJO, TIPO_MONTO_VARIABLE}:
+                qs = qs.filter(tipo_monto=tipo_monto)
+            lineage = {}
+            for row in qs.order_by('fecha_inicio', 'id').values('id', 'descripcion'):
+                lineage.setdefault((row['descripcion'] or '').strip().lower(), []).append(row['id'])
+            ctx['lineage'] = lineage
+        return ctx
+
     def _mes_seleccionado(self):
         """(primer_dia, primer_dia_mes_siguiente) del anio/mes en query, o None
         si no se pidio o es invalido. Sirve para filtrar 'activos en ese mes'."""

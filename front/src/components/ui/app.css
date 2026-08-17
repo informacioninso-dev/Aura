@@ -2117,6 +2117,20 @@
 .gastos-month-nav-row { display: flex; justify-content: center; }
 .gastos-month-nav-row .month-nav { padding: 2px 0 12px; }
 
+/* Chip "vN" junto al nombre cuando el gasto tiene varias versiones. */
+.gasto-version-chip {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: middle;
+  color: var(--app-lila);
+  background: rgba(196,135,246,0.12);
+  border: 1px solid rgba(196,135,246,0.28);
+}
+
 .month-nav-label {
   font-size: 17px;
   font-weight: 700;
