@@ -614,7 +614,7 @@ class TestSuperAdminAPI(APITestCase):
         self.assertEqual(response.data['plan']['slug'], 'pro')
         self.assertEqual(response.data['feature_access']['import_max_rows'], 5000)
         self.assertTrue(response.data['feature_access']['advanced_projection_enabled'])
-        self.assertEqual(response.data['feature_access']['advanced_projection_months'], 120)
+        self.assertEqual(response.data['feature_access']['advanced_projection_months'], 480)
         self.assertTrue(AdminActionLog.objects.filter(action='user_plan_assigned', target_user=self.user).exists())
 
     def test_superadmin_puede_listar_planes_y_features(self):

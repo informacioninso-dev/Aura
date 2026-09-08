@@ -39,6 +39,9 @@ const FUTURE_PROJECTION_OPTIONS = [
   { value: 24, label: '2 anos' },
   { value: 60, label: '5 anos' },
   { value: 120, label: '10 anos' },
+  { value: 240, label: '20 anos' },
+  { value: 360, label: '30 anos' },
+  { value: 480, label: '40 anos' },
 ]
 const DASHBOARD_FUTURE_MONTHS = 12
 const DEFAULT_FREE_PROJECTION_DISPLAY_MONTHS = 6
@@ -1611,6 +1614,15 @@ export default function Dashboard() {
                     <option value={60}>5 años</option>
                     {availableFutureProjectionOptions.some((option) => option.value === 120) && (
                       <option value={120}>10 años</option>
+                    )}
+                    {availableFutureProjectionOptions.some((option) => option.value === 240) && (
+                      <option value={240}>20 años</option>
+                    )}
+                    {availableFutureProjectionOptions.some((option) => option.value === 360) && (
+                      <option value={360}>30 años</option>
+                    )}
+                    {availableFutureProjectionOptions.some((option) => option.value === 480) && (
+                      <option value={480}>40 años</option>
                     )}
                   </select>
                 </label>

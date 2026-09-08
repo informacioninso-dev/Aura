@@ -3527,6 +3527,31 @@ class TestSimpleEsAritmetica(APITestCase):
         self.assertEqual(calcular_balance_mes(self.user, futuro.year, futuro.month), Decimal('955.00'))
 
 
+class TestHorizonteProyeccion40Anios(APITestCase):
+    """El plan Pro permite hasta 40 años (480 meses) de proyeccion acumulada."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            email='horizonte@example.com', username='u_horizonte', password='clave12345',
+        )
+        assign_plan_to_user(
+            user=self.user, plan=Plan.objects.get(slug='pro'), assigned_by=None, notes='horizonte 40',
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_pro_permite_480_meses(self):
+        r = self.client.get('/api/finanzas/proyeccion-acumulada/?months=480&past_months=6')
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(r.data['max_months_allowed'], 480)
+        proyectados = [p for p in r.data['series'] if not p['is_real']]
+        self.assertEqual(len(proyectados), 480)
+
+    def test_pro_rechaza_mas_de_480(self):
+        r = self.client.get('/api/finanzas/proyeccion-acumulada/?months=481')
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+
 class TestGastosCorrientesNavegadorMes(APITestCase):
     """El navegador de mes lista los gastos fijos activos en el mes elegido
     (segun fecha_inicio/fecha_fin) y el total refleja ese mes; editar/borrar de
