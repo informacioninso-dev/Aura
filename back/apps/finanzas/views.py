@@ -1095,14 +1095,19 @@ Reglas:
             from groq import Groq
             client = Groq(api_key=api_key, timeout=30.0, max_retries=1)
             completion = client.chat.completions.create(
-                model='llama-3.1-8b-instant',
+                # llama-3.1-8b-instant fue dado de baja por Groq (ago/sep 2026).
+                # gpt-oss-20b es un modelo de razonamiento: con reasoning_effort
+                # bajo y mas max_tokens el JSON sale completo (si no, el
+                # razonamiento se come el presupuesto y devuelve vacio).
+                model='openai/gpt-oss-20b',
                 messages=[
                     {'role': 'system', 'content': self._PROMPT_SYSTEM},
                     {'role': 'user', 'content': f'Fecha de hoy: {hoy}\n\nTexto: {texto}'},
                 ],
                 response_format={'type': 'json_object'},
                 temperature=0.1,
-                max_tokens=256,
+                max_tokens=600,
+                extra_body={'reasoning_effort': 'low'},
             )
             import json
             resultado = json.loads(completion.choices[0].message.content)
