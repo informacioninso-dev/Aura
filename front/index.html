@@ -21,6 +21,11 @@
     <meta name="theme-color" content="#C487F6" />
     <meta name="msapplication-TileColor" content="#0F172A" />
 
+    <!-- Brand font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
+
     <!-- SEO -->
     <title>Aura | Mira hasta donde llega tu plata</title>
     <meta name="description" content="Aura te muestra hasta donde llega tu plata, proyecta tus proximos meses y compara el impacto de una compra antes de comprometerte." />
@@ -39,9 +44,72 @@
     <meta name="twitter:title" content="Aura | Mira hasta donde llega tu plata" />
     <meta name="twitter:description" content="Mira que te queda, que viene y que pasa si haces esa compra antes de comprometerte." />
     <meta name="twitter:image" content="https://aura.binnso.com/logo.webp" />
+
+    <!-- Datos estructurados -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Aura",
+        "applicationCategory": "FinanceApplication",
+        "operatingSystem": "Web, Android",
+        "url": "https://aura.binnso.com/",
+        "description": "Aura te muestra hasta donde llega tu plata: proyecta tus proximos meses, avisa los que quedan en rojo y simula una compra a cuotas antes de comprometerte.",
+        "inLanguage": "es",
+        "offers": [
+          { "@type": "Offer", "name": "Gratis", "price": "0", "priceCurrency": "USD" },
+          { "@type": "Offer", "name": "Pro", "price": "2.99", "priceCurrency": "USD" }
+        ],
+        "featureList": [
+          "Proyeccion de tu saldo mes a mes",
+          "Simulador de compras y prestamos",
+          "Alerta de meses en negativo",
+          "Gastos fijos, variables y a cuotas",
+          "Score de salud financiera",
+          "Registro por voz y texto"
+        ]
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Que es Aura?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Una app de finanzas personales que te muestra cuanto te queda hoy, proyecta tus proximos meses y te deja simular una compra antes de comprometerte." }
+          },
+          {
+            "@type": "Question",
+            "name": "Puedo simular una compra o un prestamo antes de decidir?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Si. El simulador compara tu saldo futuro con y sin la decision, para que veas si te alcanza antes de gastar." }
+          },
+          {
+            "@type": "Question",
+            "name": "Cuanto cuesta Aura?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Tiene un plan gratis para ordenar tu mes y un plan Pro de 2.99 USD al mes que proyecta mas lejos, hasta 40 anos." }
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <noscript>
+        <h1>Antes de gastar, mira si te alcanza</h1>
+        <p>Aura es una app de finanzas personales que organiza tus ingresos, gastos, cuotas y planes futuros para mostrarte cuanto te queda hoy y como cambia tu dinero si tomas esa decision.</p>
+        <h2>Lo que hace Aura por tu plata</h2>
+        <ul>
+          <li>Proyecta tu saldo mes a mes, hasta 40 anos en Pro.</li>
+          <li>Simula una compra o prestamo antes de comprometerte.</li>
+          <li>Te avisa que meses quedan en rojo antes de que pasen.</li>
+          <li>Ordena tus gastos fijos, variables y a cuotas.</li>
+          <li>Score de salud financiera y registro por voz o texto.</li>
+        </ul>
+        <p><a href="https://aura.binnso.com/registro">Crear cuenta gratis</a></p>
+      </noscript>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

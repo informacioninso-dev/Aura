@@ -7,7 +7,7 @@
   display: flex;
   min-height: 100vh;
   background: var(--app-bg);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
 }
 
 /* ── SIDEBAR ── */

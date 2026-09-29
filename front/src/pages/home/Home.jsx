@@ -1,10 +1,17 @@
 import {
+  Activity,
+  AlertTriangle,
   ArrowRight,
   BarChart3,
   Calculator,
   CalendarRange,
   Check,
   CheckCircle2,
+  Layers,
+  Mic,
+  TrendingUp,
+  Upload,
+  Users,
   Wallet,
   Zap,
 } from 'lucide-react'
@@ -69,6 +76,17 @@ const pricingPlans = [
   },
 ]
 
+const strengths = [
+  { icon: TrendingUp, title: 'Deja la duda de fin de mes', desc: 'Ve a donde llega tu plata, mes a mes.' },
+  { icon: Calculator, title: 'Decide sin miedo', desc: 'Simula esa compra o prestamo antes de comprometerte.' },
+  { icon: Activity, title: 'Sabe como estas de un vistazo', desc: 'Un score de salud financiera claro, tipo banca.' },
+  { icon: AlertTriangle, title: 'Que no te agarre un mes en rojo', desc: 'Aura te avisa antes de que pase.' },
+  { icon: Layers, title: 'Tus gastos, sin el caos', desc: 'Fijos, variables y cuotas ordenados, con vista por mes.' },
+  { icon: Mic, title: 'Registra sin esfuerzo', desc: 'Dicta el gasto por voz o texto. Listo.' },
+  { icon: Upload, title: 'Arranca con lo que ya tienes', desc: 'Importa tu historial, sin empezar de cero.' },
+  { icon: Users, title: 'Cuentas claras con los demas', desc: 'Quien te debe y a quien le debes, siempre claro.' },
+]
+
 export default function Home() {
   const { user } = useAuth()
   const isLoggedIn = Boolean(user)
@@ -92,6 +110,7 @@ export default function Home() {
           </Link>
 
           <div className="home-nav-jumps" aria-label="Contenido de la pagina">
+            <a href="#fortalezas">Que hace</a>
             <a href="#como-funciona">Como funciona</a>
             <a href="#planes">Planes</a>
           </div>
@@ -192,6 +211,30 @@ export default function Home() {
             <div><span>01</span><strong>Lo que tienes hoy</strong></div>
             <div><span>02</span><strong>Lo que viene despues</strong></div>
             <div><span>03</span><strong>El costo real de decidir</strong></div>
+          </div>
+        </section>
+
+        <section id="fortalezas" className="home-strengths">
+          <div className="home-strengths-inner">
+            <div className="home-section-heading">
+              <div>
+                <span className="home-section-label">AURA ESTA DE TU LADO</span>
+                <h2>Cuidamos tu plata, para que tu vivas tranquilo.</h2>
+              </div>
+              <p>No es una app mas de gastos. Es la calma de tener el control, sin planillas ni estres.</p>
+            </div>
+
+            <div className="home-strengths-grid">
+              {strengths.map((item) => (
+                <article key={item.title} className="home-strength">
+                  <div className="home-strength-icon"><item.icon size={18} /></div>
+                  <div className="home-strength-copy">
+                    <h3>{item.title}</h3>
+                    <p>{item.desc}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
 

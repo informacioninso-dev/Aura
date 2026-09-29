@@ -13,7 +13,7 @@
   overflow-x: hidden;
   background: var(--home-ink);
   color: var(--home-paper);
-  font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 .home * {
@@ -205,7 +205,7 @@
 
 .home-hero h1,
 .home-section-heading h2 {
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
   font-weight: 700;
 }
 
@@ -338,7 +338,7 @@
 }
 
 .home-money-head strong {
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
   font-size: 18px;
 }
 
@@ -381,7 +381,7 @@
 
 .home-balance strong {
   color: var(--home-paper);
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
   font-size: clamp(30px, 9vw, 42px);
   letter-spacing: -0.04em;
 }
@@ -553,7 +553,7 @@
 
 .home-story-rail span {
   color: var(--home-lila);
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
   font-size: 14px;
   font-style: italic;
 }
@@ -567,6 +567,80 @@
 .home-pricing-inner {
   width: min(1180px, 100%);
   margin: 0 auto;
+}
+
+/* Fortalezas: grid compacto y escaneable sobre el fondo oscuro. */
+.home-strengths {
+  padding: 54px 16px 6px;
+  scroll-margin-top: 70px;
+}
+.home-strengths-inner {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+}
+.home-strengths .home-section-heading h2 {
+  color: var(--home-paper);
+}
+.home-strengths .home-section-heading > p {
+  color: rgba(243, 238, 223, 0.62);
+}
+.home-strengths .home-section-label {
+  color: var(--home-green-soft);
+}
+.home-strengths-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(238px, 1fr));
+  gap: 12px;
+}
+.home-strength {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--home-line);
+  border-radius: 16px;
+  background: rgba(243, 238, 223, 0.03);
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+.home-strength:hover {
+  border-color: rgba(243, 238, 223, 0.26);
+  background: rgba(243, 238, 223, 0.05);
+  transform: translateY(-2px);
+}
+.home-strength-icon {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: rgba(189, 139, 242, 0.14);
+  color: var(--home-lila);
+}
+.home-strength:nth-child(3n + 1) .home-strength-icon {
+  background: rgba(24, 200, 146, 0.15);
+  color: var(--home-green);
+}
+.home-strength:nth-child(3n + 3) .home-strength-icon {
+  background: rgba(255, 125, 120, 0.15);
+  color: var(--home-coral);
+}
+.home-strength-copy h3 {
+  margin: 0 0 3px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--home-paper);
+}
+.home-strength-copy p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(243, 238, 223, 0.6);
+}
+@media (max-width: 640px) {
+  .home-strengths { padding: 40px 16px 4px; }
+  .home-strengths-grid { grid-template-columns: 1fr; }
 }
 
 .home-value-section {
@@ -663,7 +737,7 @@
 .home-value-row h3 {
   margin: 5px 0 7px;
   color: var(--home-ink);
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
   font-size: 20px;
 }
 
@@ -716,7 +790,7 @@
 }
 
 .home-sheet-head strong {
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
   font-size: 24px;
 }
 
@@ -860,7 +934,7 @@
 
 .home-plan-number {
   color: rgba(243, 238, 223, 0.33);
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
   font-size: 15px;
   font-style: italic;
 }
@@ -878,7 +952,7 @@
 .home-plan-name h3 {
   margin: 0;
   color: var(--home-paper);
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
   font-size: 22px;
 }
 
@@ -898,7 +972,7 @@
 
 .home-plan-price strong {
   color: var(--home-paper);
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
   font-size: 23px;
 }
 
@@ -988,7 +1062,7 @@
 }
 
 .home-closing strong {
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
   font-size: 16px;
   line-height: 1.25;
 }
@@ -1327,7 +1401,7 @@
   --home-line: rgba(255,255,255,0.09);
   background: var(--home-ink);
   color: #FFFFFF;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 .home-hero-wrap {
