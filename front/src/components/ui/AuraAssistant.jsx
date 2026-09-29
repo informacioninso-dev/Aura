@@ -59,6 +59,7 @@ export default function AuraAssistant() {
   const [escuchando, setEscuchando] = useState(false)
   const [cargando, setCargando] = useState(false)
   const [parsed, setParsed] = useState(null)
+  const [parsedList, setParsedList] = useState(null)
   const [guardando, setGuardando] = useState(false)
   const [exito, setExito] = useState(false)
   const [error, setError] = useState('')
@@ -74,6 +75,7 @@ export default function AuraAssistant() {
   const resetear = useCallback(() => {
     setTexto('')
     setParsed(null)
+    setParsedList(null)
     setEdits({})
     setError('')
     setExito(false)
@@ -136,7 +138,8 @@ export default function AuraAssistant() {
     setError('')
     try {
       const { data } = await api.post('/finanzas/asistente/parsear/', { texto })
-      setParsed(data)
+      if (Array.isArray(data?.movimientos)) setParsedList(data.movimientos)
+      else setParsed(data)
     } catch (e) {
       setError(e?.response?.data?.detail || 'No pude entender el registro. Intentá ser más específico.')
     } finally {
@@ -155,6 +158,39 @@ export default function AuraAssistant() {
       setTimeout(cerrar, 1400)
     } catch (e) {
       setError('No se pudo guardar. Revisá los datos e intentá de nuevo.')
+      setGuardando(false)
+    }
+  }
+
+  function actualizarItem(i, key, val) {
+    setParsedList((list) => list.map((m, idx) => (idx === i ? { ...m, [key]: val } : m)))
+  }
+
+  function quitarItem(i) {
+    setParsedList((list) => {
+      const next = list.filter((_, idx) => idx !== i)
+      return next.length ? next : null
+    })
+  }
+
+  async function confirmarLista() {
+    setGuardando(true)
+    setError('')
+    let ok = 0
+    let fail = 0
+    for (const m of parsedList) {
+      try {
+        await api.post(ENDPOINT_MAP[m.tipo], buildPayload({ ...m, monto: parseFloat(m.monto) || m.monto }))
+        ok += 1
+      } catch {
+        fail += 1
+      }
+    }
+    if (fail === 0) {
+      setExito(true)
+      setTimeout(cerrar, 1600)
+    } else {
+      setError(`Se guardaron ${ok} de ${parsedList.length}. ${fail} fallaron, revisá e intentá de nuevo.`)
       setGuardando(false)
     }
   }
@@ -234,6 +270,41 @@ export default function AuraAssistant() {
               <div style={{ textAlign: 'center', padding: '24px 0' }}>
                 <Check size={40} color="var(--app-green)" style={{ margin: '0 auto 10px' }} />
                 <p style={{ color: 'var(--app-green)', fontWeight: 700, fontSize: 16 }}>¡Registrado!</p>
+              </div>
+            ) : parsedList ? (
+              /* Varios movimientos: revisar y guardar todos */
+              <div>
+                <p style={{ color: 'rgba(var(--app-ink-rgb),0.5)', fontSize: 13, marginBottom: 12 }}>
+                  Encontré <strong style={{ color: 'var(--app-text)' }}>{parsedList.length}</strong> movimientos. Revisá y guardá:
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 320, overflowY: 'auto', marginBottom: 12 }}>
+                  {parsedList.map((m, i) => {
+                    const gasto = TIPOS_GASTO.has(m.tipo)
+                    return (
+                      <div key={i} style={{ background: 'rgba(var(--app-ink-rgb),0.05)', border: '1px solid rgba(var(--app-ink-rgb),0.1)', borderRadius: 12, padding: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: gasto ? 'var(--app-danger)' : 'var(--app-green)' }}>{TIPO_LABELS[m.tipo]}</span>
+                          <button onClick={() => quitarItem(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(var(--app-ink-rgb),0.4)', padding: 2 }} title="Quitar">
+                            <X size={16} />
+                          </button>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <input value={m.descripcion || ''} onChange={(e) => actualizarItem(i, 'descripcion', e.target.value)} style={{ ...inputStyle, flex: 2 }} />
+                          <input type="number" min="0" step="0.01" value={m.monto ?? ''} onChange={(e) => actualizarItem(i, 'monto', e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                {error && <p style={{ color: 'var(--app-danger)', fontSize: 13, marginBottom: 10 }}>{error}</p>}
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={resetear} style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid rgba(var(--app-ink-rgb),0.15)', background: 'transparent', color: 'rgba(var(--app-ink-rgb),0.6)', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
+                    Volver
+                  </button>
+                  <button onClick={confirmarLista} disabled={guardando} style={{ flex: 2, padding: '10px 0', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, var(--app-lila), #8B5CF6)', color: 'var(--app-on-accent)', fontWeight: 700, cursor: guardando ? 'not-allowed' : 'pointer', fontSize: 14, opacity: guardando ? 0.7 : 1 }}>
+                    {guardando ? 'Guardando...' : `Guardar los ${parsedList.length}`}
+                  </button>
+                </div>
               </div>
             ) : parsed ? (
               /* Pantalla de confirmación editable */

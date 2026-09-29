@@ -1056,19 +1056,25 @@ class AsistenteParseView(APIView):
     throttle_classes = (throttling.ScopedRateThrottle,)
     throttle_scope = 'ai_parse'
 
-    _PROMPT_SYSTEM = """Eres un asistente financiero. Extrae la intención del texto y devuelve SOLO un JSON válido con esta estructura:
+    _PROMPT_SYSTEM = """Eres un asistente financiero. En el texto puede haber UNO O VARIOS movimientos (separados por "y", comas, etc.). Extrae TODOS y devuelve SOLO un JSON valido con esta estructura:
 
 {
-  "tipo": "ingreso_fijo" | "ingreso_puntual" | "gasto_fijo" | "gasto_variable" | "gasto_puntual",
-  "monto": número positivo,
-  "descripcion": "nombre corto y limpio del ítem (solo el objeto/concepto, sin verbos como gasté/compré/pagué/recibí)",
-  "categoria": una de [vivienda, alimentacion, transporte, salud, educacion, entretenimiento, ropa, servicios, tecnologia, deudas, ahorro, otro],
-  "frecuencia": una de [diario, semanal, quincenal, mensual, bimestral, trimestral, semestral, anual] (solo si es fijo o variable),
-  "fecha": "YYYY-MM-DD" (solo si es puntual, usa la fecha de hoy si dice "hoy" o no especifica),
-  "confianza": "alta" | "media" | "baja"
+  "movimientos": [
+    {
+      "tipo": "ingreso_fijo" | "ingreso_puntual" | "gasto_fijo" | "gasto_variable" | "gasto_puntual",
+      "monto": número positivo,
+      "descripcion": "nombre corto y limpio del ítem (solo el objeto/concepto, sin verbos como gasté/compré/pagué/recibí)",
+      "categoria": una de [vivienda, alimentacion, transporte, salud, educacion, entretenimiento, ropa, servicios, tecnologia, deudas, ahorro, otro],
+      "frecuencia": una de [diario, semanal, quincenal, mensual, bimestral, trimestral, semestral, anual] (solo si es fijo o variable),
+      "fecha": "YYYY-MM-DD" (solo si es puntual, usa la fecha de hoy si dice "hoy" o no especifica),
+      "confianza": "alta" | "media" | "baja"
+    }
+  ]
 }
 
-Reglas:
+El arreglo "movimientos" SIEMPRE debe existir, con un elemento por cada gasto o ingreso mencionado (aunque sea uno solo). Cada monto va con su ítem: "2 panes por 3 dolares y una colada por 5" son DOS movimientos (Pan: 3, Colada: 5).
+
+Reglas por movimiento:
 - "gasto_fijo" = se repite SIEMPRE POR EL MISMO MONTO (arriendo, Netflix, seguro, cuota fija)
 - "gasto_variable" = se repite pero EL MONTO CAMBIA cada vez (luz, agua, internet medido, supermercado, gasolina)
 - "gasto_puntual" = ocurrió UNA SOLA VEZ y no se repite (compré una tele, reparación del auto, un regalo)
@@ -1106,7 +1112,7 @@ Reglas:
                 ],
                 response_format={'type': 'json_object'},
                 temperature=0.1,
-                max_tokens=600,
+                max_tokens=900,
                 extra_body={'reasoning_effort': 'low'},
             )
             import json
@@ -1118,11 +1124,24 @@ Reglas:
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
+        # El modelo devuelve {"movimientos": [...]}. Por robustez tambien
+        # aceptamos un objeto plano suelto (por si devuelve uno solo).
         campos_requeridos = {'tipo', 'monto', 'descripcion'}
-        if not campos_requeridos.issubset(resultado.keys()):
+        movimientos = resultado.get('movimientos') if isinstance(resultado, dict) else None
+        if not isinstance(movimientos, list):
+            movimientos = [resultado] if isinstance(resultado, dict) else []
+        validos = [
+            m for m in movimientos
+            if isinstance(m, dict) and campos_requeridos.issubset(m.keys())
+        ]
+        if not validos:
             return Response({'detail': 'No pude entender el registro. Intentá ser más específico.'}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
-        return Response(resultado)
+        # Compat: si es uno solo, se devuelve plano (como esperan los clientes
+        # actuales, incluido el movil). Si son varios, se devuelve la lista.
+        if len(validos) == 1:
+            return Response(validos[0])
+        return Response({'movimientos': validos})
 
 
 class AsistenteTranscribirView(APIView):
