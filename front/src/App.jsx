@@ -24,6 +24,7 @@ const Planes = lazy(() => import('./pages/planes/Planes'))
 const PagoResultado = lazy(() => import('./pages/pago/PagoResultado'))
 const PrivacyNotice = lazy(() => import('./pages/legal/PrivacyNotice'))
 const TermsOfUse = lazy(() => import('./pages/legal/TermsOfUse'))
+const DeleteAccount = lazy(() => import('./pages/legal/DeleteAccount'))
 
 function AppBootFallback() {
   return (
@@ -67,6 +68,7 @@ export default function App() {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/privacidad" element={<PrivacyNotice />} />
             <Route path="/terminos" element={<TermsOfUse />} />
+            <Route path="/eliminar-cuenta" element={<DeleteAccount />} />
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/ingresos" element={<LoQueGanas />} />

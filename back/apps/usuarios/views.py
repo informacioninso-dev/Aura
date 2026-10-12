@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import EmailMessage, EmailMultiAlternatives, get_connection
-from django.db import connections, transaction
+from django.db import connections, models, transaction
 from django.db.models import Count, DecimalField, Q, Sum
 from django.db.models.functions import TruncDate, TruncMonth
 from django.shortcuts import get_object_or_404
@@ -39,6 +39,7 @@ from .plans import assign_plan_to_user, get_active_plan_assignment, get_default_
 from .security import decrypt_secret
 from .serializers import (
     AdminActionLogSerializer,
+    EliminarCuentaSerializer,
     EmailServerConfigSerializer,
     FeatureSerializer,
     GastoOperativoSerializer,
@@ -440,6 +441,69 @@ class PasswordChangeView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+# Lo que se guarda de un pago al eliminar la cuenta: sin correo, teléfono,
+# cédula ni datos de tarjeta del pagador.
+PAGO_CAMPOS_CONTABLES = {
+    'amount', 'currency', 'date', 'statusCode', 'transactionStatus', 'transactionId',
+    'clientTransactionId', 'authorizationCode', 'paymentId', 'reference', 'storeName',
+    'cardBrand', 'transactionType', 'message', 'messageCode', 'error', 'activation_error',
+}
+
+
+def eliminar_cuenta(user):
+    """Borra los datos personales y financieros del usuario.
+
+    Los pagos y las asignaciones de plan se conservan por obligaciones contables,
+    ligados a un usuario anonimizado e inactivo.
+    """
+    with transaction.atomic():
+        for relation in User._meta.related_objects:
+            model = relation.related_model
+            if model._meta.app_label in ('finanzas', 'simulador') and relation.on_delete is models.CASCADE:
+                model.objects.filter(**{relation.field.name: user}).delete()
+        user.legal_acceptances.all().delete()
+        for pago in PagoPayPhone.objects.filter(usuario=user):
+            pago.payphone_response = {
+                key: value for key, value in (pago.payphone_response or {}).items()
+                if key in PAGO_CAMPOS_CONTABLES
+            }
+            pago.save(update_fields=['payphone_response', 'updated_at'])
+        UserPlanAssignment.objects.filter(user=user, is_active=True).update(
+            is_active=False, ends_at=timezone.now(), notes='Cuenta eliminada por el usuario',
+        )
+        if user.foto_perfil:
+            user.foto_perfil.delete(save=False)
+        alias = f'eliminado-{user.pk}'
+        user.email = f'{alias}@aura.invalid'
+        user.username = alias
+        user.first_name = ''
+        user.last_name = ''
+        user.is_active = False
+        user.set_unusable_password()
+        user.auth_token_version += 1
+        user.save()
+
+
+class EliminarCuentaView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+    throttle_classes = (throttling.ScopedRateThrottle,)
+    throttle_scope = 'auth_password_change'
+
+    def post(self, request):
+        serializer = EliminarCuentaSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        refresh_token = _get_refresh_token_from_request(request)
+        if refresh_token:
+            try:
+                RefreshToken(refresh_token).blacklist()
+            except TokenError:
+                pass
+        eliminar_cuenta(request.user)
+        response = Response({'detail': 'Tu cuenta y tus datos fueron eliminados.'}, status=status.HTTP_200_OK)
+        clear_refresh_cookie(response)
+        return response
 
 
 class SuperAdminDashboardView(APIView):

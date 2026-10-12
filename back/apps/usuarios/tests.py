@@ -383,6 +383,38 @@ class TestUsuarioAPI(APITestCase):
         stale_response = self.client.get('/api/usuarios/perfil/')
         self.assertEqual(stale_response.status_code, status.HTTP_401_UNAUTHORIZED)
 
+    def test_eliminar_cuenta_borra_datos_y_conserva_pagos_anonimos(self):
+        from apps.finanzas.models import Ingreso
+
+        user = User.objects.create_user(email='borrar@example.com', username='borrar', password='clave12345')
+        Ingreso.objects.create(usuario=user, descripcion='Sueldo', monto=1000, fecha_inicio=timezone.now().date())
+        plan = Plan.objects.create(slug='pro-borrar', name='Pro', precio_mensual=5)
+        pago = PagoPayPhone.objects.create(
+            usuario=user, plan=plan, monto=5, client_transaction_id='tx-borrar',
+            payphone_response={'transactionId': 99, 'email': 'borrar@example.com', 'phoneNumber': '0999', 'document': '17'},
+        )
+        login_response = self.login_user(user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}")
+
+        wrong = self.client.post('/api/usuarios/cuenta/eliminar/', {'password': 'otra'}, format='json')
+        self.assertEqual(wrong.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(Ingreso.objects.filter(usuario=user).exists())
+
+        response = self.client.post('/api/usuarios/cuenta/eliminar/', {'password': 'clave12345'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        user.refresh_from_db()
+        self.assertFalse(user.is_active)
+        self.assertFalse(user.has_usable_password())
+        self.assertEqual(user.email, f'eliminado-{user.pk}@aura.invalid')
+        self.assertFalse(Ingreso.objects.filter(usuario=user).exists())
+        pago.refresh_from_db()
+        self.assertEqual(pago.payphone_response, {'transactionId': 99})
+        self.assertEqual(self.client.get('/api/usuarios/perfil/').status_code, status.HTTP_401_UNAUTHORIZED)
+        self.client.credentials()
+        self.assertEqual(self.login_user(user).status_code, status.HTTP_401_UNAUTHORIZED)
+        # El correo queda libre para registrarse de nuevo.
+        self.assertFalse(User.objects.filter(email__iexact='borrar@example.com').exists())
+
     def test_password_reset_invalida_refresh_cookie_previo(self):
         user = User.objects.create_user(
             email='invalidatereset@example.com',

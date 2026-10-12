@@ -461,6 +461,15 @@ class PasswordChangeSerializer(serializers.Serializer):
         return attrs
 
 
+class EliminarCuentaSerializer(serializers.Serializer):
+    password = serializers.CharField(write_only=True)
+
+    def validate_password(self, value):
+        if not self.context['request'].user.check_password(value):
+            raise serializers.ValidationError('La contraseña no es correcta.')
+        return value
+
+
 class PlanPublicoSerializer(serializers.ModelSerializer):
     features = serializers.SerializerMethodField()
 

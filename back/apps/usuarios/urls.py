@@ -2,6 +2,7 @@ from django.urls import path
 from .views import (
     CancelarSuscripcionView,
     ConfirmarPagoView,
+    EliminarCuentaView,
     ReactivarSuscripcionView,
     GastoOperativoDetailView,
     GastosOperativosView,
@@ -39,6 +40,7 @@ urlpatterns = [
     path('password/forgot/', PasswordForgotView.as_view(), name='password_forgot'),
     path('password/reset/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('password/change/', PasswordChangeView.as_view(), name='password_change'),
+    path('cuenta/eliminar/', EliminarCuentaView.as_view(), name='eliminar_cuenta'),
     path('superadmin/dashboard/', SuperAdminDashboardView.as_view(), name='superadmin_dashboard'),
     path('superadmin/usuarios/', SuperAdminUsersView.as_view(), name='superadmin_users'),
     path('superadmin/usuarios/<int:user_id>/estado/', SuperAdminUserStatusView.as_view(), name='superadmin_user_status'),

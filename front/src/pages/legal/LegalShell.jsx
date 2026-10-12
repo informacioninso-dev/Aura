@@ -32,7 +32,7 @@ export default function LegalShell({ eyebrow, title, summary, children }) {
 
       <footer className="legal-footer">
         <span>{LEGAL_OPERATOR} | {LEGAL_EMAIL}</span>
-        <span><Link to="/privacidad">Privacidad</Link><Link to="/terminos">Terminos</Link></span>
+        <span><Link to="/privacidad">Privacidad</Link><Link to="/terminos">Terminos</Link><Link to="/eliminar-cuenta">Eliminar cuenta</Link></span>
       </footer>
     </main>
   )

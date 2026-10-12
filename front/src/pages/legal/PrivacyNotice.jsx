@@ -1,3 +1,5 @@
+import { Link } from 'react-router'
+
 import LegalShell, { LEGAL_EMAIL, LEGAL_OPERATOR } from './LegalShell'
 
 export default function PrivacyNotice() {
@@ -74,6 +76,10 @@ export default function PrivacyNotice() {
         <p>
           Envia tu solicitud a <a href={`mailto:${LEGAL_EMAIL}`}>{LEGAL_EMAIL}</a>. Podremos verificar tu identidad
           antes de entregar o modificar informacion.
+        </p>
+        <p>
+          Puedes eliminar tu cuenta y tus datos en cualquier momento desde la app o la web.
+          Los pasos estan en <Link to="/eliminar-cuenta">Eliminar tu cuenta</Link>.
         </p>
       </section>
 

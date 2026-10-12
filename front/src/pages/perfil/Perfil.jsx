@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CheckCircle, Crown, RotateCcw, User } from 'lucide-react'
+import { CheckCircle, Crown, RotateCcw, Trash2, User } from 'lucide-react'
 import { useNavigate } from 'react-router'
 
 import { getApiErrorMessage } from '../../api/errors'
@@ -40,6 +40,11 @@ export default function Perfil() {
   const [cancelError, setCancelError] = useState('')
   const [confirmCancel, setConfirmCancel] = useState(false)
 
+  const [deletePassword, setDeletePassword] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+
   const isPro = user?.plan?.slug !== undefined && !user.plan.is_default
   const endsAt = user?.plan?.assignment_ends_at
   const cancelAtPeriodEnd = user?.plan?.cancel_at_period_end
@@ -73,6 +78,21 @@ export default function Perfil() {
       setCancelError(getApiErrorMessage(err, 'No se pudo deshacer la cancelacion.'))
     } finally {
       setReactivateLoading(false)
+    }
+  }
+
+  async function handleEliminarCuenta(e) {
+    e.preventDefault()
+    if (deleteLoading) return
+    setDeleteError('')
+    setDeleteLoading(true)
+    try {
+      await api.post('/usuarios/cuenta/eliminar/', { password: deletePassword })
+      await logout()
+      navigate('/')
+    } catch (err) {
+      setDeleteError(getApiErrorMessage(err, 'No se pudo eliminar la cuenta.'))
+      setDeleteLoading(false)
     }
   }
 
@@ -312,6 +332,47 @@ export default function Perfil() {
         </form>
       </div>
 
+      <div className="card" style={{ marginTop: 18 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>Eliminar cuenta</h3>
+        <p style={{ color: 'rgba(var(--app-ink-rgb),0.55)', fontSize: 13, marginBottom: 14 }}>
+          Se borran tu cuenta y todos tus datos financieros: ingresos, gastos, cuotas, cuentas y simulaciones.
+          Los registros de pagos se conservan sin datos personales por obligaciones contables. No se puede deshacer.
+        </p>
+
+        <FeedbackAlert type="error" message={deleteError} />
+
+        {!confirmDelete ? (
+          <button type="button" className="btn-modal-cancel perfil-plan-danger" onClick={() => setConfirmDelete(true)}>
+            <Trash2 size={15} /> Eliminar mi cuenta
+          </button>
+        ) : (
+          <form onSubmit={handleEliminarCuenta}>
+            <div className="form-modal-group">
+              <label className="form-modal-label">Escribe tu clave para confirmar</label>
+              <input
+                type="password"
+                className="form-modal-input"
+                required
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+              />
+            </div>
+            <div className="perfil-plan-actions">
+              <button type="submit" className="btn-modal-cancel perfil-plan-danger" disabled={deleteLoading}>
+                {deleteLoading ? 'Eliminando...' : 'Eliminar definitivamente'}
+              </button>
+              <button
+                type="button"
+                className="btn-modal-cancel"
+                disabled={deleteLoading}
+                onClick={() => { setConfirmDelete(false); setDeletePassword('') }}
+              >
+                Conservar mi cuenta
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
     </div>
   )
 }
