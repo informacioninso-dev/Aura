@@ -1173,11 +1173,12 @@ class TestFinanzasAPI(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['projection_mode'], 'simple')
-        self.assertEqual(response.data['months'], 3)
+        # Gratis: 1 solo mes proyectado; el historial real sigue en 3 meses.
+        self.assertEqual(response.data['months'], 1)
         self.assertEqual(response.data['display_past_months'], 3)
-        self.assertEqual(response.data['max_months_allowed'], 3)
+        self.assertEqual(response.data['max_months_allowed'], 1)
         # El mes en curso se incluye como dato real (past_months + 1) antes de los proyectados.
-        self.assertEqual(len(response.data['series']), 7)
+        self.assertEqual(len(response.data['series']), 5)
         self.assertTrue(all(point['is_real'] for point in response.data['series'][:4]))
         self.assertTrue(all(not point['is_real'] for point in response.data['series'][4:]))
 

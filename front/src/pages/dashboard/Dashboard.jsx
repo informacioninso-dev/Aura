@@ -45,6 +45,7 @@ const FUTURE_PROJECTION_OPTIONS = [
 ]
 const DASHBOARD_FUTURE_MONTHS = 12
 const DEFAULT_FREE_PROJECTION_DISPLAY_MONTHS = 6
+const FREE_PROJECTION_FUTURE_MONTHS = 1
 const MOBILE_PROJECTION_WINDOW_MONTHS = 12
 const DESKTOP_PROJECTION_WINDOW_MONTHS = 12
 const MOBILE_CHART_BREAKPOINT = 768
@@ -231,8 +232,10 @@ export default function Dashboard() {
     user?.feature_access?.projection_months,
     DEFAULT_FREE_PROJECTION_DISPLAY_MONTHS,
   ))
-  const freeProjectionFutureMonths = Math.max(1, Math.floor(projectionDisplayMonths / 2))
-  const freeProjectionPastMonths = Math.max(1, projectionDisplayMonths - freeProjectionFutureMonths)
+  // Igual que el backend (ProyeccionAcumuladaView): Gratis ve 1 solo mes
+  // proyectado; el historial real se queda en la mitad del valor del plan.
+  const freeProjectionFutureMonths = FREE_PROJECTION_FUTURE_MONTHS
+  const freeProjectionPastMonths = Math.max(1, projectionDisplayMonths - Math.floor(projectionDisplayMonths / 2))
   const advancedProjectionMaxMonths = normalizePositiveInt(user?.feature_access?.advanced_projection_months, 120)
   const currentPlanLabel = user?.plan?.slug === 'pro' ? 'Pro' : 'Gratis'
   const currentPlanBadgeClass = user?.plan?.slug === 'pro' ? 'is-pro' : 'is-free'
@@ -1684,7 +1687,7 @@ export default function Dashboard() {
             <div className="dashboard-card-copy">
               <h2 className="card-title">Proyección mensual</h2>
               <p className="dashboard-card-subtitle">
-                Vista simple con {freeProjectionPastMonths} meses reales y {freeProjectionFutureMonths} proyectados.
+                Vista simple con {freeProjectionPastMonths} meses reales y {freeProjectionFutureMonths === 1 ? '1 mes proyectado' : `${freeProjectionFutureMonths} proyectados`}.
               </p>
             </div>
             <span className="dashboard-free-badge">Gratis</span>
@@ -1697,7 +1700,7 @@ export default function Dashboard() {
           <div className="dashboard-premium-chip-row">
             <span className="dashboard-premium-chip">Modo simple</span>
             <span className="dashboard-premium-chip">{freeProjectionPastMonths} meses reales</span>
-            <span className="dashboard-premium-chip">{freeProjectionFutureMonths} proyectados</span>
+            <span className="dashboard-premium-chip">{freeProjectionFutureMonths === 1 ? '1 mes proyectado' : `${freeProjectionFutureMonths} proyectados`}</span>
           </div>
 
           {!projectionLoading && !projectionError && !advancedChartEmpty && renderOutlookFree()}

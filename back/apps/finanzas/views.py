@@ -920,6 +920,9 @@ class ProyeccionAcumuladaView(APIView):
     MAX_ANALYSIS_HISTORY_MONTHS = 18
     DEFAULT_ADVANCED_PROJECTION_MONTHS = 120
     DEFAULT_FREE_DISPLAY_MONTHS = 6
+    # El plan Gratis ve 1 solo mes proyectado (decision de producto, oct 2026):
+    # la proyeccion a varios meses es de Pro. El historial real no se recorta.
+    FREE_FUTURE_MONTHS = 1
 
     def _get_free_projection_limits(self, user):
         raw_display_months = get_user_feature_value(
@@ -932,8 +935,8 @@ class ProyeccionAcumuladaView(APIView):
         except (TypeError, ValueError):
             display_months = self.DEFAULT_FREE_DISPLAY_MONTHS
 
-        future_months = max(1, display_months // 2)
-        past_months = max(1, display_months - future_months)
+        past_months = max(1, display_months - display_months // 2)
+        future_months = self.FREE_FUTURE_MONTHS
         return display_months, past_months, future_months
 
     def get(self, request):

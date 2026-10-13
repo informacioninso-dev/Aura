@@ -53,13 +53,14 @@ cd /var/www/aura/front && npm run build   # solo si cambió frontend (a secas; N
   - Web usa Web Speech API del navegador para voz; Whisper es para móvil.
   - Roadmap IA: cuotas, cuentas con personas, preguntas/consultas, simular por voz. **Cuidar el costo** (modelo barato, reasoning bajo, prompts cortos).
 
-- **Proyección ("Mi dinero")**: horizonte Pro hasta **40 años** (feature `advanced_projection_months` = 480 meses; Free limitado). Alerta de meses en rojo en la card "Si sigues así".
+- **Proyección ("Mi dinero")**: horizonte Pro hasta **40 años** (feature `advanced_projection_months` = 480 meses). **Gratis: 1 solo mes proyectado** (`ProyeccionAcumuladaView.FREE_FUTURE_MONTHS`; el backend lo impone e ignora `months`) + historial real = mitad de `projection_months` (3). Web y móvil replican la regla solo para los textos. Alerta de meses en rojo en la card "Si sigues así".
 
 - **Gastos**: `GastoCorriente` (fijo/variable vía `tipo_monto`), `GastoNoCorriente` (puntual), `Diferido` (cuotas). **Versionado** de fijos: la versión vieja cierra al **fin del mes anterior** al de la nueva (evita doble conteo); chip `vN`. Navegador de mes en Fijos (`anio`/`mes` en el list). Simulador: "Agregar a mis gastos" rutea por tipo; `permitir_futuro` siembra a futuro.
 
 - **Copy / voz (Ecuador)**: tuteo (**tú**, nunca voseo). Decir **"registrar"** (no "cargar"), no usar "vueltas" para deudas. Errores: "No pudimos … Intenta de nuevo." Éxitos cortos ("Gasto guardado.", sin "correctamente"). En gastos/ingresos fijos **"versión" se queda** (concepto del producto, no cambiarlo). El emoji **🐭 de "Cuentas con personas" es de marca: NO cambiarlo**. Guía de copy: https://claude.ai/code/artifact/cafe85ee-c488-493d-ac1f-1aa6bb9cad43
 
 ## 6. Novedades (changelog — agregar arriba)
+- **2026-10-13** — Plan Gratis: la proyección pasa de 3 a **1 mes proyectado** (pedido del usuario). App móvil: auditoría UX implementada (ver `Aura_mobile/MEMORY.md`); prioridad = **paridad funcional total con la web**, porque mucha gente usará solo el móvil.
 - **2026-10-13** — Revisión de copy módulo por módulo (web + móvil) con las reglas de la sección 5. Ortografía (tildes, ñ, ¿?) en toda la web. Asistente renombrado **"Dile a Aura"** (antes "Aura AI"); se le quitó el voseo. "clave" → "contraseña" y "Free" → "Gratis" en todo lado. Textos de "simular con tasa 0%" actualizados (el Simulador ya tiene Pago único / Gasto mensual).
 - **2026-10** — Asistente: varios movimientos en una frase. IA migrada a `gpt-oss-20b` (Groq deprecó el modelo anterior). Fuente Plus Jakarta self-hosted. Landing con fortalezas + ángulo emocional + SEO (JSON-LD, `<noscript>`, sitemap). Horizonte de proyección hasta 40 años.
 - **2026-08/09** — Navegador de mes + chip de versión en gastos fijos; fix de doble conteo en versionado. Simulador "agregar a mis gastos" por tipo. Outlook de proyección (meses en rojo). Score de salud financiera. `pagar_el_resto` en diferidos.
