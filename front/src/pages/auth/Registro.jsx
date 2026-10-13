@@ -29,15 +29,15 @@ export default function Registro() {
     setError('')
 
     if (form.password.length < 8) {
-      setError('La clave debe tener al menos 8 caracteres.')
+      setError('La contraseña debe tener al menos 8 caracteres.')
       return
     }
     if (form.password !== form.confirm_password) {
-      setError('Las claves no coinciden.')
+      setError('Las contraseñas no coinciden.')
       return
     }
     if (!form.privacy_notice_acknowledged || !form.terms_accepted) {
-      setError('Debes revisar el Aviso de Privacidad y aceptar los Términos de Uso.')
+      setError('Para seguir, acepta el Aviso de Privacidad y los Términos de Uso.')
       return
     }
 
@@ -53,7 +53,7 @@ export default function Registro() {
       })
       navigate('/dashboard')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Error al crear la cuenta. Intenta nuevamente.'))
+      setError(getApiErrorMessage(err, 'No pudimos crear tu cuenta. Intenta de nuevo.'))
     } finally {
       setLoading(false)
     }
@@ -81,10 +81,10 @@ export default function Registro() {
   return (
     <div className="auth-page">
       <div className="auth-box">
-        <Link to={brandTarget} className="auth-logo auth-logo-link" aria-label={user ? 'Ir a mi dashboard' : 'Volver al inicio'}>
+        <Link to={brandTarget} className="auth-logo auth-logo-link" aria-label={user ? 'Ir a Mi dinero' : 'Volver al inicio'}>
           <BrandMark className="auth-logo-icon" />
           <div className="auth-logo-name">AURA</div>
-          <div className="auth-logo-tag">Clara proyección, futuro sólido.</div>
+          <div className="auth-logo-tag">Tu plata clara, hoy y en los próximos meses.</div>
         </Link>
 
         <div className="auth-card">
@@ -119,7 +119,7 @@ export default function Registro() {
 
             <div className="form-row">
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Clave</label>
+                <label className="form-label">Contraseña</label>
                 <input
                   type="password"
                   required
@@ -132,13 +132,13 @@ export default function Registro() {
               </div>
 
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Confirmar</label>
+                <label className="form-label">Confirma tu contraseña</label>
                 <input
                   type="password"
                   required
                   minLength={8}
                   className="form-input"
-                  placeholder="Repite la clave"
+                  placeholder="Repítela"
                   value={form.confirm_password}
                   onChange={(e) => setForm({ ...form, confirm_password: e.target.value })}
                 />
@@ -165,7 +165,7 @@ export default function Registro() {
                   onChange={(e) => setForm({ ...form, privacy_notice_acknowledged: e.target.checked })}
                 />
                 <span>
-                  He leido el <Link to="/privacidad" target="_blank" rel="noreferrer">Aviso de Privacidad</Link> y entiendo como Aura tratara mis datos.
+                  He leído el <Link to="/privacidad" target="_blank" rel="noreferrer">Aviso de Privacidad</Link> y entiendo cómo Aura tratará mis datos.
                 </span>
               </label>
 
@@ -189,7 +189,7 @@ export default function Registro() {
         </div>
 
         <p className="auth-footer">
-          Ya tienes cuenta? <Link to="/login">Inicia sesión</Link>
+          ¿Ya tienes cuenta? <Link to="/login">Inicia sesión</Link>
         </p>
         <p className="auth-footer" style={{ marginTop: 8 }}>
           <Link to="/">Volver al inicio</Link>

@@ -206,7 +206,7 @@ export default function Presupuesto() {
     const rawValue = String(valorPresup || '').trim().replace(',', '.')
     const limite = parseFloat(rawValue)
     if (!rawValue || Number.isNaN(limite) || limite <= 0) {
-      setFeedback({ type: 'error', message: 'Escribe un límite mensual válido mayor que cero.' })
+      setFeedback({ type: 'error', message: 'El límite tiene que ser mayor a cero.' })
       return
     }
     setSavingBudgetId(cat.id)
@@ -217,7 +217,7 @@ export default function Presupuesto() {
       closeBudgetEditor()
       setFeedback({ type: 'success', message: `Listo. ${cat.nombre} ya tiene presupuesto mensual.` })
     } catch {
-      setFeedback({ type: 'error', message: 'No se pudo guardar el presupuesto. Intenta otra vez.' })
+      setFeedback({ type: 'error', message: 'No pudimos guardar el presupuesto. Intenta de nuevo.' })
     } finally {
       setSavingBudgetId(null)
     }
@@ -233,7 +233,7 @@ export default function Presupuesto() {
       closeBudgetEditor()
       setFeedback({ type: 'success', message: `Quitaste el presupuesto mensual de ${cat.nombre}.` })
     } catch {
-      setFeedback({ type: 'error', message: 'No se pudo quitar el presupuesto. Intenta otra vez.' })
+      setFeedback({ type: 'error', message: 'No pudimos quitar el presupuesto. Intenta de nuevo.' })
     } finally {
       setSavingBudgetId(null)
     }
@@ -298,23 +298,23 @@ export default function Presupuesto() {
           <div className="stat-sub">Con presupuesto activo.</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Activas</div>
+          <div className="stat-label">Con gasto</div>
           <div className="stat-value">{categoriasConMovimiento}</div>
-          <div className="stat-sub">Con gasto en el mes.</div>
+          <div className="stat-sub">Categorías con gasto este mes.</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Gastado</div>
           <div className="stat-value">${formatAmount(totalGastadoMes)}</div>
-          <div className="stat-sub">Total categorizado.</div>
+          <div className="stat-sub">Lo que llevas gastado este mes.</div>
         </div>
       </div>
 
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="category-toolbar">
           <div>
-            <div className="card-title" style={{ marginBottom: 6 }}>Gestión rápida</div>
+            <div className="card-title" style={{ marginBottom: 6 }}>Tus categorías</div>
             <p className="category-toolbar-copy">
-              Busca una categoría, ajusta su límite y revisa en la misma pantalla cuánto lleva este mes.
+              Busca una categoría, ajusta su límite y mira cuánto llevas este mes.
             </p>
           </div>
           <div className="category-toolbar-search">
@@ -461,7 +461,7 @@ export default function Presupuesto() {
           </div>
 
           <div className="form-modal-group">
-            <label className="form-modal-label">Icono</label>
+            <label className="form-modal-label">Ícono</label>
             <div className="category-icon-grid">
               {visibleIcons.map((icono) => (
                 <button
@@ -517,7 +517,7 @@ export default function Presupuesto() {
       <ConfirmDialog
         open={confirmDeleteId !== null}
         title="Eliminar categoría"
-        message="Si eliminas esta categoría, los gastos que ya existen conservarán el texto actual en sus registros."
+        message="Tus gastos con esta categoría no se borran: la siguen mostrando con este nombre."
         confirmText="Eliminar"
         cancelText="Cancelar"
         loading={deletingId !== null}

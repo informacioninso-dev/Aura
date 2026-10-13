@@ -59,7 +59,7 @@ export default function Sidebar({ isOpen, onClose, theme, onThemeToggle }) {
             event.preventDefault()
             if (onClose) onClose()
           }}
-          aria-label="Cerrar menu"
+          aria-label="Cerrar menú"
         >
           X
         </button>

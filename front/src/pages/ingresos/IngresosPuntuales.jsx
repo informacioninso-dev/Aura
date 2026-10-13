@@ -77,7 +77,7 @@ export default function IngresosPuntuales({ embedded = false }) {
       setTotalItems(data.count || 0)
       setTotal(Number(data.summary?.total || 0))
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudieron cargar los ingresos puntuales.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos cargar tus ingresos puntuales. Intenta de nuevo.') })
     }
   }
 
@@ -113,10 +113,10 @@ export default function IngresosPuntuales({ embedded = false }) {
       await fetchItems()
       setFeedback({
         type: 'success',
-        message: editId ? 'Ingreso puntual actualizado correctamente.' : 'Ingreso puntual creado correctamente.',
+        message: editId ? 'Cambios guardados.' : 'Ingreso puntual guardado.',
       })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo guardar el ingreso puntual.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos guardar el ingreso puntual. Intenta de nuevo.') })
     } finally {
       setLoading(false)
     }
@@ -136,14 +136,14 @@ export default function IngresosPuntuales({ embedded = false }) {
     try {
       await api.delete(`/finanzas/ingresos-puntuales/${id}/`)
       await fetchItems()
-      setFeedback({ type: 'success', message: 'Ingreso puntual eliminado correctamente.' })
+      setFeedback({ type: 'success', message: 'Ingreso puntual eliminado.' })
       setSelectedIds((prev) => {
         const next = new Set(prev)
         next.delete(id)
         return next
       })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo eliminar el ingreso puntual.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos eliminar el ingreso puntual. Intenta de nuevo.') })
     } finally {
       setDeletingId(null)
     }
@@ -200,7 +200,7 @@ export default function IngresosPuntuales({ embedded = false }) {
     await fetchItems()
     setBulkDeleting(false)
     if (errors === 0) setFeedback({ type: 'success', message: `${ids.length} ingreso${ids.length !== 1 ? 's' : ''} eliminado${ids.length !== 1 ? 's' : ''}.` })
-    else setFeedback({ type: 'error', message: `Se eliminaron ${ids.length - errors} de ${ids.length}. Algunos fallaron.` })
+    else setFeedback({ type: 'error', message: `Eliminamos ${ids.length - errors} de ${ids.length}. Algunos no se pudieron borrar; intenta de nuevo.` })
   }
 
   async function handleConvertToFijo() {
@@ -218,7 +218,7 @@ export default function IngresosPuntuales({ embedded = false }) {
       await fetchItems()
       setFeedback({ type: 'success', message: 'Listo. Ahora lo verás en Ingresos fijos.' })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo convertir el ingreso a fijo.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos pasarlo a fijo. Intenta de nuevo.') })
     } finally {
       setConverting(false)
     }
@@ -237,7 +237,7 @@ export default function IngresosPuntuales({ embedded = false }) {
           <div>
             <h2 className="finance-panel-kicker">Ingresos puntuales</h2>
             <p className="finance-panel-kpi">
-              Total cargado:&nbsp;
+              Total registrado:&nbsp;
               <span style={{ color: 'var(--app-green)', fontWeight: 700 }}>
                 ${formatAmount(total)}
               </span>
@@ -250,7 +250,7 @@ export default function IngresosPuntuales({ embedded = false }) {
           <div className="page-header-main">
             <h1 className="page-title">Ingresos puntuales</h1>
             <p className="page-subtitle">
-              Total cargado:&nbsp;
+              Total registrado:&nbsp;
               <span style={{ color: 'var(--app-green)', fontWeight: 700 }}>
                 ${formatAmount(total)}
               </span>
@@ -266,8 +266,8 @@ export default function IngresosPuntuales({ embedded = false }) {
         {items.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">$</div>
-            <p className="empty-text">No hay ingresos puntuales</p>
-            <p className="empty-sub">Suma bonos, ventas u otros ingresos puntuales</p>
+            <p className="empty-text">Todavía no tienes ingresos puntuales</p>
+            <p className="empty-sub">Agrega bonos, ventas o cualquier plata extra que llegue una sola vez.</p>
           </div>
         ) : (
           <>
@@ -370,12 +370,12 @@ export default function IngresosPuntuales({ embedded = false }) {
         <form onSubmit={handleSubmit}>
           {!editId && (
             <p style={{ marginTop: -8, marginBottom: 14, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
-              Carga rápida: nombre y monto. Lo demás es opcional.
+              Registro rápido: nombre y monto. Lo demás es opcional.
             </p>
           )}
           <div className="form-modal-group">
-            <label className="form-modal-label">De donde entro?</label>
-            <input className="form-modal-input" required placeholder="Ej: Bono, venta, devolucion..." value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />
+            <label className="form-modal-label">¿De dónde entró?</label>
+            <input className="form-modal-input" required placeholder="Ej: Bono, venta, devolución..." value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />
           </div>
           <div className="form-modal-group">
             <label className="form-modal-label">Monto</label>
@@ -424,7 +424,7 @@ export default function IngresosPuntuales({ embedded = false }) {
                     <div>
                       <div className="form-modal-label" style={{ marginBottom: 4 }}>Usar en mi proyección conservadora</div>
                       <div style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.5)', lineHeight: 1.45 }}>
-                        Solo aplica en modo Personalizada. Déjalo activo si este ingreso puntual podría repetirse; apagalo para bonos u otros casos especiales.
+                        Solo cuenta en el modo Conservadora. Déjalo activo si este ingreso podría repetirse; apágalo si fue algo único, como un bono.
                       </div>
                     </div>
                   </label>
@@ -444,7 +444,7 @@ export default function IngresosPuntuales({ embedded = false }) {
               <div className="form-modal-convert-copy">
                 <span className="form-modal-convert-title">Cambiar tipo de movimiento</span>
                 <span className="form-modal-convert-text">
-                  Si este ingreso puntual en realidad se repite, puedes pasarlo a fijo sin volverlo a cargar desde cero.
+                  Si este ingreso puntual en realidad se repite, puedes pasarlo a fijo sin volverlo a registrar desde cero.
                 </span>
               </div>
               <button
@@ -470,7 +470,7 @@ export default function IngresosPuntuales({ embedded = false }) {
       <ConfirmDialog
         open={confirmConvert}
         title="Pasar a ingreso fijo"
-        message={`Se creara como ingreso fijo mensual desde ${form.fecha || 'la fecha actual'} y este ingreso puntual se eliminará. Luego podrás ajustar la frecuencia si hace falta.`}
+        message={`Se creará como ingreso fijo mensual desde ${form.fecha || 'la fecha actual'} y este ingreso puntual se eliminará. Luego podrás ajustar la frecuencia si hace falta.`}
         confirmText="Convertir"
         cancelText="Cancelar"
         loading={converting}
@@ -481,7 +481,7 @@ export default function IngresosPuntuales({ embedded = false }) {
       <ConfirmDialog
         open={confirmDeleteId !== null}
         title="Eliminar ingreso puntual"
-        message="Este ingreso puntual se eliminará de tus reportes y de tu historial."
+        message="Este ingreso puntual se eliminará de tus cálculos y de tu historial."
         confirmText="Eliminar"
         cancelText="Cancelar"
         loading={deletingId !== null}
@@ -492,7 +492,7 @@ export default function IngresosPuntuales({ embedded = false }) {
       <ConfirmDialog
         open={confirmBulkDelete}
         title="Eliminar seleccionados"
-        message={`Se eliminaran ${selectedIds.size} ingreso${selectedIds.size !== 1 ? 's' : ''}. Esta acción no se puede deshacer.`}
+        message={`Se eliminarán ${selectedIds.size} ingreso${selectedIds.size !== 1 ? 's' : ''}. Esta acción no se puede deshacer.`}
         confirmText="Eliminar"
         cancelText="Cancelar"
         loading={bulkDeleting}

@@ -18,7 +18,7 @@ function formatPlanDate(value) {
 export default function Perfil() {
   const { user, fetchPerfil, changePassword, logout } = useAuth()
   const navigate = useNavigate()
-  const currentPlanLabel = user?.plan?.slug === 'pro' ? 'Pro' : 'Free'
+  const currentPlanLabel = user?.plan?.slug === 'pro' ? 'Pro' : 'Gratis'
   const currentPlanBadgeClass = user?.plan?.slug === 'pro' ? 'is-pro' : 'is-free'
 
   const [form, setForm] = useState({
@@ -60,7 +60,7 @@ export default function Perfil() {
       setCancelOk('Suscripción cancelada. Tu plan Pro se mantiene hasta el fin del periodo.')
       setConfirmCancel(false)
     } catch (err) {
-      setCancelError(getApiErrorMessage(err, 'No se pudo cancelar la suscripción.'))
+      setCancelError(getApiErrorMessage(err, 'No pudimos cancelar la suscripción. Intenta de nuevo.'))
     } finally {
       setCancelLoading(false)
     }
@@ -75,7 +75,7 @@ export default function Perfil() {
       await fetchPerfil()
       setCancelOk(data.detail || 'Cancelación deshecha. Tu plan Pro vuelve a estar activo.')
     } catch (err) {
-      setCancelError(getApiErrorMessage(err, 'No se pudo deshacer la cancelación.'))
+      setCancelError(getApiErrorMessage(err, 'No pudimos deshacer la cancelación. Intenta de nuevo.'))
     } finally {
       setReactivateLoading(false)
     }
@@ -91,7 +91,7 @@ export default function Perfil() {
       await logout()
       navigate('/')
     } catch (err) {
-      setDeleteError(getApiErrorMessage(err, 'No se pudo eliminar la cuenta.'))
+      setDeleteError(getApiErrorMessage(err, 'No pudimos eliminar la cuenta. Intenta de nuevo.'))
       setDeleteLoading(false)
     }
   }
@@ -106,9 +106,9 @@ export default function Perfil() {
     try {
       await api.patch('/usuarios/perfil/', form)
       await fetchPerfil()
-      setOk('Cambios guardados correctamente.')
+      setOk('Cambios guardados.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Error al guardar los cambios.'))
+      setError(getApiErrorMessage(err, 'No pudimos guardar los cambios. Intenta de nuevo.'))
     } finally {
       setLoading(false)
     }
@@ -121,11 +121,11 @@ export default function Perfil() {
     setPassOk('')
 
     if (passForm.new_password.length < 8) {
-      setPassError('La nueva clave debe tener al menos 8 caracteres.')
+      setPassError('La nueva contraseña debe tener al menos 8 caracteres.')
       return
     }
     if (passForm.new_password !== passForm.confirm_password) {
-      setPassError('Las claves nuevas no coinciden.')
+      setPassError('Las contraseñas nuevas no coinciden.')
       return
     }
 
@@ -135,7 +135,7 @@ export default function Perfil() {
         current_password: passForm.current_password,
         new_password: passForm.new_password,
       })
-      setPassOk(response?.detail || 'Contraseña actualizada correctamente.')
+      setPassOk(response?.detail || 'Contraseña actualizada.')
       setPassForm({ current_password: '', new_password: '', confirm_password: '' })
       if (response?.force_relogin) {
         window.setTimeout(async () => {
@@ -144,7 +144,7 @@ export default function Perfil() {
         }, 1200)
       }
     } catch (err) {
-      setPassError(getApiErrorMessage(err, 'No se pudo actualizar la clave.'))
+      setPassError(getApiErrorMessage(err, 'No pudimos actualizar la contraseña. Intenta de nuevo.'))
     } finally {
       setPassLoading(false)
     }
@@ -157,7 +157,7 @@ export default function Perfil() {
           <h1 className="page-title">👤 Tu perfil</h1>
           <span className={`subtle-plan-badge ${currentPlanBadgeClass}`}>Plan {currentPlanLabel}</span>
         </div>
-        <p className="page-subtitle">Personaliza tu cuenta y seguridad</p>
+        <p className="page-subtitle">Tus datos, tu plan y tu seguridad.</p>
       </div>
 
       <div className="card" style={{ marginBottom: 18 }}>
@@ -215,13 +215,13 @@ export default function Perfil() {
         </div>
 
         <p className="perfil-plan-copy">
-          {!isPro && 'Estas en el plan Free. Puedes pasar a Pro cuando quieras para desbloquear todas las herramientas.'}
-          {isPro && !esPago && 'Tu plan Pro fue asignado a tu cuenta y no tiene cobro administrado desde Aura.'}
+          {!isPro && 'Estás en el plan Gratis. Puedes pasar a Pro cuando quieras para desbloquear todas las herramientas.'}
+          {isPro && !esPago && 'Tu plan Pro te lo activamos nosotros, así que no tiene cobros desde Aura.'}
           {isPro && esPago && cancelAtPeriodEnd && (
             <>La cancelación está programada. Conservas Pro hasta el <strong>{formatPlanDate(endsAt)}</strong> y puedes deshacerla mientras el periodo siga activo.</>
           )}
           {isPro && esPago && !cancelAtPeriodEnd && (
-            <>Tu periodo Pro esta activo{endsAt ? <> hasta el <strong>{formatPlanDate(endsAt)}</strong></> : ''}.</>
+            <>Tu periodo Pro está activo{endsAt ? <> hasta el <strong>{formatPlanDate(endsAt)}</strong></> : ''}.</>
           )}
         </p>
 
@@ -258,7 +258,7 @@ export default function Perfil() {
             ) : (
               <div className="perfil-cancel-box">
                 <p>
-                  No perderás Pro hoy. Lo conservarás hasta terminar el periodo actual y después volverás a Free.
+                  No perderás Pro hoy. Lo conservarás hasta terminar el periodo actual y después volverás al plan Gratis.
                 </p>
                 <div className="perfil-plan-actions">
                   <button
@@ -285,14 +285,14 @@ export default function Perfil() {
       </div>
 
       <div className="card">
-        <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>Cambiar clave</h3>
+        <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>Cambiar contraseña</h3>
 
         <FeedbackAlert type="error" message={passError} />
         <FeedbackAlert type="success" message={passOk} />
 
         <form onSubmit={handlePasswordSubmit}>
           <div className="form-modal-group">
-            <label className="form-modal-label">Clave actual</label>
+            <label className="form-modal-label">Contraseña actual</label>
             <input
               type="password"
               className="form-modal-input"
@@ -303,7 +303,7 @@ export default function Perfil() {
           </div>
 
           <div className="form-modal-group">
-            <label className="form-modal-label">Nueva clave</label>
+            <label className="form-modal-label">Nueva contraseña</label>
             <input
               type="password"
               className="form-modal-input"
@@ -315,7 +315,7 @@ export default function Perfil() {
           </div>
 
           <div className="form-modal-group">
-            <label className="form-modal-label">Confirmar nueva clave</label>
+            <label className="form-modal-label">Confirmar nueva contraseña</label>
             <input
               type="password"
               className="form-modal-input"
@@ -327,7 +327,7 @@ export default function Perfil() {
           </div>
 
           <button type="submit" className="btn-modal-save" disabled={passLoading} style={{ width: '100%', padding: '13px 0', marginTop: 4 }}>
-            {passLoading ? 'Actualizando...' : 'Actualizar clave'}
+            {passLoading ? 'Actualizando...' : 'Actualizar contraseña'}
           </button>
         </form>
       </div>
@@ -348,7 +348,7 @@ export default function Perfil() {
         ) : (
           <form onSubmit={handleEliminarCuenta}>
             <div className="form-modal-group">
-              <label className="form-modal-label">Escribe tu clave para confirmar</label>
+              <label className="form-modal-label">Escribe tu contraseña para confirmar</label>
               <input
                 type="password"
                 className="form-modal-input"

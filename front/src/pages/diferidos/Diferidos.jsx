@@ -18,7 +18,7 @@ const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 's
 function terminaEnLabel(item) {
   if (!item.fecha_fin) return '—'
   const [y, m] = item.fecha_fin.split('-').map(Number)
-  const prefijo = item.status?.key === 'finished' ? 'Termino en' : 'Termina en'
+  const prefijo = item.status?.key === 'finished' ? 'Terminó en' : 'Termina en'
   return `${prefijo} ${MESES_CORTOS[m - 1]} ${y}`
 }
 
@@ -202,7 +202,7 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
       setPayTarget(null)
       await fetchItems()
     } catch (err) {
-      setPayError(err.response?.data?.error || 'No se pudo registrar el pago.')
+      setPayError(err.response?.data?.error || 'No pudimos registrar el pago. Intenta de nuevo.')
     } finally {
       setPaying(false)
     }
@@ -325,7 +325,7 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
         <div className="finance-panel-header">
           <div>
             <h2 className="finance-panel-kicker">Gastos a cuotas</h2>
-            <p className="finance-panel-kpi">Lo que ya cae este mes: <span style={{ color: '#F87171', fontWeight: 700 }}>${formatAmount(totalMensual)}</span></p>
+            <p className="finance-panel-kpi">Lo que pagas este mes: <span style={{ color: '#F87171', fontWeight: 700 }}>${formatAmount(totalMensual)}</span></p>
           </div>
           <button className="btn-add page-primary-action" onClick={openNew}><Plus size={16} /> Agregar</button>
         </div>
@@ -333,7 +333,7 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
         <div className="page-header page-header-actions">
           <div className="page-header-main">
             <h1 className="page-title">🧩 Gastos a cuotas</h1>
-            <p className="page-subtitle">Vista compacta para manejar muchas deudas sin perder de vista lo que vence primero.</p>
+            <p className="page-subtitle">Todas tus compras a cuotas en un solo lugar, con lo que vence primero arriba.</p>
           </div>
           <button className="btn-add page-primary-action" onClick={openNew}>
             <Plus size={16} /> Agregar
@@ -344,24 +344,24 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
       {items.length > 0 && (
         <div className="stats-grid diferidos-stats-grid">
           <div className="stat-card">
-            <div className="stat-label">Cuota hoy</div>
+            <div className="stat-label">Cuotas de este mes</div>
             <div className="stat-value lila">${formatAmount(totalMensual)}</div>
-            <div className="stat-sub">Lo que ya cae en este mes.</div>
+            <div className="stat-sub">Lo que pagas este mes.</div>
           </div>
           <div className="stat-card">
-            <div className="stat-label">Comprometido</div>
+            <div className="stat-label">Total en cuotas</div>
             <div className="stat-value">${formatAmount(totalComprometido)}</div>
-            <div className="stat-sub">Activos y por comenzar.</div>
+            <div className="stat-sub">Lo que suman las compras que sigues pagando o que aún no empiezan.</div>
           </div>
           <div className="stat-card">
             <div className="stat-label">En curso</div>
             <div className="stat-value green">{activosHoy}</div>
-            <div className="stat-sub">Cuotas corriendo hoy.</div>
+            <div className="stat-sub">Compras que estás pagando hoy.</div>
           </div>
           <div className="stat-card">
-            <div className="stat-label">Cola</div>
+            <div className="stat-label">Por empezar</div>
             <div className="stat-value">{porComenzar}</div>
-            <div className="stat-sub">{finalizados} finalizados o fuera del flujo.</div>
+            <div className="stat-sub">{finalizados} terminadas o desactivadas.</div>
           </div>
         </div>
       )}
@@ -370,8 +370,8 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
         {items.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">💳</div>
-            <p className="empty-text">No hay gastos a cuotas</p>
-            <p className="empty-sub">Suma una compra a cuotas y la ves en tu flujo.</p>
+            <p className="empty-text">Todavía no tienes compras a cuotas</p>
+            <p className="empty-sub">Agrega una y mira cuánto te toca pagar cada mes.</p>
           </div>
         ) : (
           <>
@@ -443,8 +443,8 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
                           <div style={{ color: 'rgba(var(--app-ink-rgb),0.45)', fontSize: 12 }}>
                             {item.status.key === 'current' && 'En curso'}
                             {item.status.key === 'upcoming' && 'Pendiente de iniciar'}
-                            {item.status.key === 'finished' && 'Ya termino'}
-                            {item.status.key === 'inactive' && 'Fuera del flujo'}
+                            {item.status.key === 'finished' && 'Ya terminó'}
+                            {item.status.key === 'inactive' && 'Desactivada'}
                             {item.status.key === 'pagada' && 'Pagada de una vez'}
                           </div>
                         </td>
@@ -560,7 +560,7 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
               required
               min="0"
               step="0.01"
-              placeholder="Se calcula automático"
+              placeholder="Se calcula solo"
               value={form.cuota_mensual}
               onChange={(event) => setForm({ ...form, cuota_mensual: event.target.value })}
             />
@@ -600,7 +600,7 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
           {editId ? (
             <label className="form-modal-check">
               <input type="checkbox" checked={form.activo} onChange={(event) => setForm({ ...form, activo: event.target.checked })} />
-              <span>Activo en tu flujo</span>
+              <span>Cuenta en tus gastos</span>
             </label>
           ) : (
             <div
@@ -615,7 +615,7 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
                 color: 'rgba(var(--app-ink-rgb),0.72)',
               }}
             >
-              Esta cuota se sumará automáticamente a tu flujo mensual.
+              Esta cuota se sumará sola a tus gastos de cada mes.
             </div>
           )}
           <div className="form-modal-actions">
@@ -664,7 +664,7 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
                 marginBottom: 16,
               }}
             >
-              💸 Se registra como un <b>gasto de este mes</b>, así que tu <b>saldo disponible baja</b> ahora (sale de tu liquidez).<br />
+              💸 Se registra como un <b>gasto de este mes</b>, así que tu <b>saldo disponible baja</b> ahora.<br />
               ✅ A cambio, <b>dejas de pagar la cuota mensual</b> de aquí en adelante.
             </div>
 

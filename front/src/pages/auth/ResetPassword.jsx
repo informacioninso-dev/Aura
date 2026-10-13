@@ -39,10 +39,10 @@ export default function ResetPassword() {
     setLoading(true)
     try {
       const response = await resetPassword({ uid, token, new_password: password })
-      setSuccess(response?.detail || 'Contraseña restablecida correctamente.')
+      setSuccess(response?.detail || 'Listo, tu contraseña cambió. Ya puedes ingresar.')
       setTimeout(() => navigate('/login'), 1500)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'No se pudo restablecer la contraseña.'))
+      setError(getApiErrorMessage(err, 'No pudimos restablecer la contraseña. Intenta de nuevo.'))
     } finally {
       setLoading(false)
     }
@@ -86,10 +86,10 @@ export default function ResetPassword() {
   return (
     <div className="auth-page">
       <div className="auth-box">
-        <Link to={brandTarget} className="auth-logo auth-logo-link" aria-label={user ? 'Ir a mi dashboard' : 'Volver al inicio'}>
+        <Link to={brandTarget} className="auth-logo auth-logo-link" aria-label={user ? 'Ir a Mi dinero' : 'Volver al inicio'}>
           <BrandMark className="auth-logo-icon" />
           <div className="auth-logo-name">AURA</div>
-          <div className="auth-logo-tag">Define una nueva contraseña segura.</div>
+          <div className="auth-logo-tag">Crea una contraseña nueva.</div>
         </Link>
 
         <div className="auth-card">
@@ -131,7 +131,7 @@ export default function ResetPassword() {
         </div>
 
         <p className="auth-footer">
-          <Link to="/login">← Volver al login</Link>
+          <Link to="/login">← Volver a ingresar</Link>
         </p>
       </div>
     </div>

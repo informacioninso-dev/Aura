@@ -30,16 +30,16 @@ export default function PrivacyNotice() {
       </section>
 
       <section>
-        <h2>3. Para que usamos tus datos</h2>
+        <h2>3. Para qué usamos tus datos</h2>
         <ul>
           <li>Crear y proteger tu cuenta, autenticarte y prestarte las funciones de Aura.</li>
           <li>Calcular balances, proyecciones y simulaciones a partir de la información que registras.</li>
           <li>Gestionar planes, pagos, soporte, notificaciones y solicitudes.</li>
           <li>Prevenir abuso, investigar incidentes y cumplir obligaciones legales.</li>
-          <li>Procesar texto o audio con el proveedor de IA solo cuando activas voluntariamente esa funcion.</li>
+          <li>Procesar texto o audio con el proveedor de IA solo cuando activas voluntariamente esa función.</li>
         </ul>
         <p>
-          El tratamiento central se basa en la ejecucion del servicio que solicitas. Las obligaciones
+          El tratamiento central se basa en la ejecución del servicio que solicitas. Las obligaciones
           legales, la seguridad y las funciones opcionales pueden apoyarse en otras bases permitidas
           por la ley, incluido el consentimiento cuando sea necesario. No vendemos tus datos.
         </p>
@@ -49,19 +49,19 @@ export default function PrivacyNotice() {
         <h2>4. Proveedores y transferencias</h2>
         <p>
           Podemos usar proveedores de infraestructura, correo, seguridad y soporte. PayPhone procesa
-          pagos; Groq procesa el texto o audio que envias al asistente. Algunos proveedores pueden
-          tratar datos fuera de Ecuador. En esos casos se deben aplicar las garantias contractuales,
+          pagos; Groq procesa el texto o audio que envías al asistente. Algunos proveedores pueden
+          tratar datos fuera de Ecuador. En esos casos se deben aplicar las garantías contractuales,
           técnicas y legales exigibles para transferencias de datos.
         </p>
       </section>
 
       <section>
-        <h2>5. Conservacion y seguridad</h2>
+        <h2>5. Conservación y seguridad</h2>
         <p>
-          Conservamos los datos mientras tu cuenta este activa y durante los plazos necesarios para
+          Conservamos los datos mientras tu cuenta esté activa y durante los plazos necesarios para
           obligaciones legales, reclamos, seguridad y registros de transacciones. Luego se eliminan
-          o anonimizan cuando corresponde. Aplicamos controles de acceso, cifrado en transito,
-          separacion por usuario y monitoreo; ningun sistema puede prometer riesgo cero.
+          o anonimizan cuando corresponde. Aplicamos controles de acceso, cifrado en tránsito,
+          separación por usuario y monitoreo; ningún sistema puede prometer riesgo cero.
         </p>
       </section>
 
@@ -69,17 +69,17 @@ export default function PrivacyNotice() {
         <h2>6. Tus derechos</h2>
         <p>
           Puedes solicitar información, acceso, rectificación, actualización, eliminación, oposición,
-          portabilidad, suspension del tratamiento y revocación del consentimiento cuando aplique.
+          portabilidad, suspensión del tratamiento y revocación del consentimiento cuando aplique.
           También puedes pedir explicaciones sobre tratamientos automatizados y presentar un reclamo
           ante la <a href="https://spdp.gob.ec/" target="_blank" rel="noreferrer">Superintendencia de Protección de Datos Personales</a>.
         </p>
         <p>
-          Envia tu solicitud a <a href={`mailto:${LEGAL_EMAIL}`}>{LEGAL_EMAIL}</a>. Podremos verificar tu identidad
+          Envía tu solicitud a <a href={`mailto:${LEGAL_EMAIL}`}>{LEGAL_EMAIL}</a>. Podremos verificar tu identidad
           antes de entregar o modificar información.
         </p>
         <p>
           Puedes eliminar tu cuenta y tus datos en cualquier momento desde la app o la web.
-          Los pasos estan en <Link to="/eliminar-cuenta">Eliminar tu cuenta</Link>.
+          Los pasos están en <Link to="/eliminar-cuenta">Eliminar tu cuenta</Link>.
         </p>
       </section>
 
@@ -88,7 +88,7 @@ export default function PrivacyNotice() {
         <p>
           Las proyecciones y simulaciones son cálculos informativos basados en tus datos; Aura no toma
           decisiones crediticias ni ejecuta operaciones financieras por ti. Si este aviso cambia de
-          forma material, se informara la nueva versión y se solicitara una nueva confirmación cuando
+          forma material, se informará la nueva versión y se solicitará una nueva confirmación cuando
           la normativa lo requiera.
         </p>
       </section>

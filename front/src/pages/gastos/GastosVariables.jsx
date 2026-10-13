@@ -106,7 +106,7 @@ export default function GastosVariables({ autoNew = false }) {
       const { data } = await api.get(`/finanzas/gastos-corrientes/resumen_variables/?anio=${anio}&mes=${mes}`)
       setFilas(data)
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo cargar el resumen.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos cargar el resumen. Intenta de nuevo.') })
     } finally {
       setLoading(false)
     }
@@ -136,7 +136,7 @@ export default function GastosVariables({ autoNew = false }) {
       summary: `${pendientes} gasto${pendientes !== 1 ? 's' : ''} pendiente${pendientes !== 1 ? 's' : ''} este mes`,
       title: `Tienes ${pendientes} gasto${pendientes !== 1 ? 's' : ''} variable${pendientes !== 1 ? 's' : ''} sin registrar este mes`,
       description: 'Puedes crearlos de una vez con el valor del mes anterior (o tu promedio) y luego editar los que cambiaron.',
-      primaryActionLabel: creandoMes ? 'Creando...' : 'Crear gastos del mes',
+      primaryActionLabel: creandoMes ? 'Registrando...' : (pendientes === 1 ? 'Registrarlo ahora' : `Registrar los ${pendientes} de una vez`),
       onPrimaryAction: crearMes,
       primaryDisabled: creandoMes,
     }]
@@ -234,7 +234,7 @@ export default function GastosVariables({ autoNew = false }) {
     await fetchResumen()
     setBulkDeleting(false)
     if (errors === 0) setFeedback({ type: 'success', message: `${ids.length} gasto${ids.length !== 1 ? 's' : ''} eliminado${ids.length !== 1 ? 's' : ''}.` })
-    else setFeedback({ type: 'error', message: `Se eliminaron ${ids.length - errors} de ${ids.length}. Algunos fallaron.` })
+    else setFeedback({ type: 'error', message: `Eliminamos ${ids.length - errors} de ${ids.length}. Algunos no se pudieron borrar; intenta de nuevo.` })
   }
 
   function openNew() {
@@ -284,7 +284,7 @@ export default function GastosVariables({ autoNew = false }) {
       await fetchResumen()
       setFeedback({ type: 'success', message: editId ? 'Gasto variable actualizado.' : 'Gasto variable creado.' })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo guardar.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos guardar. Intenta de nuevo.') })
     } finally {
       setSaving(false)
     }
@@ -299,7 +299,7 @@ export default function GastosVariables({ autoNew = false }) {
       await fetchResumen()
       setFeedback({ type: 'success', message: 'Gasto eliminado.' })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo eliminar.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos eliminar. Intenta de nuevo.') })
     }
   }
 
@@ -312,10 +312,10 @@ export default function GastosVariables({ autoNew = false }) {
       await fetchResumen()
       setFeedback({
         type: 'success',
-        message: `Se crearon ${data.creados} gasto(s) con tu promedio. Ajusta los que hayan cambiado.`,
+        message: `Listo, registramos ${data.creados} gasto(s) con tu promedio. Ajusta los que hayan cambiado.`,
       })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudieron crear los gastos del mes.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos crear los gastos del mes. Intenta de nuevo.') })
     } finally {
       setCreandoMes(false)
     }
@@ -359,7 +359,7 @@ export default function GastosVariables({ autoNew = false }) {
       await fetchResumen()
       setConsumoForm({ monto: '', descripcion: '', fecha: hoyDelMes() })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo añadir la compra.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos añadir la compra. Intenta de nuevo.') })
     } finally {
       setSavingConsumo(false)
     }
@@ -379,7 +379,7 @@ export default function GastosVariables({ autoNew = false }) {
       setRubro(null)
       setFeedback({ type: 'success', message: `${rubro.descripcion}: marcado sin gasto este mes.` })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo marcar.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos marcar. Intenta de nuevo.') })
     } finally {
       setSavingConsumo(false)
     }
@@ -401,7 +401,7 @@ export default function GastosVariables({ autoNew = false }) {
       setRubro(null)
       setFeedback({ type: 'success', message: `${rubro.descripcion}: registrado $${formatAmount(monto)} este mes.` })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo registrar.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos registrar. Intenta de nuevo.') })
     } finally {
       setSavingConsumo(false)
     }
@@ -413,7 +413,7 @@ export default function GastosVariables({ autoNew = false }) {
       await cargarConsumos(rubro.id)
       await fetchResumen()
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo eliminar la compra.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos eliminar la compra. Intenta de nuevo.') })
     }
   }
 
@@ -599,8 +599,8 @@ export default function GastosVariables({ autoNew = false }) {
           )}
 
           <div className="form-modal-group">
-            <label className="form-modal-label">En que se va?</label>
-            <input className="form-modal-input" required placeholder="Ej: Luz, agua, super, gasolina..." value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />
+            <label className="form-modal-label">¿En qué se te va?</label>
+            <input className="form-modal-input" required placeholder="Ej: Luz, agua, súper, gasolina..." value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />
           </div>
 
           <div className="form-modal-group">
@@ -671,7 +671,7 @@ export default function GastosVariables({ autoNew = false }) {
                 </div>
               </div>
               <div className="form-modal-group">
-                <label className="form-modal-label">Donde? <span style={{ color: 'rgba(var(--app-ink-rgb),0.4)' }}>(opcional)</span></label>
+                <label className="form-modal-label">¿Dónde? <span style={{ color: 'rgba(var(--app-ink-rgb),0.4)' }}>(opcional)</span></label>
                 <input className="form-modal-input" placeholder="Ej: Fybeca, Sana Sana..."
                   value={consumoForm.descripcion} onChange={(e) => setConsumoForm({ ...consumoForm, descripcion: e.target.value })} />
               </div>
@@ -719,7 +719,7 @@ export default function GastosVariables({ autoNew = false }) {
       <ConfirmDialog
         open={confirmBulkDelete}
         title="Eliminar seleccionados"
-        message={`Se eliminaran ${selectedIds.size} gasto${selectedIds.size !== 1 ? 's' : ''} variable${selectedIds.size !== 1 ? 's' : ''} y sus consumos. Esta acción no se puede deshacer.`}
+        message={`Se eliminarán ${selectedIds.size} gasto${selectedIds.size !== 1 ? 's' : ''} variable${selectedIds.size !== 1 ? 's' : ''} y sus consumos. Esta acción no se puede deshacer.`}
         confirmText="Eliminar todos"
         cancelText="Cancelar"
         loading={bulkDeleting}

@@ -45,7 +45,7 @@ const SCENARIO_TYPE_LABELS = {
 const ADD_SUCCESS_MESSAGES = {
   contado: 'Listo. Este pago quedó agregado como gasto puntual en tu plan.',
   recurrente: 'Listo. Este gasto mensual quedó agregado a tu plan.',
-  cuotas: 'La decisión quedó agregada a tus gastos a cuotas.',
+  cuotas: 'Listo. Quedó agregada a tus gastos a cuotas.',
 }
 const ADD_BUTTON_LABELS = {
   contado: 'Agregar a mis gastos',
@@ -53,7 +53,7 @@ const ADD_BUTTON_LABELS = {
   cuotas: 'Agregar a mi plan',
 }
 const ADD_DONE_LABELS = {
-  contado: 'Agregado a tus gastos futuros',
+  contado: 'Agregado a tus gastos puntuales',
   recurrente: 'Agregado a gastos mensuales',
   cuotas: 'Agregado a gastos a cuotas',
 }
@@ -161,7 +161,7 @@ const SIMULATOR_DATE_ACTIONS = [
   { key: 'today', label: 'Hoy', resolve: () => new Date() },
   { key: 'month-end', label: 'Fin de mes', resolve: (base) => endOfMonth(base) },
   { key: 'next-month', label: 'Mes siguiente', resolve: (base) => shiftMonths(base, 1) },
-  { key: 'next-month-start', label: 'Prox. inicio', resolve: (base) => startOfMonth(shiftMonths(base, 1)) },
+  { key: 'next-month-start', label: 'Próx. inicio', resolve: (base) => startOfMonth(shiftMonths(base, 1)) },
 ]
 
 export default function Simulador() {
@@ -226,7 +226,7 @@ export default function Simulador() {
         const { data } = await api.get('/simulador/bancos/')
         setBancos(data)
       } catch (error) {
-        setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo cargar el simulador.') })
+        setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No pudimos cargar el simulador. Intenta de nuevo.') })
       } finally {
         setLoadingData(false)
       }
@@ -238,7 +238,7 @@ export default function Simulador() {
   useEffect(() => {
     const timer = setTimeout(() => {
       void fetchSimulaciones().catch((error) => {
-        setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudieron cargar los escenarios.') })
+        setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No pudimos cargar los escenarios. Intenta de nuevo.') })
       })
     }, 250)
     return () => clearTimeout(timer)
@@ -310,7 +310,7 @@ export default function Simulador() {
         window.localStorage.setItem(COLCHON_STORAGE_KEY, String(form.colchon_minimo))
       }
     } catch (error) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo evaluar esta decisión.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No pudimos evaluar esta decisión. Intenta de nuevo.') })
     } finally {
       setSimulating(false)
     }
@@ -324,9 +324,9 @@ export default function Simulador() {
       await api.post('/simulador/simulaciones/', buildPayload())
       if (page === 1) await fetchSimulaciones()
       else setPage(1)
-      setFeedback({ type: 'success', message: 'Escenario guardado correctamente.' })
+      setFeedback({ type: 'success', message: 'Escenario guardado.' })
     } catch (error) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo guardar el escenario.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No pudimos guardar el escenario. Intenta de nuevo.') })
     } finally {
       setGuardando(false)
     }
@@ -395,7 +395,7 @@ export default function Simulador() {
           return
         }
       }
-      setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo agregar a tus gastos.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No pudimos agregar a tus gastos. Intenta de nuevo.') })
     } finally {
       setAgregando(false)
     }
@@ -410,9 +410,9 @@ export default function Simulador() {
     try {
       await api.delete(`/simulador/simulaciones/${id}/`)
       await fetchSimulaciones()
-      setFeedback({ type: 'success', message: 'Escenario eliminado correctamente.' })
+      setFeedback({ type: 'success', message: 'Escenario eliminado.' })
     } catch (error) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo eliminar el escenario.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No pudimos eliminar el escenario. Intenta de nuevo.') })
     } finally {
       setDeletingId(null)
     }
@@ -423,12 +423,12 @@ export default function Simulador() {
   const mode = resultado?.projection_mode || user?.projection_mode || 'simple'
   const projectionModeLabel = PROJECTION_MODE_LABELS[mode] || 'Simple'
   const selectedBank = bancos.find((item) => item.id === Number(form.banco))
-  const paymentLabel = form.tipo === 'contado' ? 'Impacto único' : form.tipo === 'recurrente' ? 'Aumento mensual' : 'Cuota mensual'
+  const paymentLabel = form.tipo === 'contado' ? 'Pago único' : form.tipo === 'recurrente' ? 'Aumento mensual' : 'Cuota mensual'
   const financedAmount = resultado
     ? Math.max(0, Number(resultado.total_a_pagar) - Number(resultado.total_intereses))
     : 0
-  const amountLabel = form.tipo === 'recurrente' ? 'Monto mensual' : 'Monto de la decisión'
-  const durationLabel = form.tipo === 'recurrente' ? 'Durante cuantos meses?' : 'Plazo (meses)'
+  const amountLabel = form.tipo === 'recurrente' ? '¿Cuánto pagarías al mes?' : '¿Cuánto cuesta?'
+  const durationLabel = form.tipo === 'recurrente' ? '¿Durante cuántos meses?' : 'Plazo (meses)'
   const startDateLabel = parseLocalDate(form.fecha_inicio)?.toLocaleDateString('es-EC', {
     day: '2-digit',
     month: 'short',
@@ -513,7 +513,7 @@ export default function Simulador() {
           <p className="page-subtitle">Prueba una compra grande o un cambio de vida antes de comprometer tu dinero.</p>
         </div>
         <div className="simulator-projection-badge">
-          <span>Base de cálculo</span>
+          <span>Modo de proyección</span>
           <strong>{projectionModeLabel}</strong>
         </div>
       </div>
@@ -530,7 +530,7 @@ export default function Simulador() {
                 <Calculator size={19} />
                 <div>
                   <h2>¿Qué quieres probar?</h2>
-                  <p>Elige como afectaria tu dinero. Solo mostraremos los datos necesarios.</p>
+                  <p>Elige cómo afectaría tu dinero. Solo mostraremos los datos necesarios.</p>
                 </div>
               </div>
 
@@ -645,7 +645,7 @@ export default function Simulador() {
                       value={form.plazo_meses}
                       onChange={(event) => updateForm({ plazo_meses: event.target.value })}
                     />
-                    <p className="simulator-field-help">Usa el tiempo durante el cual quieres medir este cambio de vida.</p>
+                    <p className="simulator-field-help">¿Por cuántos meses quieres ver el efecto de este cambio?</p>
                   </div>
                 )}
 
@@ -662,7 +662,7 @@ export default function Simulador() {
                     value={form.colchon_minimo}
                     onChange={(event) => updateForm({ colchon_minimo: event.target.value })}
                   />
-                  <p className="simulator-field-help">Es el monto que no quieres tocar aun después de asumir el gasto.</p>
+                  <p className="simulator-field-help">Es la plata que no quieres tocar, pase lo que pase.</p>
                 </div>
 
                 <div className="form-modal-group">
@@ -687,7 +687,7 @@ export default function Simulador() {
                 </div>
 
                 <button type="submit" className="btn-modal-save simulator-submit" disabled={simulating}>
-                  {simulating ? 'Analizando tus finanzas...' : 'Ver impacto en mis finanzas'}
+                  {simulating ? 'Analizando tus finanzas...' : 'Ver cómo me afecta'}
                 </button>
               </form>
             </section>
@@ -724,11 +724,11 @@ export default function Simulador() {
                     <details className="simulator-details">
                       <summary>Ver detalle del cálculo</summary>
                       <div className="simulator-detail-list">
-                        <div><span>Proyección utilizada</span><strong>{projectionModeLabel}</strong></div>
+                        <div><span>Modo de proyección</span><strong>{projectionModeLabel}</strong></div>
                         <div><span>La decisión empieza</span><strong>{startDateLabel}</strong></div>
                         {resultado.tipo === 'cuotas' && (
                           <>
-                            <div><span>Monto financiado, sin intereses</span><strong>{fmt(financedAmount)}</strong></div>
+                            <div><span>Monto del crédito (sin intereses)</span><strong>{fmt(financedAmount)}</strong></div>
                             <div><span>Número de cuotas</span><strong>{resultado.meses_con_impacto}</strong></div>
                             <div><span>Valor de cada cuota</span><strong>{fmt(resultado.cuota_mensual)}</strong></div>
                             <div><span>Intereses totales del crédito</span><strong>{fmt(resultado.total_intereses)}</strong></div>
@@ -748,7 +748,7 @@ export default function Simulador() {
                         <div><span>Saldo más bajo sin el gasto</span><strong>{fmt(resultado.saldo_minimo_base)}</strong></div>
                         <div><span>Saldo más bajo incluyendo el gasto</span><strong>{fmt(resultado.saldo_minimo_escenario)}</strong></div>
                         <div><span>Reserva que quieres conservar</span><strong>{fmt(resultado.colchon_minimo)}</strong></div>
-                        <div><span>Horizonte evaluado</span><strong>{resultado.horizon_months} meses</strong></div>
+                        <div><span>Meses analizados</span><strong>{resultado.horizon_months} meses</strong></div>
                       </div>
                     </details>
 
@@ -777,7 +777,7 @@ export default function Simulador() {
                       <CalendarClock size={20} />
                     </div>
                     <p className="simulator-chart-explanation">
-                      <strong>No son gastos.</strong> Cada punto muestra el dinero acumulado que te quedaría al cerrar ese mes, después de tus ingresos y gastos proyectados durante {resultado.horizon_months} meses.
+                      <strong>Cada punto es la plata que te quedaría al cerrar ese mes</strong>, ya con tus ingresos y gastos, durante {resultado.horizon_months} meses.
                       <span>La distancia entre las líneas es el efecto acumulado de este gasto en tus finanzas.</span>
                     </p>
                     <ul className="simulator-chart-guide" aria-label="Qué representa cada línea">
@@ -849,7 +849,7 @@ export default function Simulador() {
               ) : (
                 <div className="card simulator-empty-result">
                   <div className="simulator-empty-icon"><Calculator size={28} /></div>
-                  <h2>Convierte una idea en una decisión informada</h2>
+                  <h2>Antes de gastar, mira qué pasa</h2>
                   <p>Verás cuánto cambia tu saldo, cuál sería el punto más bajo y en qué mes aparecería el primer riesgo.</p>
                   <div className="simulator-example-list">
                     <span>Un viaje dentro de seis meses</span>
@@ -870,7 +870,7 @@ export default function Simulador() {
 
             {totalSimulaciones === 0 ? (
               <div className="empty-state simulator-saved-empty">
-                <p className="empty-text">Aún no guardas escenarios</p>
+                <p className="empty-text">Todavía no tienes escenarios guardados</p>
                 <p className="empty-sub">Simula una decisión y guárdala para revisarla después.</p>
               </div>
             ) : (

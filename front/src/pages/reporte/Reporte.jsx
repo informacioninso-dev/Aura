@@ -69,7 +69,7 @@ export default function Reporte() {
       setData(response)
     } catch (err) {
       setData(null)
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo cargar el reporte.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos cargar el reporte. Intenta de nuevo.') })
     } finally {
       setLoading(false)
     }
@@ -114,7 +114,7 @@ export default function Reporte() {
       triggerDownload(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' }), filename)
       setFeedback({ type: 'success', message: 'CSV descargado correctamente.' })
     } catch {
-      setFeedback({ type: 'error', message: 'No se pudo descargar el CSV.' })
+      setFeedback({ type: 'error', message: 'No pudimos descargar el CSV. Intenta de nuevo.' })
     } finally {
       setExportingCsv(false)
     }
@@ -131,7 +131,7 @@ export default function Reporte() {
       triggerDownload(new Blob([response.data], { type: 'application/pdf' }), filename)
       setFeedback({ type: 'success', message: 'PDF descargado correctamente.' })
     } catch (err) {
-      let message = 'No se pudo descargar el PDF.'
+      let message = 'No pudimos descargar el PDF. Intenta de nuevo.'
 
       if (err?.response?.data instanceof Blob) {
         const blobMessage = await parseBlobError(err.response.data)
@@ -160,7 +160,7 @@ export default function Reporte() {
       <div className="reporte-header">
         <div className="page-header-main">
           <h1 className="page-title">Reportes</h1>
-          <p className="page-subtitle">Asi se movio tu mes</p>
+          <p className="page-subtitle">Así se movió tu mes</p>
         </div>
 
         <div className="reporte-actions">

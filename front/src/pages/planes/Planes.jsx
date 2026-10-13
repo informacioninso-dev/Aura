@@ -23,7 +23,7 @@ export default function Planes() {
       const { data } = await api.post('/usuarios/pago/iniciar/', { plan_id: plan.id })
       window.location.assign(data.pay_url)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'No se pudo iniciar el pago.'))
+      setError(getApiErrorMessage(err, 'No pudimos iniciar el pago. Intenta de nuevo.'))
       setPagando(null)
     }
   }
@@ -43,7 +43,7 @@ export default function Planes() {
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
         <h1 className="page-title">Planes</h1>
         <p style={{ color: 'rgba(var(--app-ink-rgb),0.55)', marginBottom: 32, fontSize: 15 }}>
-          Elige el plan que mejor se adapte a tus necesidades.
+          Empieza gratis y pásate a Pro cuando necesites más.
         </p>
 
         {error && (
@@ -143,7 +143,7 @@ export default function Planes() {
                       onClick={() => handleContratar(plan)}
                       disabled={pagando === plan.id}
                     >
-                      {pagando === plan.id ? 'Redirigiendo...' : 'Contratar'}
+                      {pagando === plan.id ? 'Redirigiendo...' : 'Elegir este plan'}
                     </button>
                   )}
                 </div>

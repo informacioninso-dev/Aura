@@ -17,7 +17,7 @@ import { formatAmount } from '../../utils/formatters'
 import '../../components/ui/app.css'
 
 const CATEGORIA_STORAGE_KEY = 'gastos_puntuales_last_categoria'
-const FUTURE_EXPENSE_MESSAGE = 'Los gastos futuros no se cargan aquí. Simúlalos desde el simulador con tasa 0%.'
+const FUTURE_EXPENSE_MESSAGE = '¿Es un gasto que todavía no empieza? Pruébalo primero en el Simulador y desde ahí lo agregas a tus gastos.'
 
 function getTodayDate() {
   const now = new Date()
@@ -96,7 +96,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
       setTotalItems(data.count || 0)
       setTotal(Number(data.summary?.total || 0))
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudieron cargar los gastos puntuales.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos cargar los gastos puntuales. Intenta de nuevo.') })
     }
   }
 
@@ -131,7 +131,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
       setPareceVariable(false)
       setFeedback({ type: 'success', message: 'Creado como gasto variable. Lo verás en la pestaña Variables.' })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo crear como variable.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos crear como variable. Intenta de nuevo.') })
     } finally {
       setLoading(false)
     }
@@ -162,10 +162,10 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
         type: 'success',
         message: sugerencia.destino === 'fijo'
           ? `"${sugerencia.descripcion}" ahora es un gasto fijo ${sugerencia.frecuencia_sugerida}.`
-          : `"${sugerencia.descripcion}" ahora es un gasto variable. Tu historial se conservo.`,
+          : `"${sugerencia.descripcion}" ahora es un gasto variable. Tu historial se conservó.`,
       })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo convertir el grupo.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos convertir el grupo. Intenta de nuevo.') })
     } finally {
       setSugerenciaAplicando(null)
     }
@@ -219,9 +219,9 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
       }
       setModal(false)
       await fetchItems()
-      setFeedback({ type: 'success', message: editId ? 'Gasto puntual actualizado correctamente.' : 'Gasto puntual creado correctamente.' })
+      setFeedback({ type: 'success', message: editId ? 'Cambios guardados.' : 'Gasto puntual guardado.' })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo guardar el gasto puntual.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos guardar el gasto puntual. Intenta de nuevo.') })
     } finally {
       setLoading(false)
     }
@@ -241,9 +241,9 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
     try {
       await api.delete(`/finanzas/gastos-no-corrientes/${id}/`)
       await fetchItems()
-      setFeedback({ type: 'success', message: 'Gasto puntual eliminado correctamente.' })
+      setFeedback({ type: 'success', message: 'Gasto puntual eliminado.' })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo eliminar el gasto puntual.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos eliminar el gasto puntual. Intenta de nuevo.') })
     } finally {
       setDeletingId(null)
     }
@@ -317,7 +317,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
     await fetchItems()
     setBulkDeleting(false)
     if (errors === 0) setFeedback({ type: 'success', message: `${ids.length} gasto${ids.length !== 1 ? 's' : ''} eliminado${ids.length !== 1 ? 's' : ''}.` })
-    else setFeedback({ type: 'error', message: `Se eliminaron ${ids.length - errors} de ${ids.length}. Algunos fallaron.` })
+    else setFeedback({ type: 'error', message: `Eliminamos ${ids.length - errors} de ${ids.length}. Algunos no se pudieron borrar; intenta de nuevo.` })
   }
 
   async function handleConvertToRecurrente(destino) {
@@ -345,7 +345,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
           : 'Listo. Ahora lo verás en Gastos fijos.',
       })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo convertir el gasto.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos convertir el gasto. Intenta de nuevo.') })
     } finally {
       setConverting(false)
     }
@@ -358,7 +358,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
           <div>
             <h2 className="finance-panel-kicker">Gastos puntuales</h2>
             <p className="finance-panel-kpi">
-              Total cargado:&nbsp;
+              Total registrado:&nbsp;
               <span style={{ color: 'var(--app-danger)', fontWeight: 700 }}>
                 ${formatAmount(total)}
               </span>
@@ -371,7 +371,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
           <div className="page-header-main">
             <h1 className="page-title">Gastos puntuales</h1>
             <p className="page-subtitle">
-              Total cargado:&nbsp;
+              Total registrado:&nbsp;
               <span style={{ color: 'var(--app-danger)', fontWeight: 700 }}>
                 ${formatAmount(total)}
               </span>
@@ -393,8 +393,8 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
         {items.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon"><Lightbulb size={20} /></div>
-            <p className="empty-text">No hay gastos puntuales</p>
-            <p className="empty-sub">Suma compras, salidas o imprevistos</p>
+            <p className="empty-text">Todavía no tienes gastos puntuales</p>
+            <p className="empty-sub">Agrega compras, salidas o imprevistos que pasan una sola vez.</p>
           </div>
         ) : (
           <>
@@ -499,11 +499,11 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
         <form onSubmit={handleSubmit}>
           {!editId && (
             <p style={{ marginTop: -8, marginBottom: 14, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
-              Carga rápida: nombre, categoría y monto. Lo demás es opcional.
+              Registro rápido: nombre, categoría y monto. Lo demás es opcional.
             </p>
           )}
           <div className="form-modal-group">
-            <label className="form-modal-label">En que se fue?</label>
+            <label className="form-modal-label">¿En qué se te fue?</label>
             <input
               className="form-modal-input"
               required
@@ -570,7 +570,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
                 </div>
                 <DateQuickActions value={form.fecha} onChange={(value) => setForm({ ...form, fecha: clampExpenseDate(value) })} disabled={loading} />
                 <p style={{ marginTop: 8, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)', lineHeight: 1.45 }}>
-                  Si este gasto todavía no pasa, simúlalo en el simulador con tasa 0% en lugar de dejarlo futuro aquí.
+                  Si este gasto todavía no pasa, pruébalo primero en el Simulador.
                 </p>
               </div>
               <div className="form-modal-group">
@@ -589,7 +589,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
                     <div>
                       <div className="form-modal-label" style={{ marginBottom: 4 }}>Usar en mi proyección conservadora</div>
                       <div style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.5)', lineHeight: 1.45 }}>
-                        Solo aplica en modo Personalizada. Déjalo activo si este gasto puntual podría repetirse; apagalo para viajes u otros casos especiales.
+                        Solo cuenta en el modo Conservadora. Déjalo activo si este gasto podría repetirse; apágalo si fue algo único, como un viaje.
                       </div>
                     </div>
                   </label>
@@ -600,7 +600,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
 
           {!editId && !showAdvanced && (
             <p style={{ marginTop: -4, marginBottom: 18, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
-              Si no cambias nada, queda con fecha de hoy. Si es para más adelante, simúlalo en el simulador con tasa 0%.
+              Si no cambias nada, queda con fecha de hoy. Si es para más adelante, pruébalo primero en el Simulador.
             </p>
           )}
 
@@ -609,8 +609,8 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
               <div className="form-modal-convert-copy">
                 <span className="form-modal-convert-title">Cambiar tipo de movimiento</span>
                 <span className="form-modal-convert-text">
-                  Si esto se repite todos los meses: pasalo a <strong>fijo</strong> si siempre pagas lo mismo,
-                  o a <strong>variable</strong> si el monto cambia (luz, agua, super).
+                  Si esto se repite todos los meses: pásalo a <strong>fijo</strong> si siempre pagas lo mismo,
+                  o a <strong>variable</strong> si el monto cambia (luz, agua, súper).
                 </span>
               </div>
               <div className="form-modal-convert-actions">
@@ -646,7 +646,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
       <ConfirmDialog
         open={confirmConvert}
         title="Pasar a gasto fijo"
-        message={`Se creara como gasto fijo mensual desde ${form.fecha || 'la fecha actual'} y este gasto puntual se eliminará. Luego podrás ajustar la frecuencia si hace falta.`}
+        message={`Se creará como gasto fijo mensual desde ${form.fecha || 'la fecha actual'} y este gasto puntual se eliminará. Luego podrás ajustar la frecuencia si hace falta.`}
         confirmText="Convertir"
         cancelText="Cancelar"
         loading={converting}
@@ -657,7 +657,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
       <ConfirmDialog
         open={confirmDeleteId !== null}
         title="Eliminar gasto puntual"
-        message="Este gasto puntual se eliminará de tus reportes y de tu historial."
+        message="Este gasto puntual se eliminará de tus cálculos y de tu historial."
         confirmText="Eliminar"
         cancelText="Cancelar"
         loading={deletingId !== null}
@@ -668,7 +668,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
       <ConfirmDialog
         open={confirmBulkDelete}
         title="Eliminar seleccionados"
-        message={`Se eliminaran ${selectedIds.size} gasto${selectedIds.size !== 1 ? 's' : ''}. Esta acción no se puede deshacer.`}
+        message={`Se eliminarán ${selectedIds.size} gasto${selectedIds.size !== 1 ? 's' : ''}. Esta acción no se puede deshacer.`}
         confirmText="Eliminar todos"
         cancelText="Cancelar"
         loading={bulkDeleting}

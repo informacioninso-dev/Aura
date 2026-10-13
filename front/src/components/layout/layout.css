@@ -369,7 +369,7 @@
   }
 
   /* Main content — no left margin, top padding for topbar.
-     Bottom padding deja aire para que el boton flotante de Aura AI no tape
+     Bottom padding deja aire para que el boton flotante de "Dile a Aura" no tape
      el ultimo contenido (fila, boton o banner) en pantallas chicas. */
   .app-main {
     margin-left: 0;

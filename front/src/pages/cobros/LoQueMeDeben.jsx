@@ -17,7 +17,7 @@ const DIRECTION_CONFIG = {
   me_deben: {
     panelKicker: 'Me deben',
     headerTitle: 'Lo que me deben',
-    headerSubtitle: 'Préstamos, vueltas y pendientes que otras personas tienen contigo.',
+    headerSubtitle: 'Préstamos y favores que otras personas tienen pendientes contigo.',
     panelKpiLabel: 'Pendiente por cobrar',
     panelAccent: 'var(--app-lila)',
     fetchError: 'No pudimos cargar lo que te deben.',
@@ -28,16 +28,16 @@ const DIRECTION_CONFIG = {
     settledValueClass: 'green',
     settledSub: 'Abonos y pagos que ya recibiste.',
     openCasesSub: 'Deudas que siguen pendientes.',
-    peopleSub: 'Cuantas personas te deben algo.',
-    emptyText: 'Todavía no registras deudas a tu favor',
-    emptySub: 'Aquí puedes anotar préstamos, favores o dinero pendiente por cobrar.',
-    createTitle: '+ Nueva cuenta a tu favor',
+    peopleSub: 'Cuántas personas te deben algo.',
+    emptyText: 'Todavía nadie te debe nada',
+    emptySub: 'Anota lo que prestaste para que no se te olvide cobrarlo.',
+    createTitle: '+ Alguien me debe',
     editTitle: 'Editar cuenta a tu favor',
-    quickHint: 'Carga rápida: quién te debe, por qué y cuánto.',
+    quickHint: 'Registro rápido: quién te debe, por qué y cuánto.',
     idleHint: 'Si no cambias nada, queda con fecha de hoy y sin recordatorio.',
     personaLabel: '¿Quién te debe?',
-    personaPlaceholder: 'Ej: Mama, Juan, companera de trabajo...',
-    conceptoLabel: 'Por que te debe?',
+    personaPlaceholder: 'Ej: Mamá, Juan, compañera de trabajo...',
+    conceptoLabel: '¿Por qué te debe?',
     conceptoPlaceholder: 'Ej: préstamo, almuerzo, pasajes, regalo...',
     paidLabel: 'Ya te pagaron',
     paidColumn: 'Te ha pagado',
@@ -52,20 +52,20 @@ const DIRECTION_CONFIG = {
     pendingLabel: 'Debo hoy',
     pendingValueClass: 'red',
     pendingSub: 'Lo que todavía te falta por pagar.',
-    settledLabel: 'Ya pague',
+    settledLabel: 'Ya pagué',
     settledValueClass: 'green',
     settledSub: 'Abonos y pagos que ya salieron.',
     openCasesSub: 'Deudas que aún no cierras.',
-    peopleSub: 'Cuantas personas esperan un pago tuyo.',
-    emptyText: 'Todavía no registras deudas pendientes',
-    emptySub: 'Aquí puedes anotar préstamos, vueltas o dinero que debes a personas conocidas.',
-    createTitle: '+ Nueva cuenta pendiente',
+    peopleSub: 'Cuántas personas esperan un pago tuyo.',
+    emptyText: 'Todavía no le debes a nadie',
+    emptySub: 'Anota lo que le debes a alguien para no olvidarte de pagarlo.',
+    createTitle: '+ Le debo a alguien',
     editTitle: 'Editar cuenta pendiente',
-    quickHint: 'Carga rápida: a quién debes, por qué y cuánto.',
+    quickHint: 'Registro rápido: a quién debes, por qué y cuánto.',
     idleHint: 'Si no cambias nada, queda con fecha de hoy y sin recordatorio.',
-    personaLabel: 'A quien le debes?',
-    personaPlaceholder: 'Ej: Papa, amiga, vecino...',
-    conceptoLabel: 'Por que le debes?',
+    personaLabel: '¿A quién le debes?',
+    personaPlaceholder: 'Ej: Papá, amiga, vecino...',
+    conceptoLabel: '¿Por qué le debes?',
     conceptoPlaceholder: 'Ej: préstamo, almuerzo, pasajes, regalo...',
     paidLabel: 'Ya pagaste',
     paidColumn: 'Ya pagaste',
@@ -198,10 +198,10 @@ export default function CuentasPersonasPanel({ embedded = false, direction = 'me
       await fetchItems()
       setFeedback({
         type: 'success',
-        message: editId ? 'Cuenta actualizada correctamente.' : 'Cuenta registrada correctamente.',
+        message: editId ? 'Cambios guardados.' : 'Cuenta guardada.',
       })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo guardar esta cuenta.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos guardar esta cuenta. Intenta de nuevo.') })
     } finally {
       setLoading(false)
     }
@@ -222,9 +222,9 @@ export default function CuentasPersonasPanel({ embedded = false, direction = 'me
     try {
       await api.delete(`/finanzas/cuentas-por-cobrar/${id}/`)
       await fetchItems()
-      setFeedback({ type: 'success', message: 'Cuenta eliminada correctamente.' })
+      setFeedback({ type: 'success', message: 'Cuenta eliminada.' })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo eliminar esta cuenta.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos eliminar esta cuenta. Intenta de nuevo.') })
     } finally {
       setDeletingId(null)
     }
@@ -278,7 +278,7 @@ export default function CuentasPersonasPanel({ embedded = false, direction = 'me
           <div className="stat-sub">{config.settledSub}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Casos abiertos</div>
+          <div className="stat-label">Pendientes</div>
           <div className="stat-value">{casosAbiertos}</div>
           <div className="stat-sub">{config.openCasesSub}</div>
         </div>
@@ -454,7 +454,7 @@ export default function CuentasPersonasPanel({ embedded = false, direction = 'me
             <>
               <div className="form-modal-row">
                 <div className="form-modal-group">
-                  <label className="form-modal-label">Desde cuando?</label>
+                  <label className="form-modal-label">¿Desde cuándo?</label>
                   <div className="date-input-wrap">
                     <input
                       className="form-modal-input"
@@ -481,7 +481,7 @@ export default function CuentasPersonasPanel({ embedded = false, direction = 'me
                   />
                 </div>
                 <div className="form-modal-group">
-                  <label className="form-modal-label">Recordarmelo <span>(opcional)</span></label>
+                  <label className="form-modal-label">Recuérdamelo <span>(opcional)</span></label>
                   <div className="date-input-wrap">
                     <input
                       className="form-modal-input"
@@ -533,7 +533,7 @@ export default function CuentasPersonasPanel({ embedded = false, direction = 'me
       <ConfirmDialog
         open={confirmDeleteId !== null}
         title="Eliminar cuenta"
-        message="Esta cuenta saldra de tu lista y de tus totales."
+        message="Esta cuenta saldrá de tu lista y de tus totales."
         confirmText="Eliminar"
         cancelText="Cancelar"
         loading={deletingId !== null}

@@ -20,15 +20,15 @@ import '../../components/ui/app.css'
 
 const FRECUENCIA_STORAGE_KEY = 'gastos_corrientes_last_frecuencia'
 const CATEGORIA_STORAGE_KEY = 'gastos_corrientes_last_categoria'
-const FUTURE_EXPENSE_MESSAGE = 'Los gastos futuros no se cargan aquí. Simúlalos desde el simulador con tasa 0%.'
+const FUTURE_EXPENSE_MESSAGE = '¿Es un gasto que todavía no empieza? Pruébalo primero en el Simulador y desde ahí lo agregas a tus gastos.'
 
 // Copys por tipo: un gasto variable se repite igual que un fijo, pero su monto
 // es un estimado que se reemplaza con lo que el usuario realmente paga.
 const COPY_POR_TIPO = {
   fijo: {
     titulo: 'Gastos fijos',
-    vacioTexto: 'Aún no sumas gastos fijos',
-    vacioSub: 'Agrega los pagos que se repiten con el mismo monto',
+    vacioTexto: 'Todavía no tienes gastos fijos',
+    vacioSub: 'Agrega lo que pagas igual cada mes: arriendo, internet, gym.',
     icono: '🏠',
     placeholder: 'Ej: Arriendo, Netflix, gym...',
     labelMonto: 'Monto',
@@ -36,10 +36,10 @@ const COPY_POR_TIPO = {
   },
   variable: {
     titulo: 'Gastos variables',
-    vacioTexto: 'Aún no sumas gastos variables',
-    vacioSub: 'Agrega los pagos que se repiten pero cambian de monto',
+    vacioTexto: 'Todavía no tienes gastos variables',
+    vacioSub: 'Agrega lo que pagas cada mes pero cambia: luz, agua, comida.',
     icono: '💡',
-    placeholder: 'Ej: Luz, agua, super, gasolina...',
+    placeholder: 'Ej: Luz, agua, súper, gasolina...',
     labelMonto: 'Monto estimado',
     ayudaMonto: 'Lo iremos ajustando con lo que realmente pagues cada mes.',
   },
@@ -188,7 +188,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
       setTotalItems(data.count || 0)
       setTotal(Number(data.summary?.monthly_total || 0))
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudieron cargar los gastos.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos cargar los gastos. Intenta de nuevo.') })
     }
   }
 
@@ -249,7 +249,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
       await fetchItems()
       setFeedback({ type: 'success', message: 'Monto real guardado. Tu proyección ya lo tiene en cuenta.' })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo guardar el monto real.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos guardar el monto real. Intenta de nuevo.') })
     } finally {
       setRealLoading(false)
     }
@@ -269,7 +269,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
         message: esVariable ? 'Listo. Ahora lo verás en Gastos fijos.' : 'Listo. Ahora lo verás en Gastos variables.',
       })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo cambiar el tipo de gasto.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos cambiar el tipo de gasto. Intenta de nuevo.') })
     } finally {
       setConverting(false)
     }
@@ -294,9 +294,9 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
       }
       setModal(false)
       await fetchItems()
-      setFeedback({ type: 'success', message: editId ? 'Gasto actualizado correctamente.' : 'Gasto creado correctamente.' })
+      setFeedback({ type: 'success', message: editId ? 'Cambios guardados.' : 'Gasto guardado.' })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo guardar el gasto.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos guardar el gasto. Intenta de nuevo.') })
     } finally {
       setLoading(false)
     }
@@ -317,9 +317,9 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
     try {
       await api.delete(`/finanzas/gastos-corrientes/${id}/`)
       await fetchItems()
-      setFeedback({ type: 'success', message: 'Gasto eliminado correctamente.' })
+      setFeedback({ type: 'success', message: 'Gasto eliminado.' })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo eliminar el gasto.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos eliminar el gasto. Intenta de nuevo.') })
     } finally {
       setDeletingId(null)
     }
@@ -361,7 +361,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
       await fetchItems()
       setFeedback({ type: 'success', message: 'Nueva versión creada. El historial anterior se conserva.' })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo crear la nueva versión.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos crear la nueva versión. Intenta de nuevo.') })
     } finally {
       setVersionLoading(false)
     }
@@ -383,7 +383,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
       await fetchItems()
       setFeedback({ type: 'success', message: 'Listo. Ahora lo verás en Gastos puntuales.' })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo convertir el gasto a puntual.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos convertir el gasto a puntual. Intenta de nuevo.') })
     } finally {
       setConverting(false)
     }
@@ -442,7 +442,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
     await fetchItems()
     setBulkDeleting(false)
     if (errors === 0) setFeedback({ type: 'success', message: `${ids.length} gasto${ids.length !== 1 ? 's' : ''} eliminado${ids.length !== 1 ? 's' : ''}.` })
-    else setFeedback({ type: 'error', message: `Se eliminaron ${ids.length - errors} de ${ids.length}. Algunos fallaron.` })
+    else setFeedback({ type: 'error', message: `Eliminamos ${ids.length - errors} de ${ids.length}. Algunos no se pudieron borrar; intenta de nuevo.` })
   }
 
   return (
@@ -599,7 +599,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
         <form onSubmit={handleSubmit}>
           {!editId && (
             <p style={{ marginTop: -8, marginBottom: 14, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
-              Carga rápida: nombre, categoría y monto.
+              Registro rápido: nombre, categoría y monto.
             </p>
           )}
           {!editId && catalogo.length > 0 && (
@@ -625,7 +625,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
           )}
 
           <div className="form-modal-group">
-            <label className="form-modal-label">En que se va?</label>
+            <label className="form-modal-label">¿En qué se te va?</label>
             <input className="form-modal-input" required placeholder={copy.placeholder} value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />
           </div>
 
@@ -650,13 +650,13 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
           </div>
 
           <div className="form-modal-group">
-            <label className="form-modal-label">Desde <span style={{ color: 'rgba(var(--app-ink-rgb),0.45)', fontSize: 11 }}>— afecta el histórico y la proyección</span></label>
+            <label className="form-modal-label">Desde <span style={{ color: 'rgba(var(--app-ink-rgb),0.45)', fontSize: 11 }}>— cuenta desde esta fecha en adelante</span></label>
             <div className="date-input-wrap">
               <input className="form-modal-input" type="date" required min={DATE_INPUT_MIN} max={maxExpenseDate} value={form.fecha_inicio} onChange={(e) => setStartDate(e.target.value)} />
             </div>
             <DateQuickActions value={form.fecha_inicio} onChange={setStartDate} disabled={loading} />
             <p style={{ marginTop: 8, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)', lineHeight: 1.45 }}>
-              Si este gasto empieza más adelante, no lo cargues aquí. Simúlalo en el simulador usando tasa 0%.
+              Si este gasto empieza más adelante, pruébalo primero en el Simulador.
             </p>
           </div>
 
@@ -696,8 +696,8 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
                 <span className="form-modal-convert-title">Cambiar tipo de movimiento</span>
                 <span className="form-modal-convert-text">
                   {esVariable
-                    ? 'Si el monto en realidad no cambia, pasalo a fijo. Se descartan los montos reales que cargaste.'
-                    : 'Si el monto cambia cada mes pasalo a variable, y si fue una sola vez pasalo a puntual.'}
+                    ? 'Si en realidad pagas siempre lo mismo, pásalo a fijo (se borran los montos reales que registraste).'
+                    : 'Si el monto cambia cada mes, pásalo a variable; si fue una sola vez, pásalo a puntual.'}
                 </span>
               </div>
               <div className="form-modal-convert-actions">
@@ -777,7 +777,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
                 </div>
                 <DateQuickActions value={versionForm.nuevaFecha} onChange={setVersionStartDate} disabled={versionLoading} />
                 <p style={{ marginTop: 8, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)', lineHeight: 1.45 }}>
-                  Si el nuevo gasto arranca en el futuro, llévalo al simulador con tasa 0% en vez de versionarlo aquí.
+                  Si el nuevo gasto arranca en el futuro, pruébalo primero en el Simulador en vez de versionarlo aquí.
                 </p>
               </div>
             </div>
@@ -810,7 +810,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
                 </select>
               </div>
               <div className="form-modal-group">
-                <label className="form-modal-label">Anio</label>
+                <label className="form-modal-label">Año</label>
                 <input className="form-modal-input" type="number" required value={realForm.anio} onChange={(e) => setRealForm({ ...realForm, anio: e.target.value })} />
               </div>
             </div>
@@ -840,7 +840,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
       <ConfirmDialog
         open={confirmConvert}
         title="Pasar a gasto puntual"
-        message={`Se creara un gasto puntual con la fecha ${form.fecha_inicio || 'actual'} y este gasto fijo se eliminará. Luego podrás ajustarlo si hace falta.`}
+        message={`Se creará un gasto puntual con la fecha ${form.fecha_inicio || 'actual'} y este gasto fijo se eliminará. Luego podrás ajustarlo si hace falta.`}
         confirmText="Convertir"
         cancelText="Cancelar"
         loading={converting}
@@ -862,7 +862,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
       <ConfirmDialog
         open={confirmBulkDelete}
         title="Eliminar seleccionados"
-        message={`Se eliminaran ${selectedIds.size} gasto${selectedIds.size !== 1 ? 's' : ''}. Esta acción no se puede deshacer.`}
+        message={`Se eliminarán ${selectedIds.size} gasto${selectedIds.size !== 1 ? 's' : ''}. Esta acción no se puede deshacer.`}
         confirmText="Eliminar todos"
         cancelText="Cancelar"
         loading={bulkDeleting}

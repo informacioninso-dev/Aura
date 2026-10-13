@@ -23,7 +23,7 @@ export default function ForgotPassword() {
       const response = await forgotPassword(email)
       setSuccess(response?.detail || 'Si el correo está registrado, te enviaremos instrucciones.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'No se pudo procesar la solicitud.'))
+      setError(getApiErrorMessage(err, 'No pudimos procesar la solicitud. Intenta de nuevo.'))
     } finally {
       setLoading(false)
     }
@@ -51,7 +51,7 @@ export default function ForgotPassword() {
   return (
     <div className="auth-page">
       <div className="auth-box">
-        <Link to={brandTarget} className="auth-logo auth-logo-link" aria-label={user ? 'Ir a mi dashboard' : 'Volver al inicio'}>
+        <Link to={brandTarget} className="auth-logo auth-logo-link" aria-label={user ? 'Ir a Mi dinero' : 'Volver al inicio'}>
           <BrandMark className="auth-logo-icon" />
           <div className="auth-logo-name">AURA</div>
           <div className="auth-logo-tag">Recupera el acceso de forma segura.</div>
@@ -87,7 +87,7 @@ export default function ForgotPassword() {
         </div>
 
         <p className="auth-footer">
-          <Link to="/login">← Volver al login</Link>
+          <Link to="/login">← Volver a ingresar</Link>
         </p>
       </div>
     </div>

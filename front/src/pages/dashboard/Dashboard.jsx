@@ -57,7 +57,7 @@ function getProjectionAnalysisHelp(mode, variableHistoryMonths, variableHistoryO
   }
 
   const variableHistoryText = variableHistoryObservations > 0
-    ? `Usa ${variableHistoryObservations} registros reales de variables en ${variableHistoryMonths} ${variableHistoryMonths === 1 ? 'mes' : 'meses'}, dentro de una ventana de hasta 18 meses. El último año tiene peso doble.`
+    ? `Toma ${variableHistoryObservations} gastos variables reales de ${variableHistoryMonths === 1 ? 'el último mes' : `los últimos ${variableHistoryMonths} meses`} (máximo 18). El último año cuenta más en el cálculo.`
     : 'Aún no hay montos reales de variables; mientras los registras, usa tus estimados.'
 
   if (mode === 'conservadora') {
@@ -310,7 +310,7 @@ export default function Dashboard() {
       setAdvancedProjection(null)
       setProjectionError(getApiErrorMessage(
         err,
-        advancedProjectionEnabled ? 'No se pudo cargar la proyección Pro.' : 'No se pudo cargar la proyección.',
+        'No pudimos cargar la proyección. Intenta de nuevo.',
       ))
     } finally {
       if (requestId === projectionRequestIdRef.current) {
@@ -359,7 +359,7 @@ export default function Dashboard() {
         gastosNoCorrientes: [],
         diferidos: [],
       })
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo cargar el dashboard.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos cargar tu resumen. Intenta de nuevo.') })
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -406,7 +406,7 @@ export default function Dashboard() {
       await loadProjectionChart(futureMonths, pastMonths)
     } catch (err) {
       setProjectionMode(previousMode)
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo actualizar el modo de proyección.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos cambiar el modo. Intenta de nuevo.') })
     } finally {
       setProjectionModeSaving(false)
     }
@@ -446,14 +446,14 @@ export default function Dashboard() {
         descripcion: 'Ahorros iniciales',
         monto,
         fecha,
-        notas: 'Saldo con el que empiezo a usar Aura',
+        notas: 'Saldo con el que empiezas en Aura',
         incluir_en_proyeccion: true,
       })
       setAhorroInicial('')
       setFeedback({ type: 'success', message: `Listo, empiezas con ${fmt(monto)} de saldo.` })
       await loadDashboard(selectedMonth)
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo guardar tu ahorro inicial.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos guardar tu ahorro inicial. Intenta de nuevo.') })
     } finally {
       setSavingAhorro(false)
     }
@@ -549,7 +549,7 @@ export default function Dashboard() {
       items: applySortDetail(fixedIncomesThisMonth.map((item) => ({
         id: `income-fixed-${item.id}`,
         label: item.descripcion,
-        meta: `${getFrequencyLabel(item.frecuencia)} - impacto mensual`,
+        meta: `${getFrequencyLabel(item.frecuencia)} · al mes`,
         amount: mensualizado(item),
         date: item.fecha_inicio || '',
       }))),
@@ -713,8 +713,8 @@ export default function Dashboard() {
     ? `Detalle de ingresos de ${selectedMonthLabel}`
     : `Detalle de gastos de ${selectedMonthLabel}`
   const activeSummarySubtitle = activeSummaryDetail === 'income'
-    ? `Aquí ves rápido los ingresos guardados que cuentan en ${monthReferenceText}.`
-    : `Aquí ves rápido los gastos guardados que cuentan en ${monthReferenceText}.`
+    ? `Estos son los ingresos que suman en ${monthReferenceText}.`
+    : `Estos son los gastos que cuentan en ${monthReferenceText}.`
 
 
 
@@ -1082,7 +1082,7 @@ export default function Dashboard() {
               />
             )}
           </div>
-          <p className="page-subtitle">Tu mes, claro y sin vueltas.</p>
+          <p className="page-subtitle">Tu mes, claro y sin rodeos.</p>
         </div>
         <div className="dashboard-month-switcher" aria-label="Cambiar mes del dashboard">
           <button
@@ -1119,7 +1119,7 @@ export default function Dashboard() {
         <div className="dashboard-onboarding-card">
           <h2 className="dashboard-onboarding-title">Empieza en 10 segundos.</h2>
           <p className="dashboard-onboarding-sub">
-            Carga un ingreso, un gasto o importa tu historial. Con eso Aura ya te empieza a servir.
+            Registra un ingreso, un gasto o importa tu historial. Con eso Aura ya empieza a ayudarte.
           </p>
           <div className="dashboard-onboarding-points">
             <span className="dashboard-onboarding-point">Tu saldo del mes empieza a tomar forma</span>
@@ -1147,13 +1147,13 @@ export default function Dashboard() {
               </button>
             </div>
             <p className="dashboard-onboarding-ahorro-hint">
-              Suma todo lo que tengas ahorrado hoy. Lo guardamos como tu punto de partida para que tu proyección y tu colchon arranquen bien.
+              Suma todo lo que tengas ahorrado hoy. Lo guardamos como tu punto de partida para que tu proyección y tu colchón arranquen bien.
             </p>
           </div>
 
           <div className="dashboard-onboarding-actions">
-            <Link to="/ingresos" className="btn-modal-save" style={{ textDecoration: 'none' }}>Cargar ingreso</Link>
-            <Link to="/gastos-corrientes" className="btn-modal-cancel" style={{ textDecoration: 'none' }}>Cargar gasto</Link>
+            <Link to="/ingresos" className="btn-modal-save" style={{ textDecoration: 'none' }}>Registrar ingreso</Link>
+            <Link to="/gastos-corrientes" className="btn-modal-cancel" style={{ textDecoration: 'none' }}>Registrar gasto</Link>
             <Link to="/importar" className="btn-modal-cancel" style={{ textDecoration: 'none' }}>Importar historial</Link>
           </div>
         </div>
@@ -1458,7 +1458,7 @@ export default function Dashboard() {
                   return (
                     <div className="dashboard-premium-stat dashboard-premium-stat-outlook">
                       <div className="dashboard-outlook-row">
-                        <span className="dashboard-premium-stat-label">Si sigues asi, terminarias con</span>
+                        <span className="dashboard-premium-stat-label">Si sigues así, terminarías con</span>
                         {outlook.total > 0 && (
                           <span className="dashboard-outlook-pill pos">{outlook.enPositivo} en positivo</span>
                         )}
@@ -1482,14 +1482,14 @@ export default function Dashboard() {
                   <span className="dashboard-chart-note">Saldo con el que arranca esta proyección</span>
                 </div>
                 <div className="dashboard-premium-stat">
-                  <span className="dashboard-premium-stat-label">Cálculo de variables</span>
-                  <strong className="dashboard-premium-stat-value">{isSimpleMode ? 'Estimado' : 'Ponderado'}</strong>
+                  <span className="dashboard-premium-stat-label">Cómo calculamos tus variables</span>
+                  <strong className="dashboard-premium-stat-value">{isSimpleMode ? 'Estimado' : 'Con tu historial'}</strong>
                   <span className="dashboard-chart-note">
-                    {isSimpleMode ? 'Usa los montos que registraste' : 'El último año tiene peso doble'}
+                    {isSimpleMode ? 'Usa los montos que registraste' : 'El último año cuenta más en el cálculo'}
                   </span>
                 </div>
                 <div className="dashboard-premium-stat">
-                  <span className="dashboard-premium-stat-label">Historial variable</span>
+                  <span className="dashboard-premium-stat-label">Historial de gastos variables</span>
                   <strong className="dashboard-premium-stat-value">
                     {isSimpleMode ? 'No aplica' : `${variableHistoryObservations} ${variableHistoryObservations === 1 ? 'registro' : 'registros'}`}
                   </strong>
@@ -1510,10 +1510,10 @@ export default function Dashboard() {
                   </strong>
                   <span className="dashboard-chart-note">
                     {isConservativeMode
-                      ? `${fmt(punctualTotal)} seleccionados / ${punctualHistoryMonths} meses`
+                      ? `${fmt(punctualTotal)} repartidos en ${punctualHistoryMonths} meses`
                       : isSimpleMode
                         ? 'Con tus estimados registrados'
-                        : 'Estimado del historial (ponderado)'}
+                        : 'Promedio de tu historial'}
                   </span>
                 </div>
               </div>
@@ -1580,7 +1580,7 @@ export default function Dashboard() {
                 className={`dashboard-chart-period-controls ${showProjectionPeriod ? 'is-open' : ''}`}
               >
                 <label className="dashboard-chart-control">
-                  <span>Historia</span>
+                  <span>Meses atrás</span>
                   <select
                     className="dashboard-chart-select"
                     value={pastMonths}
@@ -1598,7 +1598,7 @@ export default function Dashboard() {
                   </select>
                 </label>
                 <label className="dashboard-chart-control">
-                  <span>Horizonte</span>
+                  <span>Meses adelante</span>
                   <select
                     className="dashboard-chart-select"
                     value={futureMonths}
@@ -1628,7 +1628,7 @@ export default function Dashboard() {
                 </label>
               </div>
 
-              <div className="dashboard-chart-toggle-group dashboard-chart-series-control" role="tablist" aria-label="Curvas de la proyección">
+              <div className="dashboard-chart-toggle-group dashboard-chart-series-control" role="tablist" aria-label="Qué mostrar en el gráfico">
                 {SERIES_FOCUS_OPTIONS.map((option) => (
                   <button
                     key={option.value}
@@ -1659,7 +1659,7 @@ export default function Dashboard() {
             </div>
           ) : advancedChartEmpty && !projectionLoading ? (
             <div className="empty-state">
-              <p className="empty-text">Aún no hay base suficiente</p>
+              <p className="empty-text">Todavía faltan datos</p>
               <p className="empty-sub">Cuando registres movimientos, aquí verás tus ingresos y gastos mensuales proyectados.</p>
             </div>
           ) : (
@@ -1691,7 +1691,7 @@ export default function Dashboard() {
           </div>
 
           <p className="dashboard-premium-lock-text">
-            Tu plan gratuito muestra una lectura corta y directa de lo que entra y sale por mes, sin controles avanzados.
+            Con el plan gratis ves lo que entra y sale cada mes. Con Pro eliges cuántos años proyectar y cómo calcular.
           </p>
 
           <div className="dashboard-premium-chip-row">
@@ -1713,7 +1713,7 @@ export default function Dashboard() {
             </div>
           ) : advancedChartEmpty ? (
             <div className="empty-state">
-              <p className="empty-text">Aún no hay base suficiente</p>
+              <p className="empty-text">Todavía faltan datos</p>
               <p className="empty-sub">Cuando registres movimientos, aquí verás tus últimos meses y una proyección corta.</p>
             </div>
           ) : (

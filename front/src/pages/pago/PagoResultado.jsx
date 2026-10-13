@@ -75,11 +75,11 @@ export default function PagoResultado() {
                 ¡Pago exitoso!
               </h2>
               <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 15, margin: 0 }}>
-                Tu plan <strong style={{ color: '#C487F6' }}>{planNombre}</strong> ha sido activado.
+                Tu plan <strong style={{ color: '#C487F6' }}>{planNombre}</strong> ya está activo.
               </p>
             </div>
             <button className="btn-primary" style={{ width: '100%' }} onClick={() => navigate('/dashboard')}>
-              Ir al dashboard
+              Ir a Mi dinero
             </button>
           </>
         )}
@@ -92,7 +92,7 @@ export default function PagoResultado() {
                 Pago cancelado
               </h2>
               <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 15, margin: 0 }}>
-                No se realizó ningún cobro.
+                No te cobramos nada.
               </p>
             </div>
             <button className="btn-primary" style={{ width: '100%' }} onClick={() => navigate('/planes')}>
@@ -106,10 +106,10 @@ export default function PagoResultado() {
             <AlertCircle size={56} color="#ef4444" strokeWidth={1.5} />
             <div>
               <h2 style={{ color: '#fff', fontSize: 22, fontWeight: 700, margin: '0 0 8px' }}>
-                Error al verificar
+                No pudimos verificar tu pago
               </h2>
               <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 15, margin: 0 }}>
-                No pudimos confirmar tu pago. Contacta soporte si ya fue debitado.
+                Si ya te cobraron, escríbenos a soporte y lo revisamos.
               </p>
             </div>
             <button className="btn-primary" style={{ width: '100%' }} onClick={() => navigate('/planes')}>

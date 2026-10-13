@@ -99,7 +99,7 @@ export default function AuraAssistant() {
 
   function toggleMic() {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      setError('Tu navegador no soporta reconocimiento de voz. Escribí directamente.')
+      setError('Tu navegador no permite usar la voz. Escríbelo aquí.')
       return
     }
     if (escuchando) {
@@ -141,7 +141,7 @@ export default function AuraAssistant() {
       if (Array.isArray(data?.movimientos)) setParsedList(data.movimientos)
       else setParsed(data)
     } catch (e) {
-      setError(e?.response?.data?.detail || 'No pude entender el registro. Intentá ser más específico.')
+      setError(e?.response?.data?.detail || 'No te entendí bien. Prueba con algo como "gasté $20 en almuerzo".')
     } finally {
       setCargando(false)
     }
@@ -157,7 +157,7 @@ export default function AuraAssistant() {
       setExito(true)
       setTimeout(cerrar, 1400)
     } catch (e) {
-      setError('No se pudo guardar. Revisá los datos e intentá de nuevo.')
+      setError('No pudimos guardar. Revisa los datos e intenta de nuevo.')
       setGuardando(false)
     }
   }
@@ -190,7 +190,7 @@ export default function AuraAssistant() {
       setExito(true)
       setTimeout(cerrar, 1600)
     } else {
-      setError(`Se guardaron ${ok} de ${parsedList.length}. ${fail} fallaron, revisá e intentá de nuevo.`)
+      setError(`Guardamos ${ok} de ${parsedList.length}. Los demás no se guardaron; revísalos e intenta de nuevo.`)
       setGuardando(false)
     }
   }
@@ -230,10 +230,10 @@ export default function AuraAssistant() {
           cursor: 'pointer',
           boxShadow: '0 4px 20px rgba(196,135,246,0.45)',
         }}
-        aria-label="Abrir asistente Aura AI"
+        aria-label="Dile a Aura: registra un movimiento"
       >
         <Sparkles size={16} />
-        Aura AI
+        Dile a Aura
       </button>
 
       {/* Modal */}
@@ -259,7 +259,7 @@ export default function AuraAssistant() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Sparkles size={18} color="var(--app-lila)" />
-                <span style={{ color: 'var(--app-text)', fontWeight: 700, fontSize: 16 }}>Aura AI</span>
+                <span style={{ color: 'var(--app-text)', fontWeight: 700, fontSize: 16 }}>Dile a Aura</span>
               </div>
               <button onClick={cerrar} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(var(--app-ink-rgb),0.5)', padding: 4 }}>
                 <X size={20} />
@@ -275,7 +275,7 @@ export default function AuraAssistant() {
               /* Varios movimientos: revisar y guardar todos */
               <div>
                 <p style={{ color: 'rgba(var(--app-ink-rgb),0.5)', fontSize: 13, marginBottom: 12 }}>
-                  Encontré <strong style={{ color: 'var(--app-text)' }}>{parsedList.length}</strong> movimientos. Revisá y guardá:
+                  Encontré <strong style={{ color: 'var(--app-text)' }}>{parsedList.length}</strong> movimientos. Revísalos y guárdalos:
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 320, overflowY: 'auto', marginBottom: 12 }}>
                   {parsedList.map((m, i) => {
@@ -310,7 +310,7 @@ export default function AuraAssistant() {
               /* Pantalla de confirmación editable */
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                  <p style={{ color: 'rgba(var(--app-ink-rgb),0.5)', fontSize: 13, margin: 0 }}>Revisá y editá si hace falta:</p>
+                  <p style={{ color: 'rgba(var(--app-ink-rgb),0.5)', fontSize: 13, margin: 0 }}>Revisa y edita si hace falta:</p>
                   <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: esGasto ? 'var(--app-danger)' : 'var(--app-green)' }}>
                     {TIPO_LABELS[parsed.tipo]}
                   </span>
@@ -388,7 +388,7 @@ export default function AuraAssistant() {
               /* Pantalla de entrada */
               <div>
                 <p style={{ color: 'rgba(var(--app-ink-rgb),0.5)', fontSize: 13, marginBottom: 12 }}>
-                  Decí o escribí lo que pasó, por ejemplo:<br />
+                  Dime o escribe lo que pasó, por ejemplo:<br />
                   <span style={{ color: 'rgba(var(--app-ink-rgb),0.35)', fontStyle: 'italic' }}>"gasté $50 en almuerzo hoy"</span>
                 </p>
                 <div style={{ position: 'relative', marginBottom: 12 }}>

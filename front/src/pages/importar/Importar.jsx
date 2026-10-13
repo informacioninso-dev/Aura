@@ -92,7 +92,7 @@ export default function Importar() {
       setPreviewPage(1)
       setFase('preview')
     } catch (err) {
-      setError(err.response?.data?.error || 'Error al procesar el archivo')
+      setError(err.response?.data?.error || 'No pudimos leer el archivo. Revisa que sea .csv o .xlsx e intenta de nuevo.')
     } finally {
       setCargando(false)
     }
@@ -140,7 +140,7 @@ export default function Importar() {
       setResultado(data)
       setFase('confirmado')
     } catch (err) {
-      setError(err.response?.data?.error || 'Error al importar')
+      setError(err.response?.data?.error || 'No pudimos importar los movimientos. Intenta de nuevo.')
     } finally {
       setCargando(false)
     }
@@ -168,7 +168,7 @@ export default function Importar() {
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {
-      setRespaldoError('No se pudo exportar la cuenta.')
+      setRespaldoError('No pudimos exportar la cuenta. Intenta de nuevo.')
     } finally {
       setRespaldoCargando(false)
     }
@@ -192,7 +192,7 @@ export default function Importar() {
       setRespaldoResultado(data)
       void fetchPerfil()
     } catch (err) {
-      setRespaldoError(err.response?.data?.error || 'No se pudo importar el respaldo.')
+      setRespaldoError(err.response?.data?.error || 'No pudimos importar el respaldo. Intenta de nuevo.')
     } finally {
       setRespaldoCargando(false)
       if (respaldoInputRef.current) respaldoInputRef.current.value = ''
@@ -208,7 +208,7 @@ export default function Importar() {
 
         <div className="card" style={{ maxWidth: 520, textAlign: 'center', padding: 40 }}>
           <CheckCircle size={56} style={{ color: 'var(--app-green)', marginBottom: 16 }} />
-          <p style={{ fontWeight: 800, fontSize: 20, marginBottom: 8 }}>Todo importado</p>
+          <p style={{ fontWeight: 800, fontSize: 20, marginBottom: 8 }}>¡Listo, todo importado!</p>
 
           <div className="import-result-stats">
             <div>
@@ -287,7 +287,7 @@ export default function Importar() {
           <div className="card" style={{ padding: 0, marginBottom: 16 }}>
             <div className="import-preview-toolbar">
               <CheckCircle size={16} style={{ color: 'var(--app-green)' }} />
-              <span style={{ fontWeight: 700, fontSize: 14 }}>Filas validas ({preview.filas_ok.length})</span>
+              <span style={{ fontWeight: 700, fontSize: 14 }}>Filas válidas ({preview.filas_ok.length})</span>
               <span style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.40)' }}>
                 Mostrando {previewSliceStart + 1}-{Math.min(previewSliceEnd, preview.filas_ok.length)} de {preview.filas_ok.length}
               </span>
@@ -467,7 +467,7 @@ export default function Importar() {
               {drag ? 'Suelta aquí el archivo' : 'Arrastra tu archivo aquí'}
             </p>
             <p style={{ fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.40)' }}>o haz clic para seleccionarlo</p>
-            <p style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.25)', marginTop: 10 }}>.csv · .xlsx · max. 5 MB</p>
+            <p style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.25)', marginTop: 10 }}>.csv · .xlsx · máx. 5 MB</p>
           </>
         )}
       </div>
@@ -501,7 +501,7 @@ export default function Importar() {
 
           {[
             { col: 'fecha', desc: 'YYYY-MM-DD, DD/MM/YYYY o formatos equivalentes.' },
-            { col: 'descripcion', desc: 'Concepto o glosa del movimiento.' },
+            { col: 'descripcion', desc: 'Qué fue: sueldo, súper, arriendo…' },
             { col: 'monto', desc: 'Positivo para ingreso, negativo para gasto.' },
             { col: 'tipo', desc: '"ingreso" o "gasto" si ya lo conoces. Es opcional.' },
             { col: 'categoria', desc: 'Nombre libre de la categoría. Es opcional.' },
@@ -589,7 +589,7 @@ export default function Importar() {
             <span style={{ fontWeight: 800, fontSize: 15 }}>Respaldo de cuenta completa</span>
           </div>
           <p style={{ fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.5)', marginBottom: 14 }}>
-            Exporta TODO en un Excel (ingresos, gastos fijos/variables y sus consumos, diferidos, cuentas con personas y
+            Exporta todo en un Excel (ingresos, gastos fijos/variables y sus consumos, gastos a cuotas, cuentas con personas y
             categorías) y vuelve a importarlo en otra cuenta. Disponible solo para cuentas de asesor.
           </p>
 
@@ -641,7 +641,7 @@ export default function Importar() {
               </p>
               <p style={{ color: 'rgba(var(--app-ink-rgb),0.55)' }}>
                 {respaldoResultado.conteo?.ingresos ?? 0} ingresos · {respaldoResultado.conteo?.gastos ?? 0} gastos ·{' '}
-                {respaldoResultado.conteo?.consumos ?? 0} consumos · {respaldoResultado.conteo?.diferidos ?? 0} diferidos ·{' '}
+                {respaldoResultado.conteo?.consumos ?? 0} consumos · {respaldoResultado.conteo?.diferidos ?? 0} cuotas ·{' '}
                 {respaldoResultado.conteo?.cuentas ?? 0} cuentas · {respaldoResultado.conteo?.categorias ?? 0} categorías
               </p>
               {respaldoResultado.avisos?.length > 0 && (

@@ -100,7 +100,7 @@ export default function Ingresos({ embedded = false }) {
       setTotalItems(data.count || 0)
       setTotal(Number(data.summary?.monthly_total || 0))
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudieron cargar los ingresos.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos cargar tus ingresos. Intenta de nuevo.') })
     }
   }
 
@@ -138,9 +138,9 @@ export default function Ingresos({ embedded = false }) {
       if (typeof window !== 'undefined') window.localStorage.setItem(FRECUENCIA_STORAGE_KEY, payload.frecuencia)
       setModal(false)
       await fetchItems()
-      setFeedback({ type: 'success', message: editId ? 'Ingreso actualizado correctamente.' : 'Ingreso creado correctamente.' })
+      setFeedback({ type: 'success', message: editId ? 'Cambios guardados.' : 'Ingreso guardado.' })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo guardar el ingreso.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos guardar el ingreso. Intenta de nuevo.') })
     } finally {
       setLoading(false)
     }
@@ -161,9 +161,9 @@ export default function Ingresos({ embedded = false }) {
     try {
       await api.delete(`/finanzas/ingresos/${id}/`)
       await fetchItems()
-      setFeedback({ type: 'success', message: 'Ingreso eliminado correctamente.' })
+      setFeedback({ type: 'success', message: 'Ingreso eliminado.' })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo eliminar el ingreso.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos eliminar el ingreso. Intenta de nuevo.') })
     } finally {
       setDeletingId(null)
     }
@@ -197,9 +197,9 @@ export default function Ingresos({ embedded = false }) {
       })
       setVersioningItem(null)
       await fetchItems()
-      setFeedback({ type: 'success', message: 'Nueva versión creada. El historial anterior se conserva.' })
+      setFeedback({ type: 'success', message: 'Listo, nuevo monto guardado. Tu historial anterior se mantiene.' })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo crear la nueva versión.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos guardar el nuevo monto. Intenta de nuevo.') })
     } finally {
       setVersionLoading(false)
     }
@@ -220,7 +220,7 @@ export default function Ingresos({ embedded = false }) {
       await fetchItems()
       setFeedback({ type: 'success', message: 'Listo. Ahora lo verás en Ingresos puntuales.' })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo convertir el ingreso a puntual.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No pudimos pasarlo a puntual. Intenta de nuevo.') })
     } finally {
       setConverting(false)
     }
@@ -279,7 +279,7 @@ export default function Ingresos({ embedded = false }) {
     await fetchItems()
     setBulkDeleting(false)
     if (errors === 0) setFeedback({ type: 'success', message: `${ids.length} ingreso${ids.length !== 1 ? 's' : ''} eliminado${ids.length !== 1 ? 's' : ''}.` })
-    else setFeedback({ type: 'error', message: `Se eliminaron ${ids.length - errors} de ${ids.length}. Algunos fallaron.` })
+    else setFeedback({ type: 'error', message: `Eliminamos ${ids.length - errors} de ${ids.length}. Algunos no se pudieron borrar; intenta de nuevo.` })
   }
 
   return (
@@ -322,8 +322,8 @@ export default function Ingresos({ embedded = false }) {
         {items.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">💰</div>
-            <p className="empty-text">Aún no sumas ingresos</p>
-            <p className="empty-sub">Agrega uno y empieza a ver tu flujo</p>
+            <p className="empty-text">Todavía no tienes ingresos fijos</p>
+            <p className="empty-sub">Agrega tu sueldo u otro ingreso que se repita y mira cómo queda tu mes.</p>
           </div>
         ) : (
           <>
@@ -423,11 +423,11 @@ export default function Ingresos({ embedded = false }) {
         <form onSubmit={handleSubmit}>
           {!editId && (
             <p style={{ marginTop: -8, marginBottom: 14, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
-              Carga rápida: nombre y monto. Lo demás es opcional.
+              Registro rápido: nombre y monto. Lo demás es opcional.
             </p>
           )}
           <div className="form-modal-group">
-            <label className="form-modal-label">De donde viene?</label>
+            <label className="form-modal-label">¿De dónde viene?</label>
             <input
               className="form-modal-input"
               required
@@ -452,7 +452,7 @@ export default function Ingresos({ embedded = false }) {
           </div>
 
           <div className="form-modal-group">
-            <label className="form-modal-label">Desde <span style={{ color: 'rgba(var(--app-ink-rgb),0.45)', fontSize: 11 }}>— afecta el histórico y la proyección</span></label>
+            <label className="form-modal-label">Desde <span style={{ color: 'rgba(var(--app-ink-rgb),0.45)', fontSize: 11 }}>— cuenta desde esta fecha en adelante</span></label>
             <div className="date-input-wrap">
               <input className="form-modal-input" type="date" required min={DATE_INPUT_MIN} max={DATE_INPUT_MAX} value={form.fecha_inicio} onChange={(e) => setForm((prev) => ({ ...prev, fecha_inicio: e.target.value, fecha_fin: prev.fecha_fin && prev.fecha_fin < e.target.value ? '' : prev.fecha_fin }))} />
             </div>
@@ -522,7 +522,7 @@ export default function Ingresos({ embedded = false }) {
         {versioningItem && (
           <form onSubmit={handleVersion}>
             <p style={{ marginTop: -8, marginBottom: 16, fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.5)', lineHeight: 1.5 }}>
-              Cerramos el registro actual un día antes de la nueva fecha. El historial queda guardado.
+              El monto actual se mantiene hasta un día antes de la nueva fecha. Tu historial no se pierde.
             </p>
 
             <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(var(--app-ink-rgb),0.04)', borderRadius: 10, fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
@@ -590,7 +590,7 @@ export default function Ingresos({ embedded = false }) {
       <ConfirmDialog
         open={confirmConvert}
         title="Pasar a ingreso puntual"
-        message={`Se creara un ingreso puntual con la fecha ${form.fecha_inicio || 'actual'} y este ingreso fijo se eliminará. Luego podrás ajustarlo si hace falta.`}
+        message={`Se creará un ingreso puntual con la fecha ${form.fecha_inicio || 'actual'} y este ingreso fijo se eliminará. Luego podrás ajustarlo si hace falta.`}
         confirmText="Convertir"
         cancelText="Cancelar"
         loading={converting}
@@ -612,7 +612,7 @@ export default function Ingresos({ embedded = false }) {
       <ConfirmDialog
         open={confirmBulkDelete}
         title="Eliminar seleccionados"
-        message={`Se eliminaran ${selectedIds.size} ingreso${selectedIds.size !== 1 ? 's' : ''}. Esta acción no se puede deshacer.`}
+        message={`Se eliminarán ${selectedIds.size} ingreso${selectedIds.size !== 1 ? 's' : ''}. Esta acción no se puede deshacer.`}
         confirmText="Eliminar todos"
         cancelText="Cancelar"
         loading={bulkDeleting}

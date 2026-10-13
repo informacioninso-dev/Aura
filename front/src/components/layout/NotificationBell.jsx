@@ -100,7 +100,7 @@ export default function NotificationBell() {
             {noLeidas > 0 && (
               <button onClick={marcarTodas}
                 style={{ background: 'none', border: 'none', color: 'var(--app-lila)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <CheckCheck size={14} /> Leer todas
+                <CheckCheck size={14} /> Marcar todas como leídas
               </button>
             )}
           </div>
@@ -108,7 +108,7 @@ export default function NotificationBell() {
           <div style={{ maxHeight: 380, overflowY: 'auto' }}>
             {notifs.length === 0 ? (
               <div style={{ padding: '32px 16px', textAlign: 'center', color: 'rgba(var(--app-ink-rgb),0.30)', fontSize: 13 }}>
-                Sin notificaciones 🎉
+                Estás al día 🎉
               </div>
             ) : notifs.map(n => (
               <button

@@ -7,7 +7,7 @@ const TAB_OPTIONS = [
   {
     id: 'me_deben',
     label: 'Me deben',
-    subtitle: 'Préstamos, vueltas o favores pendientes contigo.',
+    subtitle: 'Plata que prestaste o pusiste por alguien.',
   },
   {
     id: 'debo',
@@ -32,7 +32,7 @@ export default function CuentasPersonas() {
     <div className="finance-shell">
       <div className="page-header">
         <h1 className="page-title">🐭 Cuentas con personas</h1>
-        <p className="page-subtitle">Pequeñas deudas, vueltas y préstamos informales con conocidos.</p>
+        <p className="page-subtitle">Lo que te deben y lo que debes a amigos, familia o conocidos.</p>
       </div>
 
       <div className="finance-tabs" role="tablist" aria-label="Tipos de cuentas con personas">

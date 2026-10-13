@@ -24,7 +24,7 @@ export default function Login() {
       await login(form.email, form.password)
       navigate('/dashboard')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Correo o clave incorrectos.'))
+      setError(getApiErrorMessage(err, 'Correo o contraseña incorrectos.'))
     } finally {
       setLoading(false)
     }
@@ -52,14 +52,14 @@ export default function Login() {
   return (
     <div className="auth-page">
       <div className="auth-box">
-        <Link to={brandTarget} className="auth-logo auth-logo-link" aria-label={user ? 'Ir a mi dashboard' : 'Volver al inicio'}>
+        <Link to={brandTarget} className="auth-logo auth-logo-link" aria-label={user ? 'Ir a Mi dinero' : 'Volver al inicio'}>
           <BrandMark className="auth-logo-icon" />
           <div className="auth-logo-name">AURA</div>
-          <div className="auth-logo-tag">Clara proyección, futuro sólido.</div>
+          <div className="auth-logo-tag">Tu plata clara, hoy y en los próximos meses.</div>
         </Link>
 
         <div className="auth-card">
-          <h2 className="auth-title">Bienvenido de vuelta</h2>
+          <h2 className="auth-title">Qué bueno verte de nuevo</h2>
 
           {error && <div className="auth-error">{error}</div>}
 
@@ -77,7 +77,7 @@ export default function Login() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Clave</label>
+              <label className="form-label">Contraseña</label>
               <div className="form-input-wrap">
                 <input
                   type={showPass ? 'text' : 'password'}
@@ -87,13 +87,13 @@ export default function Login() {
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                 />
-                <button type="button" className="form-eye-btn" onClick={() => setShowPass((v) => !v)} aria-label={showPass ? 'Ocultar clave' : 'Mostrar clave'}>
+                <button type="button" className="form-eye-btn" onClick={() => setShowPass((v) => !v)} aria-label={showPass ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
                   {showPass ? <EyeOff size={16} strokeWidth={2} /> : <Eye size={16} strokeWidth={2} />}
                 </button>
               </div>
               <div style={{ marginTop: 8, textAlign: 'right' }}>
                 <Link to="/forgot-password" style={{ fontSize: 12, color: '#C487F6', textDecoration: 'none' }}>
-                  Olvide mi clave
+                  Olvidé mi contraseña
                 </Link>
               </div>
             </div>
@@ -105,7 +105,7 @@ export default function Login() {
         </div>
 
         <p className="auth-footer">
-          No tienes cuenta? <Link to="/registro">Crea la tuya gratis</Link>
+          ¿No tienes cuenta? <Link to="/registro">Crea la tuya gratis</Link>
         </p>
         <p className="auth-footer" style={{ marginTop: 8 }}>
           <Link to="/">Volver al inicio</Link>
