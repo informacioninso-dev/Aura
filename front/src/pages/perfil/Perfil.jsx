@@ -57,10 +57,10 @@ export default function Perfil() {
     try {
       await api.post('/usuarios/suscripcion/cancelar/')
       await fetchPerfil()
-      setCancelOk('Suscripcion cancelada. Tu plan Pro se mantiene hasta el fin del periodo.')
+      setCancelOk('Suscripción cancelada. Tu plan Pro se mantiene hasta el fin del periodo.')
       setConfirmCancel(false)
     } catch (err) {
-      setCancelError(getApiErrorMessage(err, 'No se pudo cancelar la suscripcion.'))
+      setCancelError(getApiErrorMessage(err, 'No se pudo cancelar la suscripción.'))
     } finally {
       setCancelLoading(false)
     }
@@ -73,9 +73,9 @@ export default function Perfil() {
     try {
       const { data } = await api.post('/usuarios/suscripcion/reactivar/')
       await fetchPerfil()
-      setCancelOk(data.detail || 'Cancelacion deshecha. Tu plan Pro vuelve a estar activo.')
+      setCancelOk(data.detail || 'Cancelación deshecha. Tu plan Pro vuelve a estar activo.')
     } catch (err) {
-      setCancelError(getApiErrorMessage(err, 'No se pudo deshacer la cancelacion.'))
+      setCancelError(getApiErrorMessage(err, 'No se pudo deshacer la cancelación.'))
     } finally {
       setReactivateLoading(false)
     }
@@ -135,7 +135,7 @@ export default function Perfil() {
         current_password: passForm.current_password,
         new_password: passForm.new_password,
       })
-      setPassOk(response?.detail || 'Contrasena actualizada correctamente.')
+      setPassOk(response?.detail || 'Contraseña actualizada correctamente.')
       setPassForm({ current_password: '', new_password: '', confirm_password: '' })
       if (response?.force_relogin) {
         window.setTimeout(async () => {
@@ -187,7 +187,7 @@ export default function Perfil() {
             <input className="form-modal-input" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
           </div>
           <div className="form-modal-group">
-            <label className="form-modal-label">Correo electronico</label>
+            <label className="form-modal-label">Correo electrónico</label>
             <input className="form-modal-input" value={user?.email || ''} disabled style={{ opacity: 0.4, cursor: 'not-allowed' }} />
           </div>
           <div className="form-modal-group">
@@ -208,7 +208,7 @@ export default function Perfil() {
             <Crown size={20} />
           </div>
           <div className="perfil-plan-heading">
-            <span>Plan y suscripcion</span>
+            <span>Plan y suscripción</span>
             <h3>Plan {currentPlanLabel}</h3>
           </div>
           <span className={`subtle-plan-badge ${currentPlanBadgeClass}`}>{currentPlanLabel}</span>
@@ -218,7 +218,7 @@ export default function Perfil() {
           {!isPro && 'Estas en el plan Free. Puedes pasar a Pro cuando quieras para desbloquear todas las herramientas.'}
           {isPro && !esPago && 'Tu plan Pro fue asignado a tu cuenta y no tiene cobro administrado desde Aura.'}
           {isPro && esPago && cancelAtPeriodEnd && (
-            <>La cancelacion esta programada. Conservas Pro hasta el <strong>{formatPlanDate(endsAt)}</strong> y puedes deshacerla mientras el periodo siga activo.</>
+            <>La cancelación está programada. Conservas Pro hasta el <strong>{formatPlanDate(endsAt)}</strong> y puedes deshacerla mientras el periodo siga activo.</>
           )}
           {isPro && esPago && !cancelAtPeriodEnd && (
             <>Tu periodo Pro esta activo{endsAt ? <> hasta el <strong>{formatPlanDate(endsAt)}</strong></> : ''}.</>
@@ -241,7 +241,7 @@ export default function Perfil() {
             disabled={reactivateLoading}
             onClick={handleReactivarSuscripcion}
           >
-            <RotateCcw size={16} /> {reactivateLoading ? 'Reactivando...' : 'Deshacer cancelacion'}
+            <RotateCcw size={16} /> {reactivateLoading ? 'Reactivando...' : 'Deshacer cancelación'}
           </button>
         )}
 
@@ -258,7 +258,7 @@ export default function Perfil() {
             ) : (
               <div className="perfil-cancel-box">
                 <p>
-                  No perderas Pro hoy. Lo conservaras hasta terminar el periodo actual y despues volveras a Free.
+                  No perderás Pro hoy. Lo conservarás hasta terminar el periodo actual y después volverás a Free.
                 </p>
                 <div className="perfil-plan-actions">
                   <button
@@ -267,7 +267,7 @@ export default function Perfil() {
                     disabled={cancelLoading}
                     onClick={handleCancelarSuscripcion}
                   >
-                    {cancelLoading ? 'Cancelando...' : 'Confirmar cancelacion'}
+                    {cancelLoading ? 'Cancelando...' : 'Confirmar cancelación'}
                   </button>
                   <button
                     type="button"

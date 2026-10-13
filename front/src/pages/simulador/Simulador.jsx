@@ -38,14 +38,14 @@ const PROJECTION_MODE_LABELS = {
   conservadora: 'Conservadora',
 }
 const SCENARIO_TYPE_LABELS = {
-  contado: 'Pago unico',
-  cuotas: 'Prestamo',
+  contado: 'Pago único',
+  cuotas: 'Préstamo',
   recurrente: 'Gasto mensual',
 }
 const ADD_SUCCESS_MESSAGES = {
-  contado: 'Listo. Este pago quedo agregado como gasto puntual en tu plan.',
-  recurrente: 'Listo. Este gasto mensual quedo agregado a tu plan.',
-  cuotas: 'La decision quedo agregada a tus gastos a cuotas.',
+  contado: 'Listo. Este pago quedó agregado como gasto puntual en tu plan.',
+  recurrente: 'Listo. Este gasto mensual quedó agregado a tu plan.',
+  cuotas: 'La decisión quedó agregada a tus gastos a cuotas.',
 }
 const ADD_BUTTON_LABELS = {
   contado: 'Agregar a mis gastos',
@@ -60,14 +60,14 @@ const ADD_DONE_LABELS = {
 const SCENARIO_TYPES = [
   {
     value: 'contado',
-    label: 'Pago unico',
-    description: 'Viaje, boda, cirugia o una compra de contado.',
+    label: 'Pago único',
+    description: 'Viaje, boda, cirugía o una compra de contado.',
     icon: WalletCards,
   },
   {
     value: 'cuotas',
-    label: 'Prestamo',
-    description: 'Vehiculo, vivienda, equipo o prestamo.',
+    label: 'Préstamo',
+    description: 'Vehículo, vivienda, equipo o préstamo.',
     icon: CreditCard,
   },
   {
@@ -310,7 +310,7 @@ export default function Simulador() {
         window.localStorage.setItem(COLCHON_STORAGE_KEY, String(form.colchon_minimo))
       }
     } catch (error) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo evaluar esta decision.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo evaluar esta decisión.') })
     } finally {
       setSimulating(false)
     }
@@ -423,11 +423,11 @@ export default function Simulador() {
   const mode = resultado?.projection_mode || user?.projection_mode || 'simple'
   const projectionModeLabel = PROJECTION_MODE_LABELS[mode] || 'Simple'
   const selectedBank = bancos.find((item) => item.id === Number(form.banco))
-  const paymentLabel = form.tipo === 'contado' ? 'Impacto unico' : form.tipo === 'recurrente' ? 'Aumento mensual' : 'Cuota mensual'
+  const paymentLabel = form.tipo === 'contado' ? 'Impacto único' : form.tipo === 'recurrente' ? 'Aumento mensual' : 'Cuota mensual'
   const financedAmount = resultado
     ? Math.max(0, Number(resultado.total_a_pagar) - Number(resultado.total_intereses))
     : 0
-  const amountLabel = form.tipo === 'recurrente' ? 'Monto mensual' : 'Monto de la decision'
+  const amountLabel = form.tipo === 'recurrente' ? 'Monto mensual' : 'Monto de la decisión'
   const durationLabel = form.tipo === 'recurrente' ? 'Durante cuantos meses?' : 'Plazo (meses)'
   const startDateLabel = parseLocalDate(form.fecha_inicio)?.toLocaleDateString('es-EC', {
     day: '2-digit',
@@ -488,8 +488,8 @@ export default function Simulador() {
     const startLabel = firstDate?.toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' }) || firstDuplicate.fecha_inicio
     const endLabel = lastDate?.toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' }) || firstDuplicate.fecha_fin
     const installmentLabel = firstDuplicate.cuota_mensual ? fmt(firstDuplicate.cuota_mensual) : null
-    const moreLabel = duplicates.length > 1 ? ` Tambien hay ${duplicates.length - 1} parecido(s).` : ''
-    return `${duplicateDiferidoWarning.message} Encontramos "${firstDuplicate.descripcion}"${installmentLabel ? ` por ${installmentLabel} al mes` : ''} entre ${startLabel} y ${endLabel}. Si sigues, quedara duplicado.${moreLabel}`
+    const moreLabel = duplicates.length > 1 ? ` También hay ${duplicates.length - 1} parecido(s).` : ''
+    return `${duplicateDiferidoWarning.message} Encontramos "${firstDuplicate.descripcion}"${installmentLabel ? ` por ${installmentLabel} al mes` : ''} entre ${startLabel} y ${endLabel}. Si sigues, quedará duplicado.${moreLabel}`
   }
 
   function resultMessage() {
@@ -498,22 +498,22 @@ export default function Simulador() {
       return `Tu saldo se mantiene por encima de tu reserva de ${fmt(resultado.colchon_minimo)} durante los ${resultado.horizon_months} meses analizados.`
     }
     if (resultado.flujo_base_en_riesgo && !resultado.decision_genera_riesgo) {
-      return `Tu proyeccion ya baja de tu reserva incluso sin esta decision. Con el gasto, el punto mas bajo seria ${fmt(resultado.saldo_minimo_escenario)}.`
+      return `Tu proyección ya baja de tu reserva incluso sin esta decisión. Con el gasto, el punto más bajo sería ${fmt(resultado.saldo_minimo_escenario)}.`
     }
     if (resultado.primer_mes_negativo) {
-      return `Con esta decision tu saldo entraria en negativo por primera vez en ${resultado.primer_mes_negativo}.`
+      return `Con esta decisión tu saldo entraría en negativo por primera vez en ${resultado.primer_mes_negativo}.`
     }
-    return `Con esta decision bajarias de tu reserva por primera vez en ${resultado.primer_mes_riesgo}.`
+    return `Con esta decisión bajarías de tu reserva por primera vez en ${resultado.primer_mes_riesgo}.`
   }
   return (
     <div className="simulator-page">
       <div className="page-header simulator-page-header">
         <div>
-          <h1 className="page-title">🔮 Simula una decision de gasto</h1>
+          <h1 className="page-title">🔮 Simula una decisión de gasto</h1>
           <p className="page-subtitle">Prueba una compra grande o un cambio de vida antes de comprometer tu dinero.</p>
         </div>
         <div className="simulator-projection-badge">
-          <span>Base de calculo</span>
+          <span>Base de cálculo</span>
           <strong>{projectionModeLabel}</strong>
         </div>
       </div>
@@ -529,12 +529,12 @@ export default function Simulador() {
               <div className="simulator-section-heading">
                 <Calculator size={19} />
                 <div>
-                  <h2>Que quieres probar?</h2>
+                  <h2>¿Qué quieres probar?</h2>
                   <p>Elige como afectaria tu dinero. Solo mostraremos los datos necesarios.</p>
                 </div>
               </div>
 
-              <div className="simulator-type-switch" role="group" aria-label="Tipo de decision">
+              <div className="simulator-type-switch" role="group" aria-label="Tipo de decisión">
                 {SCENARIO_TYPES.map((option) => {
                   const Icon = option.icon
                   return (
@@ -557,7 +557,7 @@ export default function Simulador() {
 
               <form onSubmit={simular} className="simulator-form">
                 <div className="form-modal-group">
-                  <label className="form-modal-label">Ponle un nombre a la decision</label>
+                  <label className="form-modal-label">Ponle un nombre a la decisión</label>
                   <input
                     className="form-modal-input"
                     required
@@ -662,11 +662,11 @@ export default function Simulador() {
                     value={form.colchon_minimo}
                     onChange={(event) => updateForm({ colchon_minimo: event.target.value })}
                   />
-                  <p className="simulator-field-help">Es el monto que no quieres tocar aun despues de asumir el gasto.</p>
+                  <p className="simulator-field-help">Es el monto que no quieres tocar aun después de asumir el gasto.</p>
                 </div>
 
                 <div className="form-modal-group">
-                  <label className="form-modal-label">Cuando empezaria?</label>
+                  <label className="form-modal-label">¿Cuándo empezaría?</label>
                   <div className="date-input-wrap">
                     <input
                       className="form-modal-input"
@@ -701,7 +701,7 @@ export default function Simulador() {
                         : <XCircle size={34} />}
                       <div>
                         <span>{SCENARIO_TYPE_LABELS[resultado.tipo]}</span>
-                        <h2>{resultado.factible ? 'Esta decision cabe en tus finanzas' : 'Esta decision necesita cuidado'}</h2>
+                        <h2>{resultado.factible ? 'Esta decisión cabe en tus finanzas' : 'Esta decisión necesita cuidado'}</h2>
                         <p>{resultMessage()}</p>
                       </div>
                     </div>
@@ -712,7 +712,7 @@ export default function Simulador() {
                         <strong>{fmt(resultado.cuota_mensual)}</strong>
                       </div>
                       <div>
-                        <span>Saldo mas bajo</span>
+                        <span>Saldo más bajo</span>
                         <strong>{fmt(resultado.saldo_minimo_escenario)}</strong>
                       </div>
                       <div>
@@ -722,21 +722,21 @@ export default function Simulador() {
                     </div>
 
                     <details className="simulator-details">
-                      <summary>Ver detalle del calculo</summary>
+                      <summary>Ver detalle del cálculo</summary>
                       <div className="simulator-detail-list">
-                        <div><span>Proyeccion utilizada</span><strong>{projectionModeLabel}</strong></div>
-                        <div><span>La decision empieza</span><strong>{startDateLabel}</strong></div>
+                        <div><span>Proyección utilizada</span><strong>{projectionModeLabel}</strong></div>
+                        <div><span>La decisión empieza</span><strong>{startDateLabel}</strong></div>
                         {resultado.tipo === 'cuotas' && (
                           <>
                             <div><span>Monto financiado, sin intereses</span><strong>{fmt(financedAmount)}</strong></div>
-                            <div><span>Numero de cuotas</span><strong>{resultado.meses_con_impacto}</strong></div>
+                            <div><span>Número de cuotas</span><strong>{resultado.meses_con_impacto}</strong></div>
                             <div><span>Valor de cada cuota</span><strong>{fmt(resultado.cuota_mensual)}</strong></div>
-                            <div><span>Intereses totales del credito</span><strong>{fmt(resultado.total_intereses)}</strong></div>
+                            <div><span>Intereses totales del crédito</span><strong>{fmt(resultado.total_intereses)}</strong></div>
                             <div><span>Total final a pagar</span><strong>{fmt(resultado.total_a_pagar)}</strong></div>
                           </>
                         )}
                         {resultado.tipo === 'contado' && (
-                          <div><span>Pago unico</span><strong>{fmt(resultado.total_a_pagar)}</strong></div>
+                          <div><span>Pago único</span><strong>{fmt(resultado.total_a_pagar)}</strong></div>
                         )}
                         {resultado.tipo === 'recurrente' && (
                           <>
@@ -745,8 +745,8 @@ export default function Simulador() {
                             <div><span>Total durante el periodo</span><strong>{fmt(resultado.total_a_pagar)}</strong></div>
                           </>
                         )}
-                        <div><span>Saldo mas bajo sin el gasto</span><strong>{fmt(resultado.saldo_minimo_base)}</strong></div>
-                        <div><span>Saldo mas bajo incluyendo el gasto</span><strong>{fmt(resultado.saldo_minimo_escenario)}</strong></div>
+                        <div><span>Saldo más bajo sin el gasto</span><strong>{fmt(resultado.saldo_minimo_base)}</strong></div>
+                        <div><span>Saldo más bajo incluyendo el gasto</span><strong>{fmt(resultado.saldo_minimo_escenario)}</strong></div>
                         <div><span>Reserva que quieres conservar</span><strong>{fmt(resultado.colchon_minimo)}</strong></div>
                         <div><span>Horizonte evaluado</span><strong>{resultado.horizon_months} meses</strong></div>
                       </div>
@@ -849,8 +849,8 @@ export default function Simulador() {
               ) : (
                 <div className="card simulator-empty-result">
                   <div className="simulator-empty-icon"><Calculator size={28} /></div>
-                  <h2>Convierte una idea en una decision informada</h2>
-                  <p>Veras cuanto cambia tu saldo, cual seria el punto mas bajo y en que mes apareceria el primer riesgo.</p>
+                  <h2>Convierte una idea en una decisión informada</h2>
+                  <p>Verás cuánto cambia tu saldo, cuál sería el punto más bajo y en qué mes aparecería el primer riesgo.</p>
                   <div className="simulator-example-list">
                     <span>Un viaje dentro de seis meses</span>
                     <span>Independizarte y pagar arriendo</span>
@@ -870,8 +870,8 @@ export default function Simulador() {
 
             {totalSimulaciones === 0 ? (
               <div className="empty-state simulator-saved-empty">
-                <p className="empty-text">Aun no guardas escenarios</p>
-                <p className="empty-sub">Simula una decision y guardala para revisarla despues.</p>
+                <p className="empty-text">Aún no guardas escenarios</p>
+                <p className="empty-sub">Simula una decisión y guárdala para revisarla después.</p>
               </div>
             ) : (
               <>
@@ -892,13 +892,13 @@ export default function Simulador() {
                 <div className="table-wrap" style={{ border: 'none' }}>
                   <table className="table">
                     <thead>
-                      <tr>{['Decision', 'Tipo', 'Monto', 'Inicio', 'Impacto', ''].map((heading) => <th key={heading}>{heading}</th>)}</tr>
+                      <tr>{['Decisión', 'Tipo', 'Monto', 'Inicio', 'Impacto', ''].map((heading) => <th key={heading}>{heading}</th>)}</tr>
                     </thead>
                     <tbody>
                       {paginatedSimulaciones.map((item) => (
                         <tr key={item.id}>
                           <td style={{ fontWeight: 600 }}>{item.nombre}</td>
-                          <td><span className="simulator-type-pill">{SCENARIO_TYPE_LABELS[item.tipo] || 'Prestamo'}</span></td>
+                          <td><span className="simulator-type-pill">{SCENARIO_TYPE_LABELS[item.tipo] || 'Préstamo'}</span></td>
                           <td>{fmt(item.monto)}</td>
                           <td>{parseLocalDate(item.fecha_inicio)?.toLocaleDateString('es-EC', { month: 'short', year: 'numeric' })}</td>
                           <td className="table-amount positive">{fmt(item.cuota_mensual)}</td>
@@ -936,12 +936,12 @@ export default function Simulador() {
 
       <ConfirmDialog
         open={confirmAddDiferidoOpen}
-        title={form.tipo === 'cuotas' ? 'Agregar esta decision a tu plan' : 'Agregar este gasto a tu plan'}
+        title={form.tipo === 'cuotas' ? 'Agregar esta decisión a tu plan' : 'Agregar este gasto a tu plan'}
         message={form.tipo === 'contado'
-          ? `Se agregara un gasto puntual de ${fmt(resultado?.total_a_pagar || 0)} en ${startDateLabel}. Podras eliminarlo cuando quieras desde "Lo que gastas".`
+          ? `Se agregará un gasto puntual de ${fmt(resultado?.total_a_pagar || 0)} en ${startDateLabel}. Podrás eliminarlo cuando quieras desde "Lo que gastas".`
           : form.tipo === 'recurrente'
-            ? `Se agregara un gasto mensual de ${fmt(resultado?.cuota_mensual || 0)} desde ${startDateLabel} durante ${form.plazo_meses} meses. Podras eliminarlo cuando quieras.`
-            : `Se agregara una cuota mensual de ${fmt(resultado?.cuota_mensual || 0)} desde ${startDateLabel}.`}
+            ? `Se agregará un gasto mensual de ${fmt(resultado?.cuota_mensual || 0)} desde ${startDateLabel} durante ${form.plazo_meses} meses. Podrás eliminarlo cuando quieras.`
+            : `Se agregará una cuota mensual de ${fmt(resultado?.cuota_mensual || 0)} desde ${startDateLabel}.`}
         confirmText={form.tipo === 'cuotas' ? 'Agregar cuota' : 'Agregar gasto'}
         cancelText="Cancelar"
         loading={agregando}
@@ -961,7 +961,7 @@ export default function Simulador() {
       <ConfirmDialog
         open={confirmDeleteId !== null}
         title="Eliminar escenario"
-        message="Este escenario se eliminara de tus decisiones guardadas. No cambia tus gastos reales."
+        message="Este escenario se eliminará de tus decisiones guardadas. No cambia tus gastos reales."
         confirmText="Eliminar"
         cancelText="Cancelar"
         loading={deletingId !== null}

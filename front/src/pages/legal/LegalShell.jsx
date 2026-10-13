@@ -15,7 +15,7 @@ export default function LegalShell({ eyebrow, title, summary, children }) {
       <header className="legal-nav">
         <Link to="/" className="legal-brand" aria-label="Volver al inicio de Aura">
           <BrandMark className="legal-brand-mark" />
-          <span><strong>AURA</strong><small>Tu plata mas clara</small></span>
+          <span><strong>AURA</strong><small>Tu plata más clara</small></span>
         </Link>
         <Link to="/registro" className="legal-back"><ArrowLeft size={15} /> Volver al registro</Link>
       </header>
@@ -25,14 +25,14 @@ export default function LegalShell({ eyebrow, title, summary, children }) {
           <span>{eyebrow}</span>
           <h1>{title}</h1>
           <p>{summary}</p>
-          <div className="legal-version">Version {LEGAL_VERSION} | Vigente desde {LEGAL_DATE}</div>
+          <div className="legal-version">Versión {LEGAL_VERSION} | Vigente desde {LEGAL_DATE}</div>
         </div>
         <div className="legal-content">{children}</div>
       </article>
 
       <footer className="legal-footer">
         <span>{LEGAL_OPERATOR} | {LEGAL_EMAIL}</span>
-        <span><Link to="/privacidad">Privacidad</Link><Link to="/terminos">Terminos</Link><Link to="/eliminar-cuenta">Eliminar cuenta</Link></span>
+        <span><Link to="/privacidad">Privacidad</Link><Link to="/terminos">Términos</Link><Link to="/eliminar-cuenta">Eliminar cuenta</Link></span>
       </footer>
     </main>
   )

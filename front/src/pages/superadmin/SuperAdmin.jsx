@@ -310,7 +310,7 @@ export default function SuperAdmin() {
     } catch (error) {
       setFeedback({
         type: 'error',
-        message: getApiErrorMessage(error, 'No se pudo cargar la configuracion de correo.'),
+        message: getApiErrorMessage(error, 'No se pudo cargar la configuración de correo.'),
       })
     } finally {
       setEmailConfigLoading(false)
@@ -440,7 +440,7 @@ export default function SuperAdmin() {
       title: nextValue ? 'Activar usuario' : 'Desactivar usuario',
       message: nextValue
         ? `Se activara la cuenta ${target.email}.`
-        : `Se desactivara la cuenta ${target.email}. El usuario no podra iniciar sesion.`,
+        : `Se desactivara la cuenta ${target.email}. El usuario no podrá iniciar sesión.`,
       action: async () => {
         try {
           await api.patch(
@@ -693,7 +693,7 @@ export default function SuperAdmin() {
       setEmailConfig(data)
       setEmailConfigForm((prev) => ({ ...prev, host_password: '' }))
       setClearStoredPassword(false)
-      setFeedback({ type: 'success', message: 'Configuracion de correo actualizada.' })
+      setFeedback({ type: 'success', message: 'Configuración de correo actualizada.' })
       await Promise.all([
         loadDashboard({ silent: true }),
         loadAudit(),
@@ -701,7 +701,7 @@ export default function SuperAdmin() {
     } catch (error) {
       setFeedback({
         type: 'error',
-        message: getApiErrorMessage(error, 'No se pudo guardar la configuracion de correo.'),
+        message: getApiErrorMessage(error, 'No se pudo guardar la configuración de correo.'),
       })
     } finally {
       setSavingEmailConfig(false)
@@ -824,7 +824,7 @@ export default function SuperAdmin() {
       setBancosAdmin((prev) => prev.map((item) => (item.id === banco.id ? data : item)))
       setFeedback({
         type: 'success',
-        message: data.activo ? `${data.nombre} ya aparece en el simulador.` : `${data.nombre} quedo oculto del simulador.`,
+        message: data.activo ? `${data.nombre} ya aparece en el simulador.` : `${data.nombre} quedó oculto del simulador.`,
       })
     } catch (error) {
       setFeedback({ type: 'error', message: getApiErrorMessage(error, 'No se pudo cambiar el estado del banco.') })
@@ -850,7 +850,7 @@ export default function SuperAdmin() {
             <ShieldCheck size={24} />
             Super Admin
           </h1>
-          <p className="page-subtitle">Monitoreo operativo y gestion de usuarios en tiempo real.</p>
+          <p className="page-subtitle">Monitoreo operativo y gestión de usuarios en tiempo real.</p>
         </div>
         <button
           type="button"
@@ -908,7 +908,7 @@ export default function SuperAdmin() {
         <div className="stat-card">
           <div className="stat-label">Registros recientes</div>
           <div className="stat-value lila">{loadingDashboard ? '-' : (kpis.new_users_7d || 0)}</div>
-          <div className="stat-sub">Ultimos 30 dias: {loadingDashboard ? '-' : (kpis.new_users_30d || 0)}</div>
+          <div className="stat-sub">Últimos 30 días: {loadingDashboard ? '-' : (kpis.new_users_30d || 0)}</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Actividad admin hoy</div>
@@ -1011,7 +1011,7 @@ export default function SuperAdmin() {
                   </div>
                 </div>
                 <div className="form-modal-group">
-                  <label className="form-modal-label">Descripcion</label>
+                  <label className="form-modal-label">Descripción</label>
                   <input className="form-modal-input" value={planForm.description} onChange={(e) => updatePlanForm('description', e.target.value)} placeholder="Define el alcance de este plan." />
                 </div>
                 <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
@@ -1032,7 +1032,7 @@ export default function SuperAdmin() {
 
             <div className="superadmin-plan-list">
               {!plansLoading && plans.length === 0 && (
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>No hay planes configurados todavia.</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>No hay planes configurados todavía.</div>
               )}
               {plans.map((plan) => (
                 <div key={plan.id} className="superadmin-plan-card">
@@ -1044,7 +1044,7 @@ export default function SuperAdmin() {
                         {plan.is_default && <span className="badge badge-lila">Default</span>}
                         <span className={`badge ${plan.is_active ? 'badge-green' : 'badge-red'}`}>{plan.is_active ? 'Activo' : 'Inactivo'}</span>
                       </div>
-                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 6 }}>{plan.description || 'Sin descripcion.'}</div>
+                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 6 }}>{plan.description || 'Sin descripción.'}</div>
                     </div>
                     <div className="superadmin-plan-actions">
                       <button type="button" className="btn-modal-cancel" onClick={() => setExpandedPlanId((current) => current === plan.id ? null : plan.id)}>
@@ -1095,7 +1095,7 @@ export default function SuperAdmin() {
             {expandedPlanId === 'features' && (
               <div className="superadmin-feature-catalog" style={{ marginTop: 12 }}>
                 {!featuresLoading && features.length === 0 && (
-                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>No hay features registradas todavia.</span>
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>No hay features registradas todavía.</span>
                 )}
                 {features.map((feature) => (
                   <div key={feature.id} className="superadmin-feature-card">
@@ -1105,7 +1105,7 @@ export default function SuperAdmin() {
                       {feature.is_highlighted && <span className="badge badge-lila">Destacada</span>}
                     </div>
                     <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 4 }}>{feature.code}</div>
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>{feature.description || 'Sin descripcion.'}</div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>{feature.description || 'Sin descripción.'}</div>
                   </div>
                 ))}
               </div>
@@ -1117,7 +1117,7 @@ export default function SuperAdmin() {
       {activeSection === 'email' && (
       <div className="card">
         <div className="card-header">
-          <h2 className="card-title">Configuracion de correo (SMTP)</h2>
+          <h2 className="card-title">Configuración de correo (SMTP)</h2>
         </div>
 
         <div style={{ display: 'grid', gap: 12, marginBottom: 14 }}>
@@ -1127,7 +1127,7 @@ export default function SuperAdmin() {
               checked={emailConfigForm.active}
               onChange={(event) => updateEmailConfigField('active', event.target.checked)}
             />
-            <span>Activar configuracion SMTP personalizada</span>
+            <span>Activar configuración SMTP personalizada</span>
           </label>
 
           <div className="form-modal-row">
@@ -1194,7 +1194,7 @@ export default function SuperAdmin() {
                 type="password"
                 value={emailConfigForm.host_password}
                 onChange={(event) => updateEmailConfigField('host_password', event.target.value)}
-                placeholder="Deja vacio para conservar"
+                placeholder="Deja vacío para conservar"
               />
             </div>
           </div>
@@ -1261,7 +1261,7 @@ export default function SuperAdmin() {
             onClick={saveEmailConfig}
             disabled={savingEmailConfig || emailConfigLoading}
           >
-            {savingEmailConfig ? 'Guardando...' : 'Guardar configuracion SMTP'}
+            {savingEmailConfig ? 'Guardando...' : 'Guardar configuración SMTP'}
           </button>
         </div>
 
@@ -1303,7 +1303,7 @@ export default function SuperAdmin() {
               checked={testEmailForm.use_custom_config}
               onChange={(event) => updateTestEmailField('use_custom_config', event.target.checked)}
             />
-            <span>Usar configuracion SMTP personalizada (si esta activa)</span>
+            <span>Usar configuración SMTP personalizada (si esta activa)</span>
           </label>
           <button
             type="button"
@@ -1320,7 +1320,7 @@ export default function SuperAdmin() {
       {activeSection === 'users' && (
       <div className="card">
         <div className="card-header">
-          <h2 className="card-title">Gestion de usuarios</h2>
+          <h2 className="card-title">Gestión de usuarios</h2>
         </div>
 
         <div className="superadmin-user-filters">
@@ -1393,7 +1393,7 @@ export default function SuperAdmin() {
                 <th>Estado</th>
                 <th>Staff</th>
                 <th>Superadmin</th>
-                <th>Ultimo login</th>
+                <th>Último login</th>
                 <th>Acciones</th>
               </tr>
             </thead>
@@ -1561,7 +1561,7 @@ export default function SuperAdmin() {
               </div>
 
               <div className="card" style={{ marginBottom: 20 }}>
-                <div className="card-header"><h2 className="card-title">Ingresos vs Gastos — ultimos 12 meses</h2></div>
+                <div className="card-header"><h2 className="card-title">Ingresos vs Gastos — últimos 12 meses</h2></div>
                 <div className="table-wrap">
                   <table className="table">
                     <thead>
@@ -1597,10 +1597,10 @@ export default function SuperAdmin() {
                   </div>
                 </div>
                 <div className="card">
-                  <div className="card-header"><h2 className="card-title">Gastos por categoria (mes actual)</h2></div>
+                  <div className="card-header"><h2 className="card-title">Gastos por categoría (mes actual)</h2></div>
                   <div className="table-wrap">
                     <table className="table">
-                      <thead><tr><th>Categoria</th><th>Total</th></tr></thead>
+                      <thead><tr><th>Categoría</th><th>Total</th></tr></thead>
                       <tbody>
                         {gastosPorCategoria.length === 0 && <tr><td colSpan={2} style={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>Sin gastos este mes</td></tr>}
                         {gastosPorCategoria.map((row) => (
@@ -1693,7 +1693,7 @@ export default function SuperAdmin() {
                 <div className="table-wrap">
                   <table className="table">
                     <thead>
-                      <tr><th>Fecha</th><th>Concepto</th><th>Categoria</th><th>Monto</th><th>Notas</th><th></th></tr>
+                      <tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th>Monto</th><th>Notas</th><th></th></tr>
                     </thead>
                     <tbody>
                       {gastosLoading && <tr><td colSpan={6} style={{ textAlign: 'center' }}>Cargando...</td></tr>}
@@ -1925,7 +1925,7 @@ export default function SuperAdmin() {
               setAuditPage(1)
               setAuditQuery(event.target.value)
             }}
-            placeholder="Buscar por accion o correo..."
+            placeholder="Buscar por acción o correo..."
           />
           <input
             className="form-modal-input superadmin-audit-filter"
@@ -1934,7 +1934,7 @@ export default function SuperAdmin() {
               setAuditPage(1)
               setAuditAction(event.target.value)
             }}
-            placeholder="Filtro exacto de accion"
+            placeholder="Filtro exacto de acción"
           />
           <select
             className="form-modal-select superadmin-audit-pagesize"
@@ -1965,7 +1965,7 @@ export default function SuperAdmin() {
               <tr>
                 <th>Fecha</th>
                 <th>Actor</th>
-                <th>Accion</th>
+                <th>Acción</th>
                 <th>Objetivo</th>
                 <th>IP</th>
               </tr>

@@ -17,7 +17,7 @@ import { formatAmount } from '../../utils/formatters'
 import '../../components/ui/app.css'
 
 const CATEGORIA_STORAGE_KEY = 'gastos_puntuales_last_categoria'
-const FUTURE_EXPENSE_MESSAGE = 'Los gastos futuros no se cargan aqui. Simulalos desde el simulador con tasa 0%.'
+const FUTURE_EXPENSE_MESSAGE = 'Los gastos futuros no se cargan aquí. Simúlalos desde el simulador con tasa 0%.'
 
 function getTodayDate() {
   const now = new Date()
@@ -129,7 +129,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
       })
       setModal(false)
       setPareceVariable(false)
-      setFeedback({ type: 'success', message: 'Creado como gasto variable. Lo veras en la pestana Variables.' })
+      setFeedback({ type: 'success', message: 'Creado como gasto variable. Lo verás en la pestaña Variables.' })
     } catch (err) {
       setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo crear como variable.') })
     } finally {
@@ -252,12 +252,12 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
   const pageCount = Math.max(1, Math.ceil(totalItems / pageSize))
   const safePage = Math.min(page, pageCount)
   const paginatedItems = items
-  const projectionStatusLabel = (item) => (item.incluir_en_proyeccion === false ? 'Fuera de proyeccion' : 'En proyeccion')
+  const projectionStatusLabel = (item) => (item.incluir_en_proyeccion === false ? 'Fuera de proyección' : 'En proyección')
   const visibleSuggestions = sugerencias.filter((sugerencia) => !sugerenciasOcultas.has(sugerencia.descripcion))
   const suggestionItems = visibleSuggestions.map((sugerencia) => ({
     summary: `Revisa ${sugerencia.descripcion}`,
     title: sugerencia.motivo,
-    description: `${sugerencia.meses_detectados > 1 ? `Entre $${formatAmount(parseFloat(sugerencia.monto_minimo))} y $${formatAmount(parseFloat(sugerencia.monto_maximo))}. ` : ''}${sugerencia.destino === 'fijo' ? `Si lo pasas a gasto fijo ${sugerencia.frecuencia_sugerida}, tu proyeccion lo esperara en su mes.` : 'Si lo pasas a gasto variable, tu proyeccion lo tendra en cuenta cada mes y tu historial se conserva.'}`,
+    description: `${sugerencia.meses_detectados > 1 ? `Entre $${formatAmount(parseFloat(sugerencia.monto_minimo))} y $${formatAmount(parseFloat(sugerencia.monto_maximo))}. ` : ''}${sugerencia.destino === 'fijo' ? `Si lo pasas a gasto fijo ${sugerencia.frecuencia_sugerida}, tu proyección lo esperará en su mes.` : 'Si lo pasas a gasto variable, tu proyección lo tendrá en cuenta cada mes y tu historial se conserva.'}`,
     primaryActionLabel: sugerenciaAplicando === sugerencia.descripcion
       ? 'Convirtiendo...'
       : sugerencia.destino === 'fijo' ? 'Pasar a fijo anual' : 'Pasar a variable',
@@ -341,8 +341,8 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
       setFeedback({
         type: 'success',
         message: esVariable
-          ? 'Listo. Ahora lo veras en Gastos variables, y este monto quedo como el pago real de su mes.'
-          : 'Listo. Ahora lo veras en Gastos fijos.',
+          ? 'Listo. Ahora lo verás en Gastos variables, y este monto quedó como el pago real de su mes.'
+          : 'Listo. Ahora lo verás en Gastos fijos.',
       })
     } catch (err) {
       setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo convertir el gasto.') })
@@ -401,7 +401,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
             <ListControls
               query={query}
               onQueryChange={(value) => { setQuery(value); setPage(1); setSelectedIds(new Set()) }}
-              placeholder="Buscar por descripcion, categoria o nota..."
+              placeholder="Buscar por descripción, categoría o nota..."
               page={safePage}
               pageCount={pageCount}
               onPrevPage={() => setPage((p) => Math.max(1, p - 1))}
@@ -417,7 +417,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
               sortOptions={[
                 { value: 'descripcion', label: 'Nombre' },
                 { value: 'monto', label: 'Valor' },
-                { value: 'categoria', label: 'Categoria' },
+                { value: 'categoria', label: 'Categoría' },
                 { value: 'fecha', label: 'Fecha' },
               ]}
             />
@@ -442,7 +442,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
                     <th style={{ width: 36, paddingRight: 0 }}>
                       <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAll} style={{ cursor: 'pointer', accentColor: 'var(--app-lila)' }} />
                     </th>
-                    {['Nombre', 'Categoria', 'Monto', 'Fecha', 'Notas', ''].map((h) => <th key={h}>{h}</th>)}
+                    {['Nombre', 'Categoría', 'Monto', 'Fecha', 'Notas', ''].map((h) => <th key={h}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -499,7 +499,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
         <form onSubmit={handleSubmit}>
           {!editId && (
             <p style={{ marginTop: -8, marginBottom: 14, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
-              Carga rapida: nombre, categoria y monto. Lo demas es opcional.
+              Carga rápida: nombre, categoría y monto. Lo demás es opcional.
             </p>
           )}
           <div className="form-modal-group">
@@ -507,7 +507,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
             <input
               className="form-modal-input"
               required
-              placeholder="Ej: Reparacion auto, medico, ropa..."
+              placeholder="Ej: Reparación auto, médico, ropa..."
               value={form.descripcion}
               onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
               onBlur={(e) => checkPareceVariable(e.target.value, form.categoria)}
@@ -516,7 +516,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
               <div className="variable-hint">
                 <span className="variable-hint-text">
                   Esto suele cambiar de monto cada mes. Si lo creas como <strong>variable</strong>,
-                  tu proyeccion lo tendra en cuenta todos los meses.
+                  tu proyección lo tendrá en cuenta todos los meses.
                 </span>
                 <div className="variable-hint-actions">
                   <button type="button" className="btn-modal-convert" onClick={crearComoVariable} disabled={loading}>
@@ -531,7 +531,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
           </div>
           <div className="form-modal-row">
             <div className="form-modal-group">
-              <label className="form-modal-label">Categoria</label>
+              <label className="form-modal-label">Categoría</label>
               <select className="form-modal-select" value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })}>
                 {categorias.length > 0
                   ? categorias.map((c) => <option key={c.nombre} value={c.nombre}>{c.icono} {c.nombre}</option>)
@@ -551,13 +551,13 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
               onClick={() => setShowAdvanced((v) => !v)}
               style={{ width: '100%', marginBottom: 14 }}
             >
-              {showAdvanced ? 'Ocultar opciones' : canCustomizeProjection ? 'Ver fecha, notas y proyeccion' : 'Ver mas opciones'}
+              {showAdvanced ? 'Ocultar opciones' : canCustomizeProjection ? 'Ver fecha, notas y proyección' : 'Ver más opciones'}
             </button>
           )}
 
           {!editId && !showAdvanced && canCustomizeProjection && (
             <p style={{ marginTop: -4, marginBottom: 14, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
-              Aqui tambien puedes decidir si este gasto puntual entra o no en tu proyeccion conservadora.
+              Aquí también puedes decidir si este gasto puntual entra o no en tu proyección conservadora.
             </p>
           )}
 
@@ -570,7 +570,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
                 </div>
                 <DateQuickActions value={form.fecha} onChange={(value) => setForm({ ...form, fecha: clampExpenseDate(value) })} disabled={loading} />
                 <p style={{ marginTop: 8, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)', lineHeight: 1.45 }}>
-                  Si este gasto todavia no pasa, simulalo en el simulador con tasa 0% en lugar de dejarlo futuro aqui.
+                  Si este gasto todavía no pasa, simúlalo en el simulador con tasa 0% en lugar de dejarlo futuro aquí.
                 </p>
               </div>
               <div className="form-modal-group">
@@ -587,9 +587,9 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
                       style={{ marginTop: 3, accentColor: 'var(--app-lila)' }}
                     />
                     <div>
-                      <div className="form-modal-label" style={{ marginBottom: 4 }}>Usar en mi proyeccion conservadora</div>
+                      <div className="form-modal-label" style={{ marginBottom: 4 }}>Usar en mi proyección conservadora</div>
                       <div style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.5)', lineHeight: 1.45 }}>
-                        Solo aplica en modo Personalizada. Dejalo activo si este gasto puntual podria repetirse; apagalo para viajes u otros casos especiales.
+                        Solo aplica en modo Personalizada. Déjalo activo si este gasto puntual podría repetirse; apagalo para viajes u otros casos especiales.
                       </div>
                     </div>
                   </label>
@@ -600,7 +600,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
 
           {!editId && !showAdvanced && (
             <p style={{ marginTop: -4, marginBottom: 18, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
-              Si no cambias nada, queda con fecha de hoy. Si es para mas adelante, simulalo en el simulador con tasa 0%.
+              Si no cambias nada, queda con fecha de hoy. Si es para más adelante, simúlalo en el simulador con tasa 0%.
             </p>
           )}
 
@@ -646,7 +646,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
       <ConfirmDialog
         open={confirmConvert}
         title="Pasar a gasto fijo"
-        message={`Se creara como gasto fijo mensual desde ${form.fecha || 'la fecha actual'} y este gasto puntual se eliminara. Luego podras ajustar la frecuencia si hace falta.`}
+        message={`Se creara como gasto fijo mensual desde ${form.fecha || 'la fecha actual'} y este gasto puntual se eliminará. Luego podrás ajustar la frecuencia si hace falta.`}
         confirmText="Convertir"
         cancelText="Cancelar"
         loading={converting}
@@ -657,7 +657,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
       <ConfirmDialog
         open={confirmDeleteId !== null}
         title="Eliminar gasto puntual"
-        message="Este gasto puntual se eliminara de tus reportes y de tu historial."
+        message="Este gasto puntual se eliminará de tus reportes y de tu historial."
         confirmText="Eliminar"
         cancelText="Cancelar"
         loading={deletingId !== null}
@@ -668,7 +668,7 @@ export default function GastosNoCorrientes({ embedded = false, autoNew = false }
       <ConfirmDialog
         open={confirmBulkDelete}
         title="Eliminar seleccionados"
-        message={`Se eliminaran ${selectedIds.size} gasto${selectedIds.size !== 1 ? 's' : ''}. Esta accion no se puede deshacer.`}
+        message={`Se eliminaran ${selectedIds.size} gasto${selectedIds.size !== 1 ? 's' : ''}. Esta acción no se puede deshacer.`}
         confirmText="Eliminar todos"
         cancelText="Cancelar"
         loading={bulkDeleting}

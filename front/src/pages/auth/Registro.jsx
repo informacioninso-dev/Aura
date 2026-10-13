@@ -37,7 +37,7 @@ export default function Registro() {
       return
     }
     if (!form.privacy_notice_acknowledged || !form.terms_accepted) {
-      setError('Debes revisar el Aviso de Privacidad y aceptar los Terminos de Uso.')
+      setError('Debes revisar el Aviso de Privacidad y aceptar los Términos de Uso.')
       return
     }
 
@@ -64,7 +64,7 @@ export default function Registro() {
       <div className="auth-page">
         <div className="auth-box">
           <div className="auth-card">
-            <h2 className="auth-title">Recuperando sesion</h2>
+            <h2 className="auth-title">Recuperando sesión</h2>
             <p className="auth-footer" style={{ marginTop: 10 }}>Un momento...</p>
           </div>
         </div>
@@ -84,7 +84,7 @@ export default function Registro() {
         <Link to={brandTarget} className="auth-logo auth-logo-link" aria-label={user ? 'Ir a mi dashboard' : 'Volver al inicio'}>
           <BrandMark className="auth-logo-icon" />
           <div className="auth-logo-name">AURA</div>
-          <div className="auth-logo-tag">Clara proyeccion, futuro solido.</div>
+          <div className="auth-logo-tag">Clara proyección, futuro sólido.</div>
         </Link>
 
         <div className="auth-card">
@@ -94,7 +94,7 @@ export default function Registro() {
 
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label className="form-label">Correo electronico</label>
+              <label className="form-label">Correo electrónico</label>
               <input
                 type="email"
                 required
@@ -125,7 +125,7 @@ export default function Registro() {
                   required
                   minLength={8}
                   className="form-input"
-                  placeholder="Minimo 8 caracteres"
+                  placeholder="Mínimo 8 caracteres"
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                 />
@@ -177,7 +177,7 @@ export default function Registro() {
                   onChange={(e) => setForm({ ...form, terms_accepted: e.target.checked })}
                 />
                 <span>
-                  Acepto los <Link to="/terminos" target="_blank" rel="noreferrer">Terminos de Uso</Link>. Entiendo que Aura es informativa, no reemplaza asesoria financiera y sus resultados dependen de los datos que ingreso.
+                  Acepto los <Link to="/terminos" target="_blank" rel="noreferrer">Términos de Uso</Link>. Entiendo que Aura es informativa, no reemplaza asesoría financiera y sus resultados dependen de los datos que ingreso.
                 </span>
               </label>
             </div>
@@ -189,7 +189,7 @@ export default function Registro() {
         </div>
 
         <p className="auth-footer">
-          Ya tienes cuenta? <Link to="/login">Inicia sesion</Link>
+          Ya tienes cuenta? <Link to="/login">Inicia sesión</Link>
         </p>
         <p className="auth-footer" style={{ marginTop: 8 }}>
           <Link to="/">Volver al inicio</Link>

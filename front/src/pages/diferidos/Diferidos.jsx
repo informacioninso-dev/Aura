@@ -378,7 +378,7 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
             <ListControls
               query={query}
               onQueryChange={(value) => { setQuery(value); setPage(1) }}
-              placeholder="Buscar por descripcion o categoria..."
+              placeholder="Buscar por descripción o categoría..."
               page={safePage}
               pageCount={pageCount}
               onPrevPage={() => setPage((current) => Math.max(1, current - 1))}
@@ -406,7 +406,7 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
                   <thead>
                     <tr>
                       <th>Nombre</th>
-                      <th>Categoria</th>
+                      <th>Categoría</th>
                       <th>Inicio</th>
                       <th>Vence</th>
                       <th style={{ textAlign: 'right' }}>Total</th>
@@ -435,7 +435,7 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
                         <td>
                           <div>{item.fecha_inicio}</div>
                           <div style={{ color: 'rgba(var(--app-ink-rgb),0.45)', fontSize: 12 }}>
-                            {item.status.key === 'upcoming' ? 'Aun no empieza' : 'Ya cuenta en tu historial'}
+                            {item.status.key === 'upcoming' ? 'Aún no empieza' : 'Ya cuenta en tu historial'}
                           </div>
                         </td>
                         <td>
@@ -486,7 +486,7 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
               <div className="empty-state">
                 <div className="empty-icon">🔎</div>
                 <p className="empty-text">No encontramos cuotas con ese filtro</p>
-                <p className="empty-sub">Prueba con otro nombre, categoria o monto.</p>
+                <p className="empty-sub">Prueba con otro nombre, categoría o monto.</p>
               </div>
             )}
             <ListPager
@@ -506,17 +506,17 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
       <Modal open={modal} onClose={() => setModal(false)} title={editId ? 'Editar gasto a cuotas' : '+ Nuevo gasto a cuotas'}>
         <form onSubmit={handleSubmit}>
           <div className="form-modal-group">
-            <label className="form-modal-label">Que estas pagando?</label>
+            <label className="form-modal-label">¿Qué estás pagando?</label>
             <input
               className="form-modal-input"
               required
-              placeholder="Ej: celular, viaje, credito..."
+              placeholder="Ej: celular, viaje, crédito..."
               value={form.descripcion}
               onChange={(event) => setForm({ ...form, descripcion: event.target.value })}
             />
           </div>
           <div className="form-modal-group">
-            <label className="form-modal-label">Categoria</label>
+            <label className="form-modal-label">Categoría</label>
             <select className="form-modal-select" value={form.categoria} onChange={(event) => setForm({ ...form, categoria: event.target.value })}>
               {categorias.map((categoria) => (
                 <option key={categoria.nombre} value={categoria.nombre}>
@@ -540,7 +540,7 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
               />
             </div>
             <div className="form-modal-group">
-              <label className="form-modal-label">Numero de cuotas</label>
+              <label className="form-modal-label">Número de cuotas</label>
               <input
                 className="form-modal-input"
                 type="number"
@@ -560,7 +560,7 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
               required
               min="0"
               step="0.01"
-              placeholder="Se calcula automatico"
+              placeholder="Se calcula automático"
               value={form.cuota_mensual}
               onChange={(event) => setForm({ ...form, cuota_mensual: event.target.value })}
             />
@@ -615,7 +615,7 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
                 color: 'rgba(var(--app-ink-rgb),0.72)',
               }}
             >
-              Esta cuota se sumara automaticamente a tu flujo mensual.
+              Esta cuota se sumará automáticamente a tu flujo mensual.
             </div>
           )}
           <div className="form-modal-actions">
@@ -630,7 +630,7 @@ export default function Diferidos({ embedded = false, autoNew = false }) {
       <ConfirmDialog
         open={confirmDeleteId !== null}
         title="Eliminar gasto a cuotas"
-        message="Este gasto a cuotas se eliminara de tu flujo y del historial."
+        message="Este gasto a cuotas se eliminará de tu flujo y del historial."
         confirmText="Eliminar"
         cancelText="Cancelar"
         loading={deletingId !== null}

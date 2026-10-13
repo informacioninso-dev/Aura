@@ -20,14 +20,14 @@ import '../../components/ui/app.css'
 
 const FRECUENCIA_STORAGE_KEY = 'gastos_corrientes_last_frecuencia'
 const CATEGORIA_STORAGE_KEY = 'gastos_corrientes_last_categoria'
-const FUTURE_EXPENSE_MESSAGE = 'Los gastos futuros no se cargan aqui. Simulalos desde el simulador con tasa 0%.'
+const FUTURE_EXPENSE_MESSAGE = 'Los gastos futuros no se cargan aquí. Simúlalos desde el simulador con tasa 0%.'
 
 // Copys por tipo: un gasto variable se repite igual que un fijo, pero su monto
 // es un estimado que se reemplaza con lo que el usuario realmente paga.
 const COPY_POR_TIPO = {
   fijo: {
     titulo: 'Gastos fijos',
-    vacioTexto: 'Aun no sumas gastos fijos',
+    vacioTexto: 'Aún no sumas gastos fijos',
     vacioSub: 'Agrega los pagos que se repiten con el mismo monto',
     icono: '🏠',
     placeholder: 'Ej: Arriendo, Netflix, gym...',
@@ -36,7 +36,7 @@ const COPY_POR_TIPO = {
   },
   variable: {
     titulo: 'Gastos variables',
-    vacioTexto: 'Aun no sumas gastos variables',
+    vacioTexto: 'Aún no sumas gastos variables',
     vacioSub: 'Agrega los pagos que se repiten pero cambian de monto',
     icono: '💡',
     placeholder: 'Ej: Luz, agua, super, gasolina...',
@@ -247,7 +247,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
       })
       setRealItem(null)
       await fetchItems()
-      setFeedback({ type: 'success', message: 'Monto real guardado. Tu proyeccion ya lo tiene en cuenta.' })
+      setFeedback({ type: 'success', message: 'Monto real guardado. Tu proyección ya lo tiene en cuenta.' })
     } catch (err) {
       setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo guardar el monto real.') })
     } finally {
@@ -266,7 +266,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
       await fetchItems()
       setFeedback({
         type: 'success',
-        message: esVariable ? 'Listo. Ahora lo veras en Gastos fijos.' : 'Listo. Ahora lo veras en Gastos variables.',
+        message: esVariable ? 'Listo. Ahora lo verás en Gastos fijos.' : 'Listo. Ahora lo verás en Gastos variables.',
       })
     } catch (err) {
       setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo cambiar el tipo de gasto.') })
@@ -359,9 +359,9 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
       })
       setVersioningItem(null)
       await fetchItems()
-      setFeedback({ type: 'success', message: 'Nueva version creada. El historial anterior se conserva.' })
+      setFeedback({ type: 'success', message: 'Nueva versión creada. El historial anterior se conserva.' })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo crear la nueva version.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo crear la nueva versión.') })
     } finally {
       setVersionLoading(false)
     }
@@ -381,7 +381,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
       })
       setModal(false)
       await fetchItems()
-      setFeedback({ type: 'success', message: 'Listo. Ahora lo veras en Gastos puntuales.' })
+      setFeedback({ type: 'success', message: 'Listo. Ahora lo verás en Gastos puntuales.' })
     } catch (err) {
       setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo convertir el gasto a puntual.') })
     } finally {
@@ -500,7 +500,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
             <ListControls
               query={query}
               onQueryChange={(value) => { setQuery(value); setPage(1); setSelectedIds(new Set()) }}
-              placeholder="Buscar por descripcion o categoria..."
+              placeholder="Buscar por descripción o categoría..."
               page={safePage}
               pageCount={pageCount}
               onPrevPage={() => setPage((p) => Math.max(1, p - 1))}
@@ -516,7 +516,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
               sortOptions={[
                 { value: 'descripcion', label: 'Nombre' },
                 { value: 'monto', label: 'Valor' },
-                { value: 'categoria', label: 'Categoria' },
+                { value: 'categoria', label: 'Categoría' },
                 { value: 'fecha_inicio', label: 'Fecha' },
               ]}
             />
@@ -542,7 +542,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
                     <th style={{ width: 36, paddingRight: 0 }}>
                       <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAll} style={{ cursor: 'pointer', accentColor: 'var(--app-lila)' }} />
                     </th>
-                    {['Nombre', 'Categoria', esVariable ? 'Estimado' : 'Monto', 'Frecuencia', 'Desde', 'Hasta', 'Estado', ''].map((h) => <th key={h}>{h}</th>)}
+                    {['Nombre', 'Categoría', esVariable ? 'Estimado' : 'Monto', 'Frecuencia', 'Desde', 'Hasta', 'Estado', ''].map((h) => <th key={h}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -554,7 +554,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
                       <td style={{ fontWeight: 600 }}>
                         {item.descripcion}
                         {item.version_info && (
-                          <span className="gasto-version-chip" title={`Version ${item.version_info.numero} de ${item.version_info.total}`}>
+                          <span className="gasto-version-chip" title={`Versión ${item.version_info.numero} de ${item.version_info.total}`}>
                             v{item.version_info.numero}
                           </span>
                         )}
@@ -571,7 +571,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
                             <button className="btn-icon" title="Registrar lo que pagaste" style={{ color: '#4ADE80' }} onClick={() => openReal(item)}><Receipt size={15} /></button>
                           )}
                           <button className="btn-icon edit" title="Editar" onClick={() => openEdit(item)}><Pencil size={15} /></button>
-                          <button className="btn-icon" title="Nueva version" style={{ color: '#FBBF24' }} onClick={() => openVersion(item)}><GitBranch size={15} /></button>
+                          <button className="btn-icon" title="Nueva versión" style={{ color: '#FBBF24' }} onClick={() => openVersion(item)}><GitBranch size={15} /></button>
                           <button className="btn-icon danger" title="Eliminar" disabled={deletingId === item.id} onClick={() => openDeleteConfirm(item.id)}><Trash2 size={15} /></button>
                         </div>
                       </td>
@@ -599,7 +599,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
         <form onSubmit={handleSubmit}>
           {!editId && (
             <p style={{ marginTop: -8, marginBottom: 14, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
-              Carga rapida: nombre, categoria y monto.
+              Carga rápida: nombre, categoría y monto.
             </p>
           )}
           {!editId && catalogo.length > 0 && (
@@ -631,7 +631,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
 
           <div className="form-modal-row">
             <div className="form-modal-group">
-              <label className="form-modal-label">Categoria</label>
+              <label className="form-modal-label">Categoría</label>
               <select className="form-modal-select" value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })}>
                 {categorias.length > 0
                   ? categorias.map((c) => <option key={c.nombre} value={c.nombre}>{c.icono} {c.nombre}</option>)
@@ -650,19 +650,19 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
           </div>
 
           <div className="form-modal-group">
-            <label className="form-modal-label">Desde <span style={{ color: 'rgba(var(--app-ink-rgb),0.45)', fontSize: 11 }}>— afecta el historico y la proyeccion</span></label>
+            <label className="form-modal-label">Desde <span style={{ color: 'rgba(var(--app-ink-rgb),0.45)', fontSize: 11 }}>— afecta el histórico y la proyección</span></label>
             <div className="date-input-wrap">
               <input className="form-modal-input" type="date" required min={DATE_INPUT_MIN} max={maxExpenseDate} value={form.fecha_inicio} onChange={(e) => setStartDate(e.target.value)} />
             </div>
             <DateQuickActions value={form.fecha_inicio} onChange={setStartDate} disabled={loading} />
             <p style={{ marginTop: 8, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)', lineHeight: 1.45 }}>
-              Si este gasto empieza mas adelante, no lo cargues aqui. Simulalo en el simulador usando tasa 0%.
+              Si este gasto empieza más adelante, no lo cargues aquí. Simúlalo en el simulador usando tasa 0%.
             </p>
           </div>
 
           {!editId && (
             <button type="button" className="btn-modal-cancel" onClick={() => setShowAdvanced((v) => !v)} style={{ width: '100%', marginBottom: 14 }}>
-              {showAdvanced ? 'Ocultar opciones' : 'Ver mas opciones'}
+              {showAdvanced ? 'Ocultar opciones' : 'Ver más opciones'}
             </button>
           )}
 
@@ -731,11 +731,11 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
       </Modal>
 
       {/* Modal versionar */}
-      <Modal open={versioningItem !== null} onClose={() => setVersioningItem(null)} title="Nueva version">
+      <Modal open={versioningItem !== null} onClose={() => setVersioningItem(null)} title="Nueva versión">
         {versioningItem && (
           <form onSubmit={handleVersion}>
             <p style={{ marginTop: -8, marginBottom: 16, fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.5)', lineHeight: 1.5 }}>
-              La version nueva cuenta desde el mes que elijas; la anterior se cierra al fin del mes previo, para que ese mes no se cuente dos veces. El historial queda guardado.
+              La versión nueva cuenta desde el mes que elijas; la anterior se cierra al fin del mes previo, para que ese mes no se cuente dos veces. El historial queda guardado.
             </p>
 
             <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(var(--app-ink-rgb),0.04)', borderRadius: 10, fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
@@ -750,7 +750,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
 
             <div className="form-modal-row">
               <div className="form-modal-group">
-                <label className="form-modal-label">Categoria</label>
+                <label className="form-modal-label">Categoría</label>
                 <select className="form-modal-select" value={versionForm.categoria} onChange={(e) => setVersionForm({ ...versionForm, categoria: e.target.value })}>
                   {categorias.length > 0
                     ? categorias.map((c) => <option key={c.nombre} value={c.nombre}>{c.icono} {c.nombre}</option>)
@@ -777,7 +777,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
                 </div>
                 <DateQuickActions value={versionForm.nuevaFecha} onChange={setVersionStartDate} disabled={versionLoading} />
                 <p style={{ marginTop: 8, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)', lineHeight: 1.45 }}>
-                  Si el nuevo gasto arranca en el futuro, llevalo al simulador con tasa 0% en vez de versionarlo aqui.
+                  Si el nuevo gasto arranca en el futuro, llévalo al simulador con tasa 0% en vez de versionarlo aquí.
                 </p>
               </div>
             </div>
@@ -785,7 +785,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
             <div className="form-modal-actions">
               <button type="button" className="btn-modal-cancel" onClick={() => setVersioningItem(null)}>Cancelar</button>
               <button type="submit" className="btn-modal-save" disabled={versionLoading}>
-                {versionLoading ? 'Guardando...' : 'Crear nueva version'}
+                {versionLoading ? 'Guardando...' : 'Crear nueva versión'}
               </button>
             </div>
           </form>
@@ -793,11 +793,11 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
       </Modal>
 
       {/* Modal monto real del mes (gastos variables) */}
-      <Modal open={realItem !== null} onClose={() => setRealItem(null)} title="Cuanto pagaste?">
+      <Modal open={realItem !== null} onClose={() => setRealItem(null)} title="¿Cuánto pagaste?">
         {realItem && (
           <form onSubmit={handleSubmitReal}>
             <p style={{ marginTop: -8, marginBottom: 16, fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.5)', lineHeight: 1.5 }}>
-              Registra lo que realmente pagaste de <strong>{realItem.descripcion}</strong>. Con esto tu proyeccion
+              Registra lo que realmente pagaste de <strong>{realItem.descripcion}</strong>. Con esto tu proyección
               deja de usar el estimado de ${formatAmount(parseFloat(realItem.monto))}.
             </p>
 
@@ -840,7 +840,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
       <ConfirmDialog
         open={confirmConvert}
         title="Pasar a gasto puntual"
-        message={`Se creara un gasto puntual con la fecha ${form.fecha_inicio || 'actual'} y este gasto fijo se eliminara. Luego podras ajustarlo si hace falta.`}
+        message={`Se creara un gasto puntual con la fecha ${form.fecha_inicio || 'actual'} y este gasto fijo se eliminará. Luego podrás ajustarlo si hace falta.`}
         confirmText="Convertir"
         cancelText="Cancelar"
         loading={converting}
@@ -851,7 +851,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
       <ConfirmDialog
         open={confirmDeleteId !== null}
         title="Eliminar gasto"
-        message="Este gasto se eliminara de tus calculos y de tu historial."
+        message="Este gasto se eliminará de tus cálculos y de tu historial."
         confirmText="Eliminar"
         cancelText="Cancelar"
         loading={deletingId !== null}
@@ -862,7 +862,7 @@ export default function GastosCorrientes({ embedded = false, tipoMonto = 'fijo',
       <ConfirmDialog
         open={confirmBulkDelete}
         title="Eliminar seleccionados"
-        message={`Se eliminaran ${selectedIds.size} gasto${selectedIds.size !== 1 ? 's' : ''}. Esta accion no se puede deshacer.`}
+        message={`Se eliminaran ${selectedIds.size} gasto${selectedIds.size !== 1 ? 's' : ''}. Esta acción no se puede deshacer.`}
         confirmText="Eliminar todos"
         cancelText="Cancelar"
         loading={bulkDeleting}

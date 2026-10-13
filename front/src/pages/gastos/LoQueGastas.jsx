@@ -22,8 +22,8 @@ const TIPOS = {
 const CHOOSER = [
   { id: 'fijos',     icon: Home,       titulo: 'Gasto fijo',      desc: 'Se repite con el mismo valor. Ej: arriendo, seguro.', tint: '#4ADE80' },
   { id: 'variables', icon: Activity,   titulo: 'Consumo variable', desc: 'Se repite, pero cambia. Puedes sumarlo varias veces en el mes.', tint: '#C487F6' },
-  { id: 'puntuales', icon: Calendar,   titulo: 'Gasto puntual',   desc: 'Ocurre una sola vez. Ej: matricula, reparacion.', tint: '#4ADE80' },
-  { id: 'cuotas',    icon: CreditCard, titulo: 'Gasto a cuotas',  desc: 'Lo pagaras en varios meses. Ej: electrodomestico, prestamo.', tint: '#C487F6' },
+  { id: 'puntuales', icon: Calendar,   titulo: 'Gasto puntual',   desc: 'Ocurre una sola vez. Ej: matricula, reparación.', tint: '#4ADE80' },
+  { id: 'cuotas',    icon: CreditCard, titulo: 'Gasto a cuotas',  desc: 'Lo pagarás en varios meses. Ej: electrodoméstico, préstamo.', tint: '#C487F6' },
 ]
 
 function renderPanel(tab, autoNew) {
@@ -102,9 +102,9 @@ export default function LoQueGastas() {
 
       <GastosResumen onOpenTipo={irATipo} onAgregar={abrirChooser} />
 
-      <Modal open={chooserOpen} onClose={cerrarChooser} title="Que quieres registrar?">
+      <Modal open={chooserOpen} onClose={cerrarChooser} title="¿Qué quieres registrar?">
         <p style={{ marginTop: -8, marginBottom: 16, fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.5)' }}>
-          Elige el tipo de gasto segun como se comporta.
+          Elige el tipo de gasto según cómo se comporta.
         </p>
         <div className="gastos-chooser-grid">
           {CHOOSER.map((op) => {

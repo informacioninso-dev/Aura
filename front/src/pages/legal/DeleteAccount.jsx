@@ -5,7 +5,7 @@ import LegalShell, { LEGAL_EMAIL } from './LegalShell'
 export default function DeleteAccount() {
   return (
     <LegalShell
-      eyebrow="TU CUENTA, TU DECISION"
+      eyebrow="TU CUENTA, TU DECISIÓN"
       title="Eliminar tu cuenta de Aura"
       summary="Puedes borrar tu cuenta y tus datos cuando quieras, desde la app, desde la web o por correo."
     >
@@ -17,8 +17,8 @@ export default function DeleteAccount() {
       <section>
         <h2>2. Desde la web</h2>
         <p>
-          <Link to="/login">Inicia sesion</Link> en aura.binnso.com, entra a <strong>Perfil</strong> y usa
-          {' '}<strong>Eliminar mi cuenta</strong> al final de la pagina.
+          <Link to="/login">Inicia sesión</Link> en aura.binnso.com, entra a <strong>Perfil</strong> y usa
+          {' '}<strong>Eliminar mi cuenta</strong> al final de la página.
         </p>
       </section>
 
@@ -27,14 +27,14 @@ export default function DeleteAccount() {
         <p>
           Si ya no puedes entrar, escribe a <a href={`mailto:${LEGAL_EMAIL}?subject=Eliminar%20mi%20cuenta%20de%20Aura`}>{LEGAL_EMAIL}</a>
           {' '}desde el correo con el que te registraste, con el asunto "Eliminar mi cuenta de Aura".
-          La atendemos en un plazo maximo de 15 dias.
+          La atendemos en un plazo máximo de 15 días.
         </p>
       </section>
 
       <section>
         <h2>Que se elimina y que se conserva</h2>
         <ul>
-          <li>Se eliminan de inmediato: tu correo, nombre de usuario, foto, contraseña, ingresos, gastos, cuotas, cuentas con personas, categorias, presupuestos, simulaciones, notificaciones y aceptaciones legales.</li>
+          <li>Se eliminan de inmediato: tu correo, nombre de usuario, foto, contraseña, ingresos, gastos, cuotas, cuentas con personas, categorías, presupuestos, simulaciones, notificaciones y aceptaciones legales.</li>
           <li>Se conservan, sin datos que te identifiquen, los registros de pagos realizados, por obligaciones contables y tributarias.</li>
         </ul>
       </section>

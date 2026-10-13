@@ -86,7 +86,7 @@ export default function Reporte() {
     setFeedback({ type: '', message: '' })
     try {
       const filas = [
-        ['Categoria', 'Total', 'Limite', '% del limite'],
+        ['Categoría', 'Total', 'Límite', '% del límite'],
         ...data.categorias.map((categoria) => ([
           categoria.categoria,
           categoria.total,
@@ -234,7 +234,7 @@ export default function Reporte() {
 
           {data.categorias.length > 0 && (
             <div className="card" style={{ marginBottom: 24 }}>
-              <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 18 }}>Gastos por categoria</h2>
+              <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 18 }}>Gastos por categoría</h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {data.categorias.map((categoria) => {
                   const pct = categoria.pct_limite
@@ -284,13 +284,13 @@ export default function Reporte() {
 
           {data.top_gastos.length > 0 && (
             <div className="card">
-              <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Gastos puntuales mas altos</h2>
+              <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Gastos puntuales más altos</h2>
               <div className="table-wrap" style={{ border: 'none' }}>
                 <table className="table">
                   <thead>
                     <tr>
                       <th>Nombre</th>
-                      <th>Categoria</th>
+                      <th>Categoría</th>
                       <th>Fecha</th>
                       <th style={{ textAlign: 'right' }}>Monto</th>
                     </tr>

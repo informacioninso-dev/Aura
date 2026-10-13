@@ -71,7 +71,7 @@ export default function GastosResumen({ onOpenTipo, onAgregar }) {
     { id: 'fijos', icon: Home, tint: '#4ADE80', title: 'Gastos fijos', valor: `$${formatAmount(t.fijosTotal)}`, unidad: '/ mes', sub: `${t.fijosCount} gasto${t.fijosCount !== 1 ? 's' : ''}` },
     { id: 'variables', icon: Activity, tint: '#C487F6', title: 'Gastos variables', valor: `$${formatAmount(t.varReal)}`, unidad: '/ este mes', sub: t.varPend > 0 ? `${t.varPend} por registrar (~$${formatAmount(t.varPendMonto)})` : `${t.varCount} gasto${t.varCount !== 1 ? 's' : ''}` },
     { id: 'cuotas', icon: CreditCard, tint: '#C487F6', title: 'Gastos a cuotas', valor: `$${formatAmount(t.cuotasTotal)}`, unidad: '/ cuota del mes', sub: `${t.cuotasCount} cuota${t.cuotasCount !== 1 ? 's' : ''} activa${t.cuotasCount !== 1 ? 's' : ''}` },
-    { id: 'puntuales', icon: Calendar, tint: '#4ADE80', title: 'Gastos puntuales', valor: `${t.puntuales} registrado${t.puntuales !== 1 ? 's' : ''}`, unidad: '', sub: 'No afectan tu proyeccion' },
+    { id: 'puntuales', icon: Calendar, tint: '#4ADE80', title: 'Gastos puntuales', valor: `${t.puntuales} registrado${t.puntuales !== 1 ? 's' : ''}`, unidad: '', sub: 'No afectan tu proyección' },
   ]
 
   return (

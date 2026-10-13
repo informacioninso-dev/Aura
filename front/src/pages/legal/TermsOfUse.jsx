@@ -4,24 +4,24 @@ export default function TermsOfUse() {
   return (
     <LegalShell
       eyebrow="ANTES DE DECIDIR"
-      title="Terminos de Uso"
-      summary="Aura organiza informacion y muestra escenarios. La decision final siempre necesita tu criterio y datos correctos."
+      title="Términos de Uso"
+      summary="Aura organiza información y muestra escenarios. La decisión final siempre necesita tu criterio y datos correctos."
     >
       <section>
         <h2>1. Que es Aura</h2>
         <p>
-          Aura es una herramienta de organizacion financiera personal. Registra la informacion que
+          Aura es una herramienta de organización financiera personal. Registra la información que
           proporcionas y genera balances, proyecciones y simulaciones para ayudarte a comprender
-          posibles escenarios. Aura no mueve dinero, no concede credito y no ejecuta inversiones.
+          posibles escenarios. Aura no mueve dinero, no concede crédito y no ejecuta inversiones.
         </p>
       </section>
 
       <section className="legal-highlight">
         <h2>2. Descargo financiero</h2>
         <p>
-          Aura no reemplaza asesoria financiera, contable, tributaria, legal ni de inversion. Sus
+          Aura no reemplaza asesoría financiera, contable, tributaria, legal ni de inversión. Sus
           resultados son estimaciones, no garantias ni recomendaciones personalizadas. Antes de una
-          decision importante debes revisar el escenario, considerar riesgos que la aplicacion no
+          decisión importante debes revisar el escenario, considerar riesgos que la aplicación no
           conoce y, cuando corresponda, consultar a un profesional calificado.
         </p>
       </section>
@@ -39,10 +39,10 @@ export default function TermsOfUse() {
       <section>
         <h2>4. Responsabilidad</h2>
         <p>
-          En la maxima medida permitida por la ley, Aura y su operador no responden por perdidas
+          En la máxima medida permitida por la ley, Aura y su operador no responden por pérdidas
           derivadas exclusivamente de decisiones tomadas por el usuario con base en datos incompletos,
-          incorrectos o desactualizados, ni por tratar una simulacion como una garantia. Nada en estos
-          terminos excluye responsabilidades que legalmente no puedan limitarse.
+          incorrectos o desactualizados, ni por tratar una simulación como una garantía. Nada en estos
+          términos excluye responsabilidades que legalmente no puedan limitarse.
         </p>
       </section>
 
@@ -51,8 +51,8 @@ export default function TermsOfUse() {
         <ul>
           <li>Debes proteger tus credenciales y avisar si detectas acceso no autorizado.</li>
           <li>No puedes intentar vulnerar, sobrecargar, automatizar abusivamente o interferir con Aura.</li>
-          <li>No debes usar la aplicacion para fraude, suplantacion ni actividades ilegales.</li>
-          <li>Si no tienes capacidad legal para aceptar estos terminos, debes usar Aura con tu representante.</li>
+          <li>No debes usar la aplicación para fraude, suplantación ni actividades ilegales.</li>
+          <li>Si no tienes capacidad legal para aceptar estos términos, debes usar Aura con tu representante.</li>
         </ul>
       </section>
 
@@ -60,9 +60,9 @@ export default function TermsOfUse() {
         <h2>6. Planes, disponibilidad y cambios</h2>
         <p>
           Algunas funciones requieren un plan de pago. El precio y alcance se muestran antes de
-          contratar. Puedes gestionar la continuidad de tu suscripcion desde tu perfil conforme a
+          contratar. Puedes gestionar la continuidad de tu suscripción desde tu perfil conforme a
           las condiciones informadas. Podemos corregir errores, mantener el servicio o cambiar
-          funciones; los cambios materiales de estos terminos se comunicaran mediante una nueva version.
+          funciones; los cambios materiales de estos términos se comunicaran mediante una nueva versión.
         </p>
       </section>
 
@@ -71,7 +71,7 @@ export default function TermsOfUse() {
         <p>
           El tratamiento de datos se explica en el <a href="/privacidad">Aviso de Privacidad</a>.
           Podemos restringir una cuenta por incumplimiento, riesgo de seguridad o exigencia legal.
-          Estos terminos se interpretan conforme a la normativa aplicable en Ecuador, sin limitar los
+          Estos términos se interpretan conforme a la normativa aplicable en Ecuador, sin limitar los
           derechos irrenunciables del consumidor o titular de datos.
         </p>
         <p>Consultas: <a href={`mailto:${LEGAL_EMAIL}`}>{LEGAL_EMAIL}</a>.</p>

@@ -203,7 +203,7 @@ export default function Importar() {
     return (
       <div>
         <div className="page-header">
-          <h1 className="page-title">Importacion completada</h1>
+          <h1 className="page-title">Importación completada</h1>
         </div>
 
         <div className="card" style={{ maxWidth: 520, textAlign: 'center', padding: 40 }}>
@@ -239,9 +239,9 @@ export default function Importar() {
       <div>
         <div className="page-header page-header-actions">
           <div className="page-header-main">
-            <h1 className="page-title">Revisar importacion</h1>
+            <h1 className="page-title">Revisar importación</h1>
             <p className="page-subtitle">
-              {preview.total} filas detectadas, {preview.filas_ok.length} validas, {preview.filas_error.length} con error y un limite actual de {formatNumber(maxFilasDetectadas)} filas.
+              {preview.total} filas detectadas, {preview.filas_ok.length} validas, {preview.filas_error.length} con error y un límite actual de {formatNumber(maxFilasDetectadas)} filas.
             </p>
           </div>
 
@@ -298,7 +298,7 @@ export default function Importar() {
                   onClick={togglePaginaActual}
                   style={{ fontSize: 12, color: 'var(--app-lila)', background: 'none', border: 'none', cursor: 'pointer' }}
                 >
-                  {visibleSelectedCount === visibleIndexes.length ? 'Deseleccionar pagina' : 'Seleccionar pagina'}
+                  {visibleSelectedCount === visibleIndexes.length ? 'Deseleccionar página' : 'Seleccionar página'}
                 </button>
                 <button
                   type="button"
@@ -333,7 +333,7 @@ export default function Importar() {
                 Siguiente
               </button>
               <span style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.35)' }}>
-                La tabla se pagina para mantener la carga rapida aun con archivos grandes.
+                La tabla se pagina para mantener la carga rápida aun con archivos grandes.
               </span>
             </div>
 
@@ -342,7 +342,7 @@ export default function Importar() {
                 <thead>
                   <tr>
                     <th style={{ width: 36 }}></th>
-                    {['Fecha', 'Descripcion', 'Monto', 'Tipo', 'Categoria', 'Clase'].map((header) => (
+                    {['Fecha', 'Descripción', 'Monto', 'Tipo', 'Categoría', 'Clase'].map((header) => (
                       <th key={header}>{header}</th>
                     ))}
                   </tr>
@@ -415,7 +415,7 @@ export default function Importar() {
 
             {preview.filas_error.length > 5 && (
               <div style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.30)' }}>
-                ...y {preview.filas_error.length - 5} mas
+                ...y {preview.filas_error.length - 5} más
               </div>
             )}
           </div>
@@ -464,7 +464,7 @@ export default function Importar() {
           <>
             <Upload size={44} style={{ color: drag ? 'var(--app-lila)' : 'rgba(var(--app-ink-rgb),0.25)', marginBottom: 16 }} />
             <p style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>
-              {drag ? 'Suelta aqui el archivo' : 'Arrastra tu archivo aqui'}
+              {drag ? 'Suelta aquí el archivo' : 'Arrastra tu archivo aquí'}
             </p>
             <p style={{ fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.40)' }}>o haz clic para seleccionarlo</p>
             <p style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.25)', marginTop: 10 }}>.csv · .xlsx · max. 5 MB</p>
@@ -504,8 +504,8 @@ export default function Importar() {
             { col: 'descripcion', desc: 'Concepto o glosa del movimiento.' },
             { col: 'monto', desc: 'Positivo para ingreso, negativo para gasto.' },
             { col: 'tipo', desc: '"ingreso" o "gasto" si ya lo conoces. Es opcional.' },
-            { col: 'categoria', desc: 'Nombre libre de la categoria. Es opcional.' },
-            { col: 'frecuencia', desc: 'mensual, quincenal, anual... si se repite. Vacio = una sola vez (puntual). Opcional.' },
+            { col: 'categoria', desc: 'Nombre libre de la categoría. Es opcional.' },
+            { col: 'frecuencia', desc: 'mensual, quincenal, anual... si se repite. Vacío = una sola vez (puntual). Opcional.' },
             { col: 'tipo_monto', desc: 'Para gastos que se repiten: "fijo" (mismo monto) o "variable" (cambia). Opcional.' },
           ].map((item) => (
             <div key={item.col} style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
@@ -515,7 +515,7 @@ export default function Importar() {
           ))}
 
           <div style={{ marginTop: 14, padding: '10px 14px', background: 'rgba(var(--app-ink-rgb),0.04)', borderRadius: 10 }}>
-            <p style={{ fontSize: 11, color: 'rgba(var(--app-ink-rgb),0.30)', marginBottom: 2 }}>Tambien detecta alias comunes:</p>
+            <p style={{ fontSize: 11, color: 'rgba(var(--app-ink-rgb),0.30)', marginBottom: 2 }}>También detecta alias comunes:</p>
             <p style={{ fontSize: 11, color: 'rgba(var(--app-ink-rgb),0.25)' }}>
               concepto, detalle, glosa, importe, valor, amount, abono, cargo, movement.
             </p>
@@ -533,7 +533,7 @@ export default function Importar() {
               'Sin columna frecuencia, todo entra como puntual (movimiento de una sola vez).',
               'Con frecuencia (mensual, anual...) se crea un ingreso o gasto recurrente. Ponlo una sola vez, no uno por mes.',
               'En gastos que se repiten, "variable" es para los que cambian de monto (luz, agua); "fijo" para los que no (arriendo).',
-              `Tu plan permite hasta ${formatNumber(maxFilasPlan)} filas por importacion.`,
+              `Tu plan permite hasta ${formatNumber(maxFilasPlan)} filas por importación.`,
             ].map((text, index) => (
               <div key={`${index}-${text}`} style={{ display: 'flex', gap: 8, marginBottom: 7, alignItems: 'flex-start' }}>
                 <span style={{ color: 'var(--app-lila)', marginTop: 1 }}>·</span>
@@ -553,8 +553,8 @@ export default function Importar() {
               color: 'rgba(var(--app-ink-rgb),0.55)',
             }}
           >
-            Si necesitas una carga masiva con reglas especiales o mas volumen, ese flujo debe vivir en un plan superior y con un
-            proceso mas controlado.
+            Si necesitas una carga masiva con reglas especiales o más volumen, ese flujo debe vivir en un plan superior y con un
+            proceso más controlado.
           </div>
 
           <button
@@ -590,7 +590,7 @@ export default function Importar() {
           </div>
           <p style={{ fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.5)', marginBottom: 14 }}>
             Exporta TODO en un Excel (ingresos, gastos fijos/variables y sus consumos, diferidos, cuentas con personas y
-            categorias) y vuelve a importarlo en otra cuenta. Disponible solo para cuentas de asesor.
+            categorías) y vuelve a importarlo en otra cuenta. Disponible solo para cuentas de asesor.
           </p>
 
           <div className="inline-actions-wrap" style={{ flexWrap: 'wrap' }}>
@@ -642,7 +642,7 @@ export default function Importar() {
               <p style={{ color: 'rgba(var(--app-ink-rgb),0.55)' }}>
                 {respaldoResultado.conteo?.ingresos ?? 0} ingresos · {respaldoResultado.conteo?.gastos ?? 0} gastos ·{' '}
                 {respaldoResultado.conteo?.consumos ?? 0} consumos · {respaldoResultado.conteo?.diferidos ?? 0} diferidos ·{' '}
-                {respaldoResultado.conteo?.cuentas ?? 0} cuentas · {respaldoResultado.conteo?.categorias ?? 0} categorias
+                {respaldoResultado.conteo?.cuentas ?? 0} cuentas · {respaldoResultado.conteo?.categorias ?? 0} categorías
               </p>
               {respaldoResultado.avisos?.length > 0 && (
                 <p style={{ marginTop: 6, color: 'rgba(var(--app-ink-rgb),0.40)', fontSize: 12 }}>

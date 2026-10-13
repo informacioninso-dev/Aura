@@ -69,7 +69,7 @@ export default function ResetPassword() {
       <div className="auth-page">
         <div className="auth-box">
           <div className="auth-card">
-            <h2 className="auth-title">Recuperando sesion</h2>
+            <h2 className="auth-title">Recuperando sesión</h2>
             <p className="auth-footer" style={{ marginTop: 10 }}>Un momento...</p>
           </div>
         </div>

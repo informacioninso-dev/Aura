@@ -197,9 +197,9 @@ export default function Ingresos({ embedded = false }) {
       })
       setVersioningItem(null)
       await fetchItems()
-      setFeedback({ type: 'success', message: 'Nueva version creada. El historial anterior se conserva.' })
+      setFeedback({ type: 'success', message: 'Nueva versión creada. El historial anterior se conserva.' })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo crear la nueva version.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo crear la nueva versión.') })
     } finally {
       setVersionLoading(false)
     }
@@ -218,7 +218,7 @@ export default function Ingresos({ embedded = false }) {
       })
       setModal(false)
       await fetchItems()
-      setFeedback({ type: 'success', message: 'Listo. Ahora lo veras en Ingresos puntuales.' })
+      setFeedback({ type: 'success', message: 'Listo. Ahora lo verás en Ingresos puntuales.' })
     } catch (err) {
       setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo convertir el ingreso a puntual.') })
     } finally {
@@ -322,7 +322,7 @@ export default function Ingresos({ embedded = false }) {
         {items.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">💰</div>
-            <p className="empty-text">Aun no sumas ingresos</p>
+            <p className="empty-text">Aún no sumas ingresos</p>
             <p className="empty-sub">Agrega uno y empieza a ver tu flujo</p>
           </div>
         ) : (
@@ -330,7 +330,7 @@ export default function Ingresos({ embedded = false }) {
             <ListControls
               query={query}
               onQueryChange={(value) => { setQuery(value); setPage(1); setSelectedIds(new Set()) }}
-              placeholder="Buscar por descripcion o frecuencia..."
+              placeholder="Buscar por descripción o frecuencia..."
               page={safePage}
               pageCount={pageCount}
               onPrevPage={() => setPage((p) => Math.max(1, p - 1))}
@@ -395,7 +395,7 @@ export default function Ingresos({ embedded = false }) {
                       <td className="table-actions-cell">
                         <div className="table-actions-row">
                           <button className="btn-icon edit" title="Editar" onClick={() => openEdit(item)}><Pencil size={15} /></button>
-                          <button className="btn-icon" title="Nueva version" style={{ color: '#FBBF24' }} onClick={() => openVersion(item)}><GitBranch size={15} /></button>
+                          <button className="btn-icon" title="Nueva versión" style={{ color: '#FBBF24' }} onClick={() => openVersion(item)}><GitBranch size={15} /></button>
                           <button className="btn-icon danger" title="Eliminar" disabled={deletingId === item.id} onClick={() => openDeleteConfirm(item.id)}><Trash2 size={15} /></button>
                         </div>
                       </td>
@@ -423,7 +423,7 @@ export default function Ingresos({ embedded = false }) {
         <form onSubmit={handleSubmit}>
           {!editId && (
             <p style={{ marginTop: -8, marginBottom: 14, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
-              Carga rapida: nombre y monto. Lo demas es opcional.
+              Carga rápida: nombre y monto. Lo demás es opcional.
             </p>
           )}
           <div className="form-modal-group">
@@ -452,7 +452,7 @@ export default function Ingresos({ embedded = false }) {
           </div>
 
           <div className="form-modal-group">
-            <label className="form-modal-label">Desde <span style={{ color: 'rgba(var(--app-ink-rgb),0.45)', fontSize: 11 }}>— afecta el historico y la proyeccion</span></label>
+            <label className="form-modal-label">Desde <span style={{ color: 'rgba(var(--app-ink-rgb),0.45)', fontSize: 11 }}>— afecta el histórico y la proyección</span></label>
             <div className="date-input-wrap">
               <input className="form-modal-input" type="date" required min={DATE_INPUT_MIN} max={DATE_INPUT_MAX} value={form.fecha_inicio} onChange={(e) => setForm((prev) => ({ ...prev, fecha_inicio: e.target.value, fecha_fin: prev.fecha_fin && prev.fecha_fin < e.target.value ? '' : prev.fecha_fin }))} />
             </div>
@@ -461,7 +461,7 @@ export default function Ingresos({ embedded = false }) {
 
           {!editId && (
             <button type="button" className="btn-modal-cancel" onClick={() => setShowAdvanced((v) => !v)} style={{ width: '100%', marginBottom: 14 }}>
-              {showAdvanced ? 'Ocultar opciones' : 'Ver mas opciones'}
+              {showAdvanced ? 'Ocultar opciones' : 'Ver más opciones'}
             </button>
           )}
 
@@ -518,11 +518,11 @@ export default function Ingresos({ embedded = false }) {
       </Modal>
 
       {/* Modal versionar */}
-      <Modal open={versioningItem !== null} onClose={() => setVersioningItem(null)} title="Nueva version">
+      <Modal open={versioningItem !== null} onClose={() => setVersioningItem(null)} title="Nueva versión">
         {versioningItem && (
           <form onSubmit={handleVersion}>
             <p style={{ marginTop: -8, marginBottom: 16, fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.5)', lineHeight: 1.5 }}>
-              Cerramos el registro actual un dia antes de la nueva fecha. El historial queda guardado.
+              Cerramos el registro actual un día antes de la nueva fecha. El historial queda guardado.
             </p>
 
             <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(var(--app-ink-rgb),0.04)', borderRadius: 10, fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
@@ -580,7 +580,7 @@ export default function Ingresos({ embedded = false }) {
             <div className="form-modal-actions">
               <button type="button" className="btn-modal-cancel" onClick={() => setVersioningItem(null)}>Cancelar</button>
               <button type="submit" className="btn-modal-save" disabled={versionLoading}>
-                {versionLoading ? 'Guardando...' : 'Crear nueva version'}
+                {versionLoading ? 'Guardando...' : 'Crear nueva versión'}
               </button>
             </div>
           </form>
@@ -590,7 +590,7 @@ export default function Ingresos({ embedded = false }) {
       <ConfirmDialog
         open={confirmConvert}
         title="Pasar a ingreso puntual"
-        message={`Se creara un ingreso puntual con la fecha ${form.fecha_inicio || 'actual'} y este ingreso fijo se eliminara. Luego podras ajustarlo si hace falta.`}
+        message={`Se creara un ingreso puntual con la fecha ${form.fecha_inicio || 'actual'} y este ingreso fijo se eliminará. Luego podrás ajustarlo si hace falta.`}
         confirmText="Convertir"
         cancelText="Cancelar"
         loading={converting}
@@ -601,7 +601,7 @@ export default function Ingresos({ embedded = false }) {
       <ConfirmDialog
         open={confirmDeleteId !== null}
         title="Eliminar ingreso"
-        message="Este ingreso se eliminara de tus calculos y de tu historial."
+        message="Este ingreso se eliminará de tus cálculos y de tu historial."
         confirmText="Eliminar"
         cancelText="Cancelar"
         loading={deletingId !== null}
@@ -612,7 +612,7 @@ export default function Ingresos({ embedded = false }) {
       <ConfirmDialog
         open={confirmBulkDelete}
         title="Eliminar seleccionados"
-        message={`Se eliminaran ${selectedIds.size} ingreso${selectedIds.size !== 1 ? 's' : ''}. Esta accion no se puede deshacer.`}
+        message={`Se eliminaran ${selectedIds.size} ingreso${selectedIds.size !== 1 ? 's' : ''}. Esta acción no se puede deshacer.`}
         confirmText="Eliminar todos"
         cancelText="Cancelar"
         loading={bulkDeleting}

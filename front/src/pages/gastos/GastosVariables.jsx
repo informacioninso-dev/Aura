@@ -359,7 +359,7 @@ export default function GastosVariables({ autoNew = false }) {
       await fetchResumen()
       setConsumoForm({ monto: '', descripcion: '', fecha: hoyDelMes() })
     } catch (err) {
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo anadir la compra.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo añadir la compra.') })
     } finally {
       setSavingConsumo(false)
     }
@@ -453,7 +453,7 @@ export default function GastosVariables({ autoNew = false }) {
             <ListControls
               query={query}
               onQueryChange={(value) => { setQuery(value); setPage(1); setSelectedIds(new Set()) }}
-              placeholder="Buscar por gasto o categoria..."
+              placeholder="Buscar por gasto o categoría..."
               page={safePage}
               pageCount={pageCount}
               onPrevPage={() => setPage((prev) => Math.max(1, prev - 1))}
@@ -469,7 +469,7 @@ export default function GastosVariables({ autoNew = false }) {
               sortOptions={[
                 { value: 'descripcion', label: 'Nombre' },
                 { value: 'valor', label: 'Valor' },
-                { value: 'categoria', label: 'Categoria' },
+                { value: 'categoria', label: 'Categoría' },
               ]}
               showSearch={filas.length > 0}
               showSort={filas.length > 0}
@@ -493,7 +493,7 @@ export default function GastosVariables({ autoNew = false }) {
             ) : filteredRows.length === 0 ? (
               <div className="empty-state">
                 <p className="empty-text">No encontramos gastos para ese filtro</p>
-                <p className="empty-sub">Prueba con otro nombre, categoria o cambia de mes.</p>
+                <p className="empty-sub">Prueba con otro nombre, categoría o cambia de mes.</p>
               </div>
             ) : (
               <>
@@ -517,8 +517,8 @@ export default function GastosVariables({ autoNew = false }) {
                       <th style={{ width: 36, paddingRight: 0 }}>
                         <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAll} style={{ cursor: 'pointer', accentColor: 'var(--app-lila)' }} />
                       </th>
-                      {['Gasto', 'Categoria', 'Este mes', 'Accion'].map((header) => (
-                        <th key={header} className={header === 'Categoria' ? 'col-cat' : undefined}>{header}</th>
+                      {['Gasto', 'Categoría', 'Este mes', 'Acción'].map((header) => (
+                        <th key={header} className={header === 'Categoría' ? 'col-cat' : undefined}>{header}</th>
                       ))}
                     </tr>
                   </thead>
@@ -604,7 +604,7 @@ export default function GastosVariables({ autoNew = false }) {
           </div>
 
           <div className="form-modal-group">
-            <label className="form-modal-label">Categoria</label>
+            <label className="form-modal-label">Categoría</label>
             <select className="form-modal-select" value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })}>
               {categorias.length > 0
                 ? categorias.map((categoria) => <option key={categoria.nombre} value={categoria.nombre}>{categoria.icono} {categoria.nombre}</option>)
@@ -660,12 +660,12 @@ export default function GastosVariables({ autoNew = false }) {
             <form onSubmit={handleAddConsumo} className="rubro-add-form">
               <div className="form-modal-row">
                 <div className="form-modal-group" style={{ flex: '1 1 120px' }}>
-                  <label className="form-modal-label">Cuanto gastaste?</label>
+                  <label className="form-modal-label">¿Cuánto gastaste?</label>
                   <input className="form-modal-input" type="number" min="0" step="0.01" placeholder="0" required autoFocus
                     value={consumoForm.monto} onChange={(e) => setConsumoForm({ ...consumoForm, monto: e.target.value })} />
                 </div>
                 <div className="form-modal-group" style={{ flex: '1 1 120px' }}>
-                  <label className="form-modal-label">Dia</label>
+                  <label className="form-modal-label">Día</label>
                   <input className="form-modal-input" type="date" required value={consumoForm.fecha}
                     onChange={(e) => setConsumoForm({ ...consumoForm, fecha: e.target.value })} />
                 </div>
@@ -676,7 +676,7 @@ export default function GastosVariables({ autoNew = false }) {
                   value={consumoForm.descripcion} onChange={(e) => setConsumoForm({ ...consumoForm, descripcion: e.target.value })} />
               </div>
               <button type="submit" className="btn-modal-save" style={{ width: '100%' }} disabled={savingConsumo}>
-                {savingConsumo ? 'Guardando...' : '+ Anadir compra'}
+                {savingConsumo ? 'Guardando...' : '+ Añadir compra'}
               </button>
             </form>
 
@@ -684,7 +684,7 @@ export default function GastosVariables({ autoNew = false }) {
             <p className="rubro-list-title">Compras de este mes</p>
             {consumos.length === 0 ? (
               <p style={{ fontSize: 13, color: 'rgba(var(--app-ink-rgb),0.4)', textAlign: 'center', padding: '12px 0' }}>
-                Aun no anades compras. Cada compra suma al total del mes.
+                Aún no añades compras. Cada compra suma al total del mes.
               </p>
             ) : (
               <div className="rubro-consumos">
@@ -709,7 +709,7 @@ export default function GastosVariables({ autoNew = false }) {
       <ConfirmDialog
         open={confirmDeleteId !== null}
         title="Eliminar gasto variable"
-        message="Se eliminara el gasto y sus montos reales registrados."
+        message="Se eliminará el gasto y sus montos reales registrados."
         confirmText="Eliminar"
         cancelText="Cancelar"
         onConfirm={handleDelete}
@@ -719,7 +719,7 @@ export default function GastosVariables({ autoNew = false }) {
       <ConfirmDialog
         open={confirmBulkDelete}
         title="Eliminar seleccionados"
-        message={`Se eliminaran ${selectedIds.size} gasto${selectedIds.size !== 1 ? 's' : ''} variable${selectedIds.size !== 1 ? 's' : ''} y sus consumos. Esta accion no se puede deshacer.`}
+        message={`Se eliminaran ${selectedIds.size} gasto${selectedIds.size !== 1 ? 's' : ''} variable${selectedIds.size !== 1 ? 's' : ''} y sus consumos. Esta acción no se puede deshacer.`}
         confirmText="Eliminar todos"
         cancelText="Cancelar"
         loading={bulkDeleting}

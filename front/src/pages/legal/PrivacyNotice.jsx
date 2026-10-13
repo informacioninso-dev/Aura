@@ -5,15 +5,15 @@ import LegalShell, { LEGAL_EMAIL, LEGAL_OPERATOR } from './LegalShell'
 export default function PrivacyNotice() {
   return (
     <LegalShell
-      eyebrow="TU INFORMACION, SIN LETRA PEQUENA"
+      eyebrow="TU INFORMACIÓN, SIN LETRA PEQUEÑA"
       title="Aviso de Privacidad"
-      summary="Aqui explicamos que datos usa Aura, para que los necesita y como puedes ejercer control sobre ellos."
+      summary="Aquí explicamos qué datos usa Aura, para qué los necesita y cómo puedes ejercer control sobre ellos."
     >
       <section>
         <h2>1. Responsable y alcance</h2>
         <p>
           {LEGAL_OPERATOR}, como operador de Aura en aura.binnso.com, trata los datos personales
-          necesarios para prestar la aplicacion. Puedes escribir a <a href={`mailto:${LEGAL_EMAIL}`}>{LEGAL_EMAIL}</a> para
+          necesarios para prestar la aplicación. Puedes escribir a <a href={`mailto:${LEGAL_EMAIL}`}>{LEGAL_EMAIL}</a> para
           consultas o para ejercer tus derechos.
         </p>
       </section>
@@ -22,9 +22,9 @@ export default function PrivacyNotice() {
         <h2>2. Datos que tratamos</h2>
         <ul>
           <li>Datos de cuenta: nombre de usuario, correo, moneda, credenciales protegidas y foto opcional.</li>
-          <li>Datos financieros que ingresas: ingresos, gastos, deudas, cuotas, saldos, categorias y simulaciones.</li>
-          <li>Datos tecnicos y de seguridad: direccion IP, dispositivo, navegador, fechas de acceso y registros de actividad.</li>
-          <li>Datos de pago y suscripcion recibidos de PayPhone. Aura no almacena el numero completo de tu tarjeta.</li>
+          <li>Datos financieros que ingresas: ingresos, gastos, deudas, cuotas, saldos, categorías y simulaciones.</li>
+          <li>Datos técnicos y de seguridad: dirección IP, dispositivo, navegador, fechas de acceso y registros de actividad.</li>
+          <li>Datos de pago y suscripción recibidos de PayPhone. Aura no almacena el número completo de tu tarjeta.</li>
           <li>Texto o audio que decides enviar al asistente para interpretar un registro financiero.</li>
         </ul>
       </section>
@@ -33,7 +33,7 @@ export default function PrivacyNotice() {
         <h2>3. Para que usamos tus datos</h2>
         <ul>
           <li>Crear y proteger tu cuenta, autenticarte y prestarte las funciones de Aura.</li>
-          <li>Calcular balances, proyecciones y simulaciones a partir de la informacion que registras.</li>
+          <li>Calcular balances, proyecciones y simulaciones a partir de la información que registras.</li>
           <li>Gestionar planes, pagos, soporte, notificaciones y solicitudes.</li>
           <li>Prevenir abuso, investigar incidentes y cumplir obligaciones legales.</li>
           <li>Procesar texto o audio con el proveedor de IA solo cuando activas voluntariamente esa funcion.</li>
@@ -51,7 +51,7 @@ export default function PrivacyNotice() {
           Podemos usar proveedores de infraestructura, correo, seguridad y soporte. PayPhone procesa
           pagos; Groq procesa el texto o audio que envias al asistente. Algunos proveedores pueden
           tratar datos fuera de Ecuador. En esos casos se deben aplicar las garantias contractuales,
-          tecnicas y legales exigibles para transferencias de datos.
+          técnicas y legales exigibles para transferencias de datos.
         </p>
       </section>
 
@@ -68,14 +68,14 @@ export default function PrivacyNotice() {
       <section>
         <h2>6. Tus derechos</h2>
         <p>
-          Puedes solicitar informacion, acceso, rectificacion, actualizacion, eliminacion, oposicion,
-          portabilidad, suspension del tratamiento y revocacion del consentimiento cuando aplique.
-          Tambien puedes pedir explicaciones sobre tratamientos automatizados y presentar un reclamo
-          ante la <a href="https://spdp.gob.ec/" target="_blank" rel="noreferrer">Superintendencia de Proteccion de Datos Personales</a>.
+          Puedes solicitar información, acceso, rectificación, actualización, eliminación, oposición,
+          portabilidad, suspension del tratamiento y revocación del consentimiento cuando aplique.
+          También puedes pedir explicaciones sobre tratamientos automatizados y presentar un reclamo
+          ante la <a href="https://spdp.gob.ec/" target="_blank" rel="noreferrer">Superintendencia de Protección de Datos Personales</a>.
         </p>
         <p>
           Envia tu solicitud a <a href={`mailto:${LEGAL_EMAIL}`}>{LEGAL_EMAIL}</a>. Podremos verificar tu identidad
-          antes de entregar o modificar informacion.
+          antes de entregar o modificar información.
         </p>
         <p>
           Puedes eliminar tu cuenta y tus datos en cualquier momento desde la app o la web.
@@ -84,11 +84,11 @@ export default function PrivacyNotice() {
       </section>
 
       <section>
-        <h2>7. Calculos automatizados y cambios</h2>
+        <h2>7. Cálculos automatizados y cambios</h2>
         <p>
-          Las proyecciones y simulaciones son calculos informativos basados en tus datos; Aura no toma
+          Las proyecciones y simulaciones son cálculos informativos basados en tus datos; Aura no toma
           decisiones crediticias ni ejecuta operaciones financieras por ti. Si este aviso cambia de
-          forma material, se informara la nueva version y se solicitara una nueva confirmacion cuando
+          forma material, se informara la nueva versión y se solicitara una nueva confirmación cuando
           la normativa lo requiera.
         </p>
       </section>

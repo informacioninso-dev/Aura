@@ -35,13 +35,13 @@ const PROJECTION_MODE_OPTIONS = [
   { value: 'conservadora', label: 'Conservadora' },
 ]
 const FUTURE_PROJECTION_OPTIONS = [
-  { value: 12, label: '1 ano' },
-  { value: 24, label: '2 anos' },
-  { value: 60, label: '5 anos' },
-  { value: 120, label: '10 anos' },
-  { value: 240, label: '20 anos' },
-  { value: 360, label: '30 anos' },
-  { value: 480, label: '40 anos' },
+  { value: 12, label: '1 año' },
+  { value: 24, label: '2 años' },
+  { value: 60, label: '5 años' },
+  { value: 120, label: '10 años' },
+  { value: 240, label: '20 años' },
+  { value: 360, label: '30 años' },
+  { value: 480, label: '40 años' },
 ]
 const DASHBOARD_FUTURE_MONTHS = 12
 const DEFAULT_FREE_PROJECTION_DISPLAY_MONTHS = 6
@@ -57,13 +57,13 @@ function getProjectionAnalysisHelp(mode, variableHistoryMonths, variableHistoryO
   }
 
   const variableHistoryText = variableHistoryObservations > 0
-    ? `Usa ${variableHistoryObservations} registros reales de variables en ${variableHistoryMonths} ${variableHistoryMonths === 1 ? 'mes' : 'meses'}, dentro de una ventana de hasta 18 meses. El ultimo ano tiene peso doble.`
-    : 'Aun no hay montos reales de variables; mientras los registras, usa tus estimados.'
+    ? `Usa ${variableHistoryObservations} registros reales de variables en ${variableHistoryMonths} ${variableHistoryMonths === 1 ? 'mes' : 'meses'}, dentro de una ventana de hasta 18 meses. El último año tiene peso doble.`
+    : 'Aún no hay montos reales de variables; mientras los registras, usa tus estimados.'
 
   if (mode === 'conservadora') {
-    return `${variableHistoryText} Conservadora tambien distribuye entre 12 meses los gastos puntuales que marcaste para incluir.`
+    return `${variableHistoryText} Conservadora también distribuye entre 12 meses los gastos puntuales que marcaste para incluir.`
   }
-  return `${variableHistoryText} Inteligente no proyecta gastos puntuales historicos.`
+  return `${variableHistoryText} Inteligente no proyecta gastos puntuales históricos.`
 }
 
 function getFrequencyLabel(frequency) {
@@ -242,7 +242,7 @@ export default function Dashboard() {
       baseOptions.push({
         value: advancedProjectionMaxMonths,
         label: advancedProjectionMaxMonths % 12 === 0
-          ? `${advancedProjectionMaxMonths / 12} anos`
+          ? `${advancedProjectionMaxMonths / 12} años`
           : `${advancedProjectionMaxMonths} meses`,
       })
     }
@@ -310,7 +310,7 @@ export default function Dashboard() {
       setAdvancedProjection(null)
       setProjectionError(getApiErrorMessage(
         err,
-        advancedProjectionEnabled ? 'No se pudo cargar la proyeccion Pro.' : 'No se pudo cargar la proyeccion.',
+        advancedProjectionEnabled ? 'No se pudo cargar la proyección Pro.' : 'No se pudo cargar la proyección.',
       ))
     } finally {
       if (requestId === projectionRequestIdRef.current) {
@@ -406,7 +406,7 @@ export default function Dashboard() {
       await loadProjectionChart(futureMonths, pastMonths)
     } catch (err) {
       setProjectionMode(previousMode)
-      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo actualizar el modo de proyeccion.') })
+      setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo actualizar el modo de proyección.') })
     } finally {
       setProjectionModeSaving(false)
     }
@@ -580,7 +580,7 @@ export default function Dashboard() {
       items: applySortDetail(fixedExpensesThisMonth.map((item) => ({
         id: `expense-fixed-${item.id}`,
         label: item.descripcion,
-        meta: `${item.categoria || 'Sin categoria'} - ${getFrequencyLabel(item.frecuencia)}`,
+        meta: `${item.categoria || 'Sin categoría'} - ${getFrequencyLabel(item.frecuencia)}`,
         amount: mensualizado(item),
         date: item.fecha_inicio || '',
       }))),
@@ -594,7 +594,7 @@ export default function Dashboard() {
       items: applySortDetail(variableExpensesThisMonth.map((item) => ({
         id: `expense-variable-${item.id}`,
         label: item.descripcion,
-        meta: `${item.categoria || 'Sin categoria'} - variable`,
+        meta: `${item.categoria || 'Sin categoría'} - variable`,
         amount: mensualizado(item),
         date: item.fecha_inicio || '',
       }))),
@@ -611,9 +611,9 @@ export default function Dashboard() {
           id: `expense-installment-${item.id}`,
           label: item.descripcion,
           meta: prog
-            ? `${item.categoria || 'Sin categoria'} · ${prog.actual}/${prog.total}`
+            ? `${item.categoria || 'Sin categoría'} · ${prog.actual}/${prog.total}`
               + (item.fecha_fin ? ` · termina ${mesAnioCorto(item.fecha_fin)}` : '')
-            : `${item.categoria || 'Sin categoria'} - cuota mensual`,
+            : `${item.categoria || 'Sin categoría'} - cuota mensual`,
           amount: Number(item.cuota_mes ?? item.cuota_mensual),
           date: item.fecha_inicio || '',
           progress: prog ? prog.pct : null,
@@ -629,7 +629,7 @@ export default function Dashboard() {
       items: applySortDetail(punctualExpensesThisMonth.map((item) => ({
         id: `expense-punctual-${item.id}`,
         label: item.descripcion,
-        meta: `${item.categoria || 'Sin categoria'} - ${item.fecha}`,
+        meta: `${item.categoria || 'Sin categoría'} - ${item.fecha}`,
         amount: Number(item.monto),
         date: item.fecha || '',
       }))),
@@ -640,7 +640,7 @@ export default function Dashboard() {
     const map = new Map()
 
     function registerExpenseItem(category, item) {
-      const cat = category || 'Sin categoria'
+      const cat = category || 'Sin categoría'
       const current = map.get(cat) || { cat, total: 0, items: [] }
       current.total += item.amount
       current.items.push(item)
@@ -713,8 +713,8 @@ export default function Dashboard() {
     ? `Detalle de ingresos de ${selectedMonthLabel}`
     : `Detalle de gastos de ${selectedMonthLabel}`
   const activeSummarySubtitle = activeSummaryDetail === 'income'
-    ? `Aqui ves rapido los ingresos guardados que cuentan en ${monthReferenceText}.`
-    : `Aqui ves rapido los gastos guardados que cuentan en ${monthReferenceText}.`
+    ? `Aquí ves rápido los ingresos guardados que cuentan en ${monthReferenceText}.`
+    : `Aquí ves rápido los gastos guardados que cuentan en ${monthReferenceText}.`
 
 
 
@@ -827,7 +827,7 @@ export default function Dashboard() {
               </li>
             ))}
             {resto > 0 && (
-              <li className="dashboard-outlook-more">y {resto} {resto === 1 ? 'mes mas' : 'meses mas'} en rojo</li>
+              <li className="dashboard-outlook-more">y {resto} {resto === 1 ? 'mes más' : 'meses más'} en rojo</li>
             )}
           </ul>
         )}
@@ -1032,7 +1032,7 @@ export default function Dashboard() {
           <div className="dashboard-fullchart-overlay" onClick={() => setShowFullChart(false)}>
             <div className="dashboard-fullchart-box" onClick={e => e.stopPropagation()}>
               <div className="dashboard-fullchart-header">
-                <span className="dashboard-fullchart-title">Proyeccion completa</span>
+                <span className="dashboard-fullchart-title">Proyección completa</span>
                 <button className="dashboard-fullchart-close" onClick={() => setShowFullChart(false)} aria-label="Cerrar">
                   <X size={18} />
                 </button>
@@ -1056,7 +1056,7 @@ export default function Dashboard() {
   }
 
   const hora = new Date().getHours()
-  const saludo = hora < 12 ? 'Buenos dias' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
+  const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
   const nombre = user?.username ? `, ${user.username}` : ''
 
 
@@ -1123,8 +1123,8 @@ export default function Dashboard() {
           </p>
           <div className="dashboard-onboarding-points">
             <span className="dashboard-onboarding-point">Tu saldo del mes empieza a tomar forma</span>
-            <span className="dashboard-onboarding-point">La proyeccion ya puede darte una primera lectura</span>
-            <span className="dashboard-onboarding-point">Lo demas lo completas despues, sin apuro</span>
+            <span className="dashboard-onboarding-point">La proyección ya puede darte una primera lectura</span>
+            <span className="dashboard-onboarding-point">Lo demás lo completas después, sin apuro</span>
           </div>
 
           <div className="dashboard-onboarding-ahorro">
@@ -1147,7 +1147,7 @@ export default function Dashboard() {
               </button>
             </div>
             <p className="dashboard-onboarding-ahorro-hint">
-              Suma todo lo que tengas ahorrado hoy. Lo guardamos como tu punto de partida para que tu proyeccion y tu colchon arranquen bien.
+              Suma todo lo que tengas ahorrado hoy. Lo guardamos como tu punto de partida para que tu proyección y tu colchon arranquen bien.
             </p>
           </div>
 
@@ -1212,7 +1212,7 @@ export default function Dashboard() {
             <PiggyBank size={16} style={{ color: tasaColor }} />
           </div>
           <div className="stat-value" style={{ color: tasaColor }}>{tasaAhorro}%</div>
-          <div className="stat-sub">{tasaAhorro >= 20 ? 'Buen ritmo de ahorro' : tasaAhorro >= 0 ? 'Margen ajustado' : 'Gastas mas de lo que ganas'}</div>
+          <div className="stat-sub">{tasaAhorro >= 20 ? 'Buen ritmo de ahorro' : tasaAhorro >= 0 ? 'Margen ajustado' : 'Gastas más de lo que ganas'}</div>
         </div>
       </div>
 
@@ -1264,7 +1264,7 @@ export default function Dashboard() {
                 onClick={toggleCategoryView}
               >
                 <Tag size={12} />
-                Por categorias
+                Por categorías
               </button>
             )}
           </div>
@@ -1275,7 +1275,7 @@ export default function Dashboard() {
                 <div className="dashboard-summary-detail-section-head">
                   <span className="dashboard-summary-detail-section-title">
                     <LayoutList size={13} style={{ display: 'inline', marginRight: 6, verticalAlign: 'middle' }} />
-                    Gastos por categoria — {selectedMonthLabel}
+                    Gastos por categoría — {selectedMonthLabel}
                   </span>
                   <strong className="dashboard-summary-detail-section-total expense">{fmt(totalGastos)}</strong>
                 </div>
@@ -1372,13 +1372,13 @@ export default function Dashboard() {
       <Modal
         open={Boolean(activeExpenseCategory)}
         onClose={() => setSelectedExpenseCategory(null)}
-        title={activeExpenseCategory ? `${activeExpenseCategory.cat} - ${selectedMonthLabel}` : 'Detalle por categoria'}
+        title={activeExpenseCategory ? `${activeExpenseCategory.cat} - ${selectedMonthLabel}` : 'Detalle por categoría'}
       >
         {activeExpenseCategory && (
           <>
             <div className="dashboard-category-modal-summary">
               <div className="dashboard-category-modal-summary-top">
-                <span className="dashboard-category-modal-summary-label">Total de la categoria</span>
+                <span className="dashboard-category-modal-summary-label">Total de la categoría</span>
                 <span className="dashboard-category-modal-summary-pill">
                   {activeExpenseCategory.items.length} {activeExpenseCategory.items.length === 1 ? 'mov.' : 'movs.'}
                 </span>
@@ -1433,7 +1433,7 @@ export default function Dashboard() {
           {/* ── Header ── */}
           <div className="card-header dashboard-card-header-compact">
             <div className="dashboard-card-copy">
-              <h2 className="card-title">Proyeccion mensual</h2>
+              <h2 className="card-title">Proyección mensual</h2>
             </div>
             <span className="dashboard-premium-badge">Pro</span>
           </div>
@@ -1479,13 +1479,13 @@ export default function Dashboard() {
                 <div className="dashboard-premium-stat">
                   <span className="dashboard-premium-stat-label">Hoy partes con</span>
                   <strong className="dashboard-premium-stat-value">{fmt(advancedProjection?.starting_balance ?? 0)}</strong>
-                  <span className="dashboard-chart-note">Saldo con el que arranca esta proyeccion</span>
+                  <span className="dashboard-chart-note">Saldo con el que arranca esta proyección</span>
                 </div>
                 <div className="dashboard-premium-stat">
-                  <span className="dashboard-premium-stat-label">Calculo de variables</span>
+                  <span className="dashboard-premium-stat-label">Cálculo de variables</span>
                   <strong className="dashboard-premium-stat-value">{isSimpleMode ? 'Estimado' : 'Ponderado'}</strong>
                   <span className="dashboard-chart-note">
-                    {isSimpleMode ? 'Usa los montos que registraste' : 'El ultimo ano tiene peso doble'}
+                    {isSimpleMode ? 'Usa los montos que registraste' : 'El último año tiene peso doble'}
                   </span>
                 </div>
                 <div className="dashboard-premium-stat">
@@ -1543,8 +1543,8 @@ export default function Dashboard() {
                   className="dashboard-chart-icon-button"
                   onClick={handleManualRefresh}
                   disabled={loading || refreshing || projectionLoading}
-                  aria-label={projectionLoading ? 'Actualizando proyeccion' : 'Actualizar proyeccion'}
-                  title={projectionLoading ? 'Actualizando proyeccion' : 'Actualizar proyeccion'}
+                  aria-label={projectionLoading ? 'Actualizando proyección' : 'Actualizar proyección'}
+                  title={projectionLoading ? 'Actualizando proyección' : 'Actualizar proyección'}
                 >
                   <RefreshCw size={17} className={projectionLoading ? 'is-spinning' : ''} />
                 </button>
@@ -1552,8 +1552,8 @@ export default function Dashboard() {
                   type="button"
                   className="dashboard-chart-icon-button dashboard-chart-view-all"
                   onClick={() => setShowFullChart(true)}
-                  aria-label="Ampliar proyeccion"
-                  title="Ampliar proyeccion"
+                  aria-label="Ampliar proyección"
+                  title="Ampliar proyección"
                 >
                   <Maximize2 size={17} />
                 </button>
@@ -1628,7 +1628,7 @@ export default function Dashboard() {
                 </label>
               </div>
 
-              <div className="dashboard-chart-toggle-group dashboard-chart-series-control" role="tablist" aria-label="Curvas de la proyeccion">
+              <div className="dashboard-chart-toggle-group dashboard-chart-series-control" role="tablist" aria-label="Curvas de la proyección">
                 {SERIES_FOCUS_OPTIONS.map((option) => (
                   <button
                     key={option.value}
@@ -1654,13 +1654,13 @@ export default function Dashboard() {
           {/* ── 4. Chart ── */}
           {projectionError ? (
             <div className="empty-state">
-              <p className="empty-text">No pudimos cargar la proyeccion</p>
+              <p className="empty-text">No pudimos cargar la proyección</p>
               <p className="empty-sub">{projectionError}</p>
             </div>
           ) : advancedChartEmpty && !projectionLoading ? (
             <div className="empty-state">
-              <p className="empty-text">Aun no hay base suficiente</p>
-              <p className="empty-sub">Cuando registres movimientos, aqui veras tus ingresos y gastos mensuales proyectados.</p>
+              <p className="empty-text">Aún no hay base suficiente</p>
+              <p className="empty-sub">Cuando registres movimientos, aquí verás tus ingresos y gastos mensuales proyectados.</p>
             </div>
           ) : (
             <div style={{ position: 'relative' }}>
@@ -1682,7 +1682,7 @@ export default function Dashboard() {
         <div className="card dashboard-chart-card dashboard-free-card">
           <div className="dashboard-premium-lock-head">
             <div className="dashboard-card-copy">
-              <h2 className="card-title">Proyeccion mensual</h2>
+              <h2 className="card-title">Proyección mensual</h2>
               <p className="dashboard-card-subtitle">
                 Vista simple con {freeProjectionPastMonths} meses reales y {freeProjectionFutureMonths} proyectados.
               </p>
@@ -1708,13 +1708,13 @@ export default function Dashboard() {
             </div>
           ) : projectionError ? (
             <div className="empty-state">
-              <p className="empty-text">No pudimos cargar la proyeccion</p>
+              <p className="empty-text">No pudimos cargar la proyección</p>
               <p className="empty-sub">{projectionError}</p>
             </div>
           ) : advancedChartEmpty ? (
             <div className="empty-state">
-              <p className="empty-text">Aun no hay base suficiente</p>
-              <p className="empty-sub">Cuando registres movimientos, aqui veras tus ultimos meses y una proyeccion corta.</p>
+              <p className="empty-text">Aún no hay base suficiente</p>
+              <p className="empty-sub">Cuando registres movimientos, aquí verás tus últimos meses y una proyección corta.</p>
             </div>
           ) : (
             renderProjectionAreaChart()

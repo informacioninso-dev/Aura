@@ -25,22 +25,22 @@ const valueRows = [
   {
     icon: Wallet,
     step: '01 / AHORA',
-    title: 'Cuanto me queda de verdad?',
+    title: '¿Cuánto me queda de verdad?',
     desc: 'Aura descuenta fijos, variables, cuotas y compromisos para mostrar el dinero realmente disponible.',
     tone: 'green',
   },
   {
     icon: BarChart3,
-    step: '02 / DESPUES',
-    title: 'Como vienen mis proximos meses?',
-    desc: 'La proyeccion convierte tu historial en una ruta clara, no en otra lista de movimientos pasados.',
+    step: '02 / DESPUÉS',
+    title: '¿Cómo vienen mis próximos meses?',
+    desc: 'La proyección convierte tu historial en una ruta clara, no en otra lista de movimientos pasados.',
     tone: 'lila',
   },
   {
     icon: Calculator,
     step: '03 / ANTES DE DECIDIR',
-    title: 'Que pasa si hago este gasto?',
-    desc: 'Simula una compra, un prestamo o un gasto de vida y compara tu saldo futuro antes de comprometerte.',
+    title: '¿Qué pasa si hago este gasto?',
+    desc: 'Simula una compra, un préstamo o un gasto de vida y compara tu saldo futuro antes de comprometerte.',
     tone: 'coral',
   },
 ]
@@ -56,19 +56,19 @@ const pricingPlans = [
     features: [
       'Dashboard de ingresos y gastos',
       'Gastos a cuotas y simulador',
-      'Proyeccion de 6 meses',
+      'Proyección de 6 meses',
     ],
     cta: 'Crear cuenta gratis',
   },
   {
     name: 'Pro',
     number: '02',
-    desc: 'Para ver mas lejos y proyectar con mas contexto.',
+    desc: 'Para ver más lejos y proyectar con más contexto.',
     price: '$2.99',
     period: '/ mes',
     featured: true,
     features: [
-      'Proyeccion acumulada hasta 10 anos',
+      'Mira décadas adelante: hasta 40 años',
       'Modos inteligente y conservador',
       'Historial ampliado y cuentas con personas',
     ],
@@ -77,14 +77,14 @@ const pricingPlans = [
 ]
 
 const strengths = [
-  { icon: TrendingUp, title: 'Deja la duda de fin de mes', desc: 'Ve a donde llega tu plata, mes a mes.' },
-  { icon: Calculator, title: 'Decide sin miedo', desc: 'Simula esa compra o prestamo antes de comprometerte.' },
-  { icon: Activity, title: 'Sabe como estas de un vistazo', desc: 'Un score de salud financiera claro, tipo banca.' },
+  { icon: TrendingUp, title: 'Deja la duda de fin de mes', desc: 'Ve a dónde llega tu plata, mes a mes.' },
+  { icon: Calculator, title: 'Decide sin miedo', desc: 'Simula esa compra o préstamo antes de comprometerte.' },
+  { icon: Activity, title: 'Sabe cómo estás de un vistazo', desc: 'Un score de salud financiera claro, tipo banca.' },
   { icon: AlertTriangle, title: 'Que no te agarre un mes en rojo', desc: 'Aura te avisa antes de que pase.' },
   { icon: Layers, title: 'Tus gastos, sin el caos', desc: 'Fijos, variables y cuotas ordenados, con vista por mes.' },
   { icon: Mic, title: 'Registra sin esfuerzo', desc: 'Dicta el gasto por voz o texto. Listo.' },
   { icon: Upload, title: 'Arranca con lo que ya tienes', desc: 'Importa tu historial, sin empezar de cero.' },
-  { icon: Users, title: 'Cuentas claras con los demas', desc: 'Quien te debe y a quien le debes, siempre claro.' },
+  { icon: Users, title: 'Cuentas claras con los demás', desc: 'Quién te debe y a quién le debes, siempre claro.' },
 ]
 
 export default function Home() {
@@ -105,13 +105,13 @@ export default function Home() {
             <BrandMark className="home-brand-mark" />
             <span className="home-brand-copy">
               <strong>AURA</strong>
-              <small>Tu plata mas clara</small>
+              <small>Tu plata más clara</small>
             </span>
           </Link>
 
-          <div className="home-nav-jumps" aria-label="Contenido de la pagina">
-            <a href="#fortalezas">Que hace</a>
-            <a href="#como-funciona">Como funciona</a>
+          <div className="home-nav-jumps" aria-label="Contenido de la página">
+            <a href="#fortalezas">Qué hace</a>
+            <a href="#como-funciona">Cómo funciona</a>
             <a href="#planes">Planes</a>
           </div>
 
@@ -137,7 +137,7 @@ export default function Home() {
                 <em> mira si te alcanza.</em>
               </h1>
               <p className="home-hero-desc">
-                Aura organiza ingresos, gastos, cuotas y planes futuros para mostrarte cuanto te queda hoy y como cambia tu dinero si tomas esa decision.
+                Organiza ingresos, gastos y cuotas, y mira cómo cambia tu plata si tomas esa decisión.
               </p>
 
               <div className="home-hero-actions">
@@ -145,14 +145,14 @@ export default function Home() {
                   {primaryLabel} <ArrowRight size={17} />
                 </Link>
                 <a href="#como-funciona" className="home-btn-text">
-                  Ver como funciona
+                  Ver cómo funciona
                 </a>
               </div>
 
               <div className="home-proof-line" aria-label="Beneficios de registro">
                 <span><Check size={14} /> Sin tarjeta</span>
                 <span><Check size={14} /> Listo en 2 minutos</span>
-                <span><Check size={14} /> Hecho para celular</span>
+                <span><Check size={14} /> Hecho para el celu</span>
               </div>
             </div>
 
@@ -169,7 +169,7 @@ export default function Home() {
                 <div>
                   <span>Saldo disponible proyectado</span>
                   <strong>$245.00</strong>
-                  <small>Despues de cubrir gastos y cuotas del mes</small>
+                  <small>Después de cubrir gastos y cuotas del mes</small>
                 </div>
                 <span className="home-health">Saludable</span>
               </div>
@@ -209,7 +209,7 @@ export default function Home() {
 
           <div className="home-story-rail" aria-label="Lo que Aura muestra">
             <div><span>01</span><strong>Lo que tienes hoy</strong></div>
-            <div><span>02</span><strong>Lo que viene despues</strong></div>
+            <div><span>02</span><strong>Lo que viene después</strong></div>
             <div><span>03</span><strong>El costo real de decidir</strong></div>
           </div>
         </section>
@@ -218,10 +218,10 @@ export default function Home() {
           <div className="home-strengths-inner">
             <div className="home-section-heading">
               <div>
-                <span className="home-section-label">AURA ESTA DE TU LADO</span>
-                <h2>Cuidamos tu plata, para que tu vivas tranquilo.</h2>
+                <span className="home-section-label">AURA ESTÁ DE TU LADO</span>
+                <h2>Cuidamos tu plata, para que tú vivas tranquilo.</h2>
               </div>
-              <p>No es una app mas de gastos. Es la calma de tener el control, sin planillas ni estres.</p>
+              <p>No es una app más de gastos. Es la calma de tener el control, sin planillas ni estrés.</p>
             </div>
 
             <div className="home-strengths-grid">
@@ -245,7 +245,7 @@ export default function Home() {
               <h2>Las tres respuestas que necesitas antes de mover tu dinero.</h2>
             </div>
             <p>
-              Lo importante no es llenar cuadros. Es entender rapido que puedes hacer con tu dinero.
+              Lo importante no es llenar cuadros. Es entender rápido qué puedes hacer con tu dinero.
             </p>
           </div>
 
@@ -266,11 +266,11 @@ export default function Home() {
 
             <aside className="home-simulator-sheet">
               <div className="home-sheet-head">
-                <span>SIMULACION / COMPRA GRANDE</span>
-                <strong>Puede mi plata con esto?</strong>
+                <span>SIMULACIÓN / COMPRA GRANDE</span>
+                <strong>¿Puede mi plata con esto?</strong>
               </div>
               <div className="home-sheet-choice">
-                <span>Decision</span>
+                <span>Decisión</span>
                 <strong>Computadora para trabajar</strong>
                 <small>$900.00 a 12 meses</small>
               </div>
@@ -296,7 +296,7 @@ export default function Home() {
                 </div>
               </div>
               <Link to={simulatorTarget} className="home-sheet-link">
-                Probar una decision <ArrowRight size={16} />
+                Probar una decisión <ArrowRight size={16} />
               </Link>
             </aside>
           </div>
@@ -307,9 +307,9 @@ export default function Home() {
             <div className="home-section-heading is-pricing">
               <div>
                 <span className="home-section-label">EMPIEZA SIN COMPROMETERTE</span>
-                <h2>Primero entiende tu mes. Luego decide si necesitas mas.</h2>
+                <h2>Primero entiende tu mes. Luego decide si necesitas más.</h2>
               </div>
-              <p>El plan gratis ya te deja ordenar, proyectar y simular. Pro abre una mirada mas larga.</p>
+              <p>El plan gratis ya te deja ordenar, proyectar y simular. Pro abre una mirada más larga.</p>
             </div>
 
             <div className="home-plan-list">
@@ -343,8 +343,8 @@ export default function Home() {
               <div>
                 <BrandMark className="home-closing-mark" />
                 <div>
-                  <span>Tu plata mas clara, desde hoy.</span>
-                  <strong>Abre Aura y arma tu primer mes en minutos.</strong>
+                  <span>Tu plata más clara, desde hoy.</span>
+                  <strong>Empieza gratis. En 2 minutos ves tu plata clara.</strong>
                 </div>
               </div>
               <Link to={primaryTarget} className="home-btn-primary">
@@ -361,10 +361,10 @@ export default function Home() {
             <BrandMark className="home-brand-mark" />
             <span className="home-brand-copy"><strong>AURA</strong></span>
           </Link>
-          <span>Aura no reemplaza asesoria financiera profesional.</span>
+          <span>Aura no reemplaza asesoría financiera profesional.</span>
           <span className="home-footer-legal">
             <Link to="/privacidad">Privacidad</Link>
-            <Link to="/terminos">Terminos</Link>
+            <Link to="/terminos">Términos</Link>
           </span>
           <span>(c) {new Date().getFullYear()} Aura</span>
         </div>

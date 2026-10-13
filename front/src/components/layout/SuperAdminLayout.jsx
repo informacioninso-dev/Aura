@@ -63,7 +63,7 @@ export default function SuperAdminLayout() {
           onMouseEnter={(e) => { e.currentTarget.style.color = '#F87171'; e.currentTarget.style.borderColor = 'rgba(248,113,113,0.35)' }}
           onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.55)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)' }}
         >
-          <LogOut size={14} strokeWidth={2.1} /> Cerrar sesion
+          <LogOut size={14} strokeWidth={2.1} /> Cerrar sesión
         </button>
       </header>
 

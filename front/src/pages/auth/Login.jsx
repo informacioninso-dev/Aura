@@ -35,7 +35,7 @@ export default function Login() {
       <div className="auth-page">
         <div className="auth-box">
           <div className="auth-card">
-            <h2 className="auth-title">Recuperando sesion</h2>
+            <h2 className="auth-title">Recuperando sesión</h2>
             <p className="auth-footer" style={{ marginTop: 10 }}>Un momento...</p>
           </div>
         </div>
@@ -55,7 +55,7 @@ export default function Login() {
         <Link to={brandTarget} className="auth-logo auth-logo-link" aria-label={user ? 'Ir a mi dashboard' : 'Volver al inicio'}>
           <BrandMark className="auth-logo-icon" />
           <div className="auth-logo-name">AURA</div>
-          <div className="auth-logo-tag">Clara proyeccion, futuro solido.</div>
+          <div className="auth-logo-tag">Clara proyección, futuro sólido.</div>
         </Link>
 
         <div className="auth-card">
@@ -65,7 +65,7 @@ export default function Login() {
 
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label className="form-label">Correo electronico</label>
+              <label className="form-label">Correo electrónico</label>
               <input
                 type="email"
                 required

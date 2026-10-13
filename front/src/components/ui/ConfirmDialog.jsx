@@ -4,8 +4,8 @@ import Modal from './Modal'
 
 export default function ConfirmDialog({
   open,
-  title = 'Confirmar accion',
-  message = 'Esta accion no se puede deshacer.',
+  title = 'Confirmar acción',
+  message = 'Esta acción no se puede deshacer.',
   confirmText = 'Confirmar',
   cancelText = 'Cancelar',
   onConfirm,

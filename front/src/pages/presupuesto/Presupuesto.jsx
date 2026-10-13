@@ -206,7 +206,7 @@ export default function Presupuesto() {
     const rawValue = String(valorPresup || '').trim().replace(',', '.')
     const limite = parseFloat(rawValue)
     if (!rawValue || Number.isNaN(limite) || limite <= 0) {
-      setFeedback({ type: 'error', message: 'Escribe un limite mensual valido mayor que cero.' })
+      setFeedback({ type: 'error', message: 'Escribe un límite mensual válido mayor que cero.' })
       return
     }
     setSavingBudgetId(cat.id)
@@ -273,12 +273,12 @@ export default function Presupuesto() {
     <div>
       <div className="page-header page-header-actions">
         <div className="page-header-main">
-          <h1 className="page-title">🏷️ Categorias y presupuesto</h1>
-          <p className="page-subtitle">Organiza tus categorias, mira en que se te va el mes y define limites solo donde de verdad te ayuden.</p>
+          <h1 className="page-title">🏷️ Categorías y presupuesto</h1>
+          <p className="page-subtitle">Organiza tus categorías, mira en qué se te va el mes y define límites solo donde de verdad te ayuden.</p>
         </div>
         <button className="btn-add page-primary-action" onClick={openNew}>
           <Plus size={16} />
-          Nueva categoria
+          Nueva categoría
         </button>
       </div>
 
@@ -288,12 +288,12 @@ export default function Presupuesto() {
 
       <div className="stats-grid" style={{ marginBottom: 20 }}>
         <div className="stat-card">
-          <div className="stat-label">Categorias</div>
+          <div className="stat-label">Categorías</div>
           <div className="stat-value">{categorias.length}</div>
           <div className="stat-sub">Creadas en total.</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Con limite</div>
+          <div className="stat-label">Con límite</div>
           <div className="stat-value">{categorias.filter((cat) => cat.limite_mensual != null).length}</div>
           <div className="stat-sub">Con presupuesto activo.</div>
         </div>
@@ -312,15 +312,15 @@ export default function Presupuesto() {
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="category-toolbar">
           <div>
-            <div className="card-title" style={{ marginBottom: 6 }}>Gestion rapida</div>
+            <div className="card-title" style={{ marginBottom: 6 }}>Gestión rápida</div>
             <p className="category-toolbar-copy">
-              Busca una categoria, ajusta su limite y revisa en la misma pantalla cuanto lleva este mes.
+              Busca una categoría, ajusta su límite y revisa en la misma pantalla cuánto lleva este mes.
             </p>
           </div>
           <div className="category-toolbar-search">
             <input
               className="form-modal-input"
-              placeholder="Buscar categoria..."
+              placeholder="Buscar categoría..."
               value={query}
               onChange={handleQueryChange}
             />
@@ -331,9 +331,9 @@ export default function Presupuesto() {
       <div className="card" style={{ marginBottom: 24 }}>
         <div className="card-header">
           <div>
-            <h2 className="card-title">Resumen por categoria</h2>
+            <h2 className="card-title">Resumen por categoría</h2>
             <p className="category-toolbar-copy" style={{ marginTop: 4 }}>
-              Lo que mas pesa en {MESES_FULL[selectedMonth.getMonth()]} {selectedMonth.getFullYear()}.
+              Lo que más pesa en {MESES_FULL[selectedMonth.getMonth()]} {selectedMonth.getFullYear()}.
             </p>
           </div>
           {resumenCategorias.length > SUMMARY_PREVIEW_COUNT && (
@@ -367,7 +367,7 @@ export default function Presupuesto() {
 
       {conLimite.length > 0 && (
         <>
-          <p className="presupuesto-section-label">Con limite mensual</p>
+          <p className="presupuesto-section-label">Con límite mensual</p>
           <div className="budget-card-grid" style={{ marginBottom: 28 }}>
             {conLimite.map((cat) => (
               <TarjetaCategoria
@@ -393,7 +393,7 @@ export default function Presupuesto() {
 
       {sinLimiteConGasto.length > 0 && (
         <>
-          <p className="presupuesto-section-label">Sin limite · con gasto</p>
+          <p className="presupuesto-section-label">Sin límite · con gasto</p>
           <div className="budget-card-grid" style={{ marginBottom: 28 }}>
             {sinLimiteConGasto.map((cat) => (
               <TarjetaCategoria
@@ -443,18 +443,18 @@ export default function Presupuesto() {
 
       {categoriasFiltradas.length === 0 && (
         <div className="empty-state" style={{ marginTop: 16 }}>
-          No encontramos categorias con ese texto. Prueba otro nombre o crea una nueva.
+          No encontramos categorías con ese texto. Prueba otro nombre o crea una nueva.
         </div>
       )}
 
-      <Modal open={modal} onClose={closeModal} title={editId ? 'Editar categoria' : 'Nueva categoria'}>
+      <Modal open={modal} onClose={closeModal} title={editId ? 'Editar categoría' : 'Nueva categoría'}>
         <form onSubmit={handleSubmit}>
           <div className="form-modal-group">
             <label className="form-modal-label">Nombre</label>
             <input
               className="form-modal-input"
               required
-              placeholder="Ej: mascota, gimnasio, cafe..."
+              placeholder="Ej: mascota, gimnasio, café..."
               value={form.nombre}
               onChange={(e) => setForm({ ...form, nombre: e.target.value })}
             />
@@ -480,7 +480,7 @@ export default function Presupuesto() {
                 className="category-icon-toggle"
                 onClick={() => setShowAllIcons((value) => !value)}
               >
-                {showAllIcons ? 'Ver menos iconos' : 'Ver mas iconos'}
+                {showAllIcons ? 'Ver menos iconos' : 'Ver más iconos'}
               </button>
             )}
             <input
@@ -499,7 +499,7 @@ export default function Presupuesto() {
               type="number"
               min="0"
               step="0.01"
-              placeholder="Sin limite"
+              placeholder="Sin límite"
               value={form.limite_mensual}
               onChange={(e) => setForm({ ...form, limite_mensual: e.target.value })}
             />
@@ -508,7 +508,7 @@ export default function Presupuesto() {
           <div className="form-modal-actions">
             <button type="button" className="btn-modal-cancel" onClick={closeModal}>Cancelar</button>
             <button type="submit" className="btn-modal-save" disabled={saving}>
-              {saving ? 'Guardando...' : editId ? 'Guardar cambios' : 'Crear categoria'}
+              {saving ? 'Guardando...' : editId ? 'Guardar cambios' : 'Crear categoría'}
             </button>
           </div>
         </form>
@@ -516,8 +516,8 @@ export default function Presupuesto() {
 
       <ConfirmDialog
         open={confirmDeleteId !== null}
-        title="Eliminar categoria"
-        message="Si eliminas esta categoria, los gastos que ya existen conservaran el texto actual en sus registros."
+        title="Eliminar categoría"
+        message="Si eliminas esta categoría, los gastos que ya existen conservarán el texto actual en sus registros."
         confirmText="Eliminar"
         cancelText="Cancelar"
         loading={deletingId !== null}
@@ -550,7 +550,7 @@ const ResumenCategoriaRow = memo(function ResumenCategoriaRow({ cat, totalGastad
             <div className="category-summary-name">{cat.nombre}</div>
             <div className="category-summary-sub">
               {porcentajeMes}% de tus gastos del mes
-              {limite != null ? ` · ${Math.min(usoLimite, 999)}% del limite` : ' · sin limite'}
+              {limite != null ? ` · ${Math.min(usoLimite, 999)}% del límite` : ' · sin límite'}
             </div>
           </div>
         </div>
@@ -613,7 +613,7 @@ const TarjetaCategoria = memo(function TarjetaCategoria({
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 5 }}>
             <span style={{ color: over ? 'var(--app-danger)' : warn ? '#FBBF24' : 'rgba(var(--app-ink-rgb),0.60)' }}>
               ${formatAmount(gasto)}
-              {over ? '  · limite superado' : ''}
+              {over ? '  · límite superado' : ''}
             </span>
             <span style={{ color: 'rgba(var(--app-ink-rgb),0.30)' }}>${formatAmount(limite)}</span>
           </div>
@@ -637,7 +637,7 @@ const TarjetaCategoria = memo(function TarjetaCategoria({
             type="number"
             min="0"
             step="0.01"
-            placeholder="Limite mensual"
+            placeholder="Límite mensual"
             value={valorPresup}
             onChange={(e) => setValorPresup(e.target.value)}
             inputMode="decimal"
@@ -696,7 +696,7 @@ const TarjetaCategoria = memo(function TarjetaCategoria({
             transition: 'all 0.15s',
           }}
         >
-          {limite ? 'Cambiar limite' : 'Anadir limite mensual'}
+          {limite ? 'Cambiar límite' : 'Añadir límite mensual'}
         </button>
       )}
     </div>
@@ -737,7 +737,7 @@ const FilaCategoria = memo(function FilaCategoria({
               type="number"
               min="0"
               step="0.01"
-              placeholder="Limite mensual"
+              placeholder="Límite mensual"
               value={valorPresup}
               onChange={(e) => setValorPresup(e.target.value)}
               inputMode="decimal"
@@ -760,7 +760,7 @@ const FilaCategoria = memo(function FilaCategoria({
             className="presupuesto-fila-add-btn"
             onClick={() => { setEditPresup(cat.id); setValorPresup('') }}
           >
-            + Limite
+            + Límite
           </button>
         )}
         <button className="btn-icon edit" onClick={() => openEdit(cat)}><Pencil size={13} /></button>

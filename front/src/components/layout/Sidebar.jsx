@@ -14,7 +14,7 @@ const FINANCE_NAV_ITEMS = [
 ]
 
 const TOOL_NAV_ITEMS = [
-  { to: '/presupuesto', icon: '🏷️', label: 'Categorias' },
+  { to: '/presupuesto', icon: '🏷️', label: 'Categorías' },
   { to: '/simulador', icon: '🔮', label: 'Simulador' },
   { to: '/importar', icon: '📥', label: 'Importar historial' },
 ]
@@ -103,7 +103,7 @@ export default function Sidebar({ isOpen, onClose, theme, onThemeToggle }) {
           className="nav-item nav-item-danger"
         >
           <span className="nav-item-icon nav-item-emoji" aria-hidden="true">🚪</span>
-          Cerrar sesion
+          Cerrar sesión
         </button>
       </div>
     </aside>

@@ -216,7 +216,7 @@ export default function IngresosPuntuales({ embedded = false }) {
       })
       setModal(false)
       await fetchItems()
-      setFeedback({ type: 'success', message: 'Listo. Ahora lo veras en Ingresos fijos.' })
+      setFeedback({ type: 'success', message: 'Listo. Ahora lo verás en Ingresos fijos.' })
     } catch (err) {
       setFeedback({ type: 'error', message: getApiErrorMessage(err, 'No se pudo convertir el ingreso a fijo.') })
     } finally {
@@ -228,7 +228,7 @@ export default function IngresosPuntuales({ embedded = false }) {
   const safePage = Math.min(page, pageCount)
   const paginated = items
   const pageAllSelected = paginated.length > 0 && paginated.every((item) => selectedIds.has(item.id))
-  const projectionStatusLabel = (item) => (item.incluir_en_proyeccion === false ? 'Fuera de proyeccion' : 'En proyeccion')
+  const projectionStatusLabel = (item) => (item.incluir_en_proyeccion === false ? 'Fuera de proyección' : 'En proyección')
 
   return (
     <div>
@@ -274,7 +274,7 @@ export default function IngresosPuntuales({ embedded = false }) {
             <ListControls
               query={query}
               onQueryChange={(value) => { setQuery(value); setPage(1); setSelectedIds(new Set()) }}
-              placeholder="Buscar por descripcion, fecha o nota..."
+              placeholder="Buscar por descripción, fecha o nota..."
               page={safePage}
               pageCount={pageCount}
               onPrevPage={() => setPage((p) => Math.max(1, p - 1))}
@@ -370,7 +370,7 @@ export default function IngresosPuntuales({ embedded = false }) {
         <form onSubmit={handleSubmit}>
           {!editId && (
             <p style={{ marginTop: -8, marginBottom: 14, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
-              Carga rapida: nombre y monto. Lo demas es opcional.
+              Carga rápida: nombre y monto. Lo demás es opcional.
             </p>
           )}
           <div className="form-modal-group">
@@ -389,13 +389,13 @@ export default function IngresosPuntuales({ embedded = false }) {
               onClick={() => setShowAdvanced((v) => !v)}
               style={{ width: '100%', marginBottom: 14 }}
             >
-              {showAdvanced ? 'Ocultar opciones' : canCustomizeProjection ? 'Ver fecha, notas y proyeccion' : 'Ver mas opciones'}
+              {showAdvanced ? 'Ocultar opciones' : canCustomizeProjection ? 'Ver fecha, notas y proyección' : 'Ver más opciones'}
             </button>
           )}
 
           {!editId && !showAdvanced && canCustomizeProjection && (
             <p style={{ marginTop: -4, marginBottom: 14, fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.45)' }}>
-              Aqui tambien puedes decidir si este ingreso puntual entra o no en tu proyeccion conservadora.
+              Aquí también puedes decidir si este ingreso puntual entra o no en tu proyección conservadora.
             </p>
           )}
 
@@ -422,9 +422,9 @@ export default function IngresosPuntuales({ embedded = false }) {
                       style={{ marginTop: 3, accentColor: 'var(--app-lila)' }}
                     />
                     <div>
-                      <div className="form-modal-label" style={{ marginBottom: 4 }}>Usar en mi proyeccion conservadora</div>
+                      <div className="form-modal-label" style={{ marginBottom: 4 }}>Usar en mi proyección conservadora</div>
                       <div style={{ fontSize: 12, color: 'rgba(var(--app-ink-rgb),0.5)', lineHeight: 1.45 }}>
-                        Solo aplica en modo Personalizada. Dejalo activo si este ingreso puntual podria repetirse; apagalo para bonos u otros casos especiales.
+                        Solo aplica en modo Personalizada. Déjalo activo si este ingreso puntual podría repetirse; apagalo para bonos u otros casos especiales.
                       </div>
                     </div>
                   </label>
@@ -470,7 +470,7 @@ export default function IngresosPuntuales({ embedded = false }) {
       <ConfirmDialog
         open={confirmConvert}
         title="Pasar a ingreso fijo"
-        message={`Se creara como ingreso fijo mensual desde ${form.fecha || 'la fecha actual'} y este ingreso puntual se eliminara. Luego podras ajustar la frecuencia si hace falta.`}
+        message={`Se creara como ingreso fijo mensual desde ${form.fecha || 'la fecha actual'} y este ingreso puntual se eliminará. Luego podrás ajustar la frecuencia si hace falta.`}
         confirmText="Convertir"
         cancelText="Cancelar"
         loading={converting}
@@ -481,7 +481,7 @@ export default function IngresosPuntuales({ embedded = false }) {
       <ConfirmDialog
         open={confirmDeleteId !== null}
         title="Eliminar ingreso puntual"
-        message="Este ingreso puntual se eliminara de tus reportes y de tu historial."
+        message="Este ingreso puntual se eliminará de tus reportes y de tu historial."
         confirmText="Eliminar"
         cancelText="Cancelar"
         loading={deletingId !== null}
@@ -492,7 +492,7 @@ export default function IngresosPuntuales({ embedded = false }) {
       <ConfirmDialog
         open={confirmBulkDelete}
         title="Eliminar seleccionados"
-        message={`Se eliminaran ${selectedIds.size} ingreso${selectedIds.size !== 1 ? 's' : ''}. Esta accion no se puede deshacer.`}
+        message={`Se eliminaran ${selectedIds.size} ingreso${selectedIds.size !== 1 ? 's' : ''}. Esta acción no se puede deshacer.`}
         confirmText="Eliminar"
         cancelText="Cancelar"
         loading={bulkDeleting}
