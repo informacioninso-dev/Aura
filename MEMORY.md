@@ -43,6 +43,7 @@ npm install --no-audit --no-fund && NODE_OPTIONS="--max-old-space-size=512" npm 
 - **Dependencias backend**: fuente = `back/pyproject.toml` + `poetry.lock`; prod no usa Poetry y instala desde `back/requirements.txt` (generado del lock, versiones exactas). Al cambiar dependencias: `poetry lock` → regenerar `requirements.txt` → commitear los tres juntos. Antes de oct-2026 el deploy **nunca** instalaba dependencias y el lock llevaba meses desfasado (prod corría versiones vulnerables sin que nadie lo supiera).
 - **Auditar seguridad**: `pip-audit -r back/requirements.txt` y `npm audit` en `front/` y `Aura_mobile/`. En móvil **NO** `npm audit fix --force` (propone bajar a Expo 44); los avisos de Expo CLI/Metro son de build, no entran al APK.
 - Verificar: `curl -I -H 'Host: aura.binnso.com' https://aura.binnso.com` + `journalctl -u aura-api -n 20`.
+- **Seguridad del server (desde 2026-10-25)**: SSH **solo con llave** (sin contraseñas; había 14k intentos de fuerza bruta/día), **fail2ban** y **ufw** (solo 22/80/443): un puerto nuevo hacia afuera necesita `ufw allow`; lo interno va por 127.0.0.1 + nginx. `back/.env` en `600` con dueño **`aura`** (dotenv está instalado y Django lo lee como ese usuario: `root:600` tumba la API).
 
 ## 5. Decisiones y aprendizajes clave (gotchas)
 
