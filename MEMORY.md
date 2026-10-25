@@ -1,7 +1,7 @@
 # MEMORY — Memoria de largo plazo de Aura
 
 > Memoria del proyecto que **viaja con el repo**: cualquier agente, en cualquier PC, la lee y la mantiene al día vía git. Cómo mantenerla: ver [AGENTS.md](AGENTS.md).
-> Mantenerla **curada y timbre corto** (se carga cada sesión). Última actualización: **2026-10-13**.
+> Mantenerla **curada y timbre corto** (se carga cada sesión). Última actualización: **2026-10-24**.
 
 ## 1. Qué es Aura
 App de finanzas personales en español. Muestra cuánto te queda hoy, proyecta tus próximos meses y deja **simular decisiones antes de gastar**. Posicionamiento: vende **tranquilidad** ("alguien cuida tu plata, para que vos vivas tranquilo"), no solo funcionalidad. Público joven (millennial / Gen Z): UX simple y escaneable.
@@ -32,11 +32,14 @@ Server DigitalOcean `161.35.237.169` (host AURA); **convive con Folk y Academia 
 cd /var/www/aura/back
 git pull origin main
 source .venv/bin/activate        # en el server 'python' NO está en PATH sin esto
+pip install -r requirements.txt  # solo si cambió back/requirements.txt (dependencias)
 python manage.py migrate         # solo si hubo migración
 systemctl restart aura-api       # solo si cambió backend (views/serializers/models)
 cd /var/www/aura/front && npm run build   # solo si cambió frontend (a secas; NO npm ci: disco justo)
 ```
 - **NO usar `deploy.sh`** (es instalación inicial, desactualizado). `collectstatic` suele ser no-op.
+- **Dependencias backend**: fuente = `back/pyproject.toml` + `poetry.lock`; prod no usa Poetry y instala desde `back/requirements.txt` (generado del lock, versiones exactas). Al cambiar dependencias: `poetry lock` → regenerar `requirements.txt` → commitear los tres juntos. Antes de oct-2026 el deploy **nunca** instalaba dependencias y el lock llevaba meses desfasado (prod corría versiones vulnerables sin que nadie lo supiera).
+- **Auditar seguridad**: `pip-audit -r back/requirements.txt` y `npm audit` en `front/` y `Aura_mobile/`. En móvil **NO** `npm audit fix --force` (propone bajar a Expo 44); los avisos de Expo CLI/Metro son de build, no entran al APK.
 - Verificar: `curl -I -H 'Host: aura.binnso.com' https://aura.binnso.com` + `journalctl -u aura-api -n 20`.
 
 ## 5. Decisiones y aprendizajes clave (gotchas)
@@ -60,6 +63,7 @@ cd /var/www/aura/front && npm run build   # solo si cambió frontend (a secas; N
 - **Copy / voz (Ecuador)**: tuteo (**tú**, nunca voseo). Decir **"registrar"** (no "cargar"), no usar "vueltas" para deudas. Errores: "No pudimos … Intenta de nuevo." Éxitos cortos ("Gasto guardado.", sin "correctamente"). En gastos/ingresos fijos **"versión" se queda** (concepto del producto, no cambiarlo). El emoji **🐭 de "Cuentas con personas" es de marca: NO cambiarlo**. Guía de copy: https://claude.ai/code/artifact/cafe85ee-c488-493d-ac1f-1aa6bb9cad43
 
 ## 6. Novedades (changelog — agregar arriba)
+- **2026-10-24** — Parche de seguridad (avisos de oct-2026): Django 5.2.18, DRF 3.18.3 (DoS sin login), Pillow 13 (RCE por imagen; afecta foto de perfil), PyJWT 2.15, cryptography 50, certifi 2026.10.23 (CA eMudhra comprometida, la del 21/10), urllib3 2.8, sqlparse 0.6; `requests` declarado (lo usa PayPhone). Nuevo `back/requirements.txt` + paso `pip install` en el deploy. Web: axios 1.20.0, vite 8.3.5 (0 avisos). Móvil: ver su MEMORY. Pendiente en server: Node 20 (EOL, sin parches; lo comparte Folk) → 22/24 LTS, y `apt upgrade` (nginx, Redis 7.0 EOL, PostgreSQL, Python).
 - **2026-10-13** — Plan Gratis: la proyección pasa de 3 a **1 mes proyectado** (pedido del usuario). App móvil: auditoría UX implementada (ver `Aura_mobile/MEMORY.md`); prioridad = **paridad funcional total con la web**, porque mucha gente usará solo el móvil.
 - **2026-10-13** — Revisión de copy módulo por módulo (web + móvil) con las reglas de la sección 5. Ortografía (tildes, ñ, ¿?) en toda la web. Asistente renombrado **"Dile a Aura"** (antes "Aura AI"); se le quitó el voseo. "clave" → "contraseña" y "Free" → "Gratis" en todo lado. Textos de "simular con tasa 0%" actualizados (el Simulador ya tiene Pago único / Gasto mensual).
 - **2026-10** — Asistente: varios movimientos en una frase. IA migrada a `gpt-oss-20b` (Groq deprecó el modelo anterior). Fuente Plus Jakarta self-hosted. Landing con fortalezas + ángulo emocional + SEO (JSON-LD, `<noscript>`, sitemap). Horizonte de proyección hasta 40 años.
